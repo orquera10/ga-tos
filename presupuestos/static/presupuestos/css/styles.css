@@ -1,0 +1,27 @@
+/* Estilos para la barra de progreso */
+.progress {
+    height: 1.5rem;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    font-size: 0.9rem;
+    line-height: 1.5rem;
+    text-align: center;
+    padding: 0.25rem 0;
+    transition: width 0.3s ease-in-out;
+}
+
+.progress-bar-success {
+    background-color: #198754;
+}
+
+.progress-bar-warning {
+    background-color: #ffc107;
+}
+
+.progress-bar-danger {
+    background-color: #dc3545;
+}

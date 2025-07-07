@@ -1,0 +1,106 @@
+{% extends 'presupuestos/base.html' %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ presupuesto.nombre }}</h2>
+        <div>
+            <a href="{% url 'presupuestos:editar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-warning">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            <a href="{% url 'presupuestos:eliminar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-danger">
+                <i class="bi bi-trash"></i> Eliminar
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="card-text">
+                        <strong>Periodo:</strong> {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
+                        <br>
+                        <strong>Fecha de Creación:</strong> {{ presupuesto.fecha_creacion|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 class="mb-0">{{ presupuesto.monto_total|floatformat:"2" }} {{ presupuesto.get_moneda_display }}</h4>
+                            <small class="text-muted">Monto Total</small>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+                            </h4>
+                            <small class="text-muted">Restante</small>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar {% if presupuesto.porcentaje_gastado < 50 %}progress-bar-success{% elif presupuesto.porcentaje_gastado < 75 %}progress-bar-warning{% else %}progress-bar-danger{% endif %}"
+                             role="progressbar" 
+                             style="width: {{ presupuesto.porcentaje_gastado|floatformat:"0" }}%;" 
+                             aria-valuenow="{{ presupuesto.porcentaje_gastado|floatformat:"0" }}" 
+                             aria-valuemin="0" aria-valuemax="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if presupuesto.descripcion %}
+                <p class="card-text mt-3">
+                    <strong>Descripción:</strong> {{ presupuesto.descripcion }}
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Agregar Gasto
+        </a>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for gasto in presupuesto.gastos.all %}
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">{{ gasto.nombre }}</h5>
+                    <p class="card-text">
+                        <strong>Categoría:</strong> {{ gasto.categoria.nombre|default:"Sin categoría" }}
+                        <br>
+                        <strong>Monto:</strong> {{ gasto.monto }} {{ gasto.get_moneda_display }}
+                        <br>
+                        <strong>Fecha:</strong> {{ gasto.fecha|date:"d/m/Y" }}
+                        <br>
+                        <strong>Descripción:</strong> {{ gasto.descripcion|default:"" }}
+                    </p>
+                    {% if gasto.adjunto %}
+                        <a href="{{ gasto.adjunto.url }}" class="btn btn-sm btn-primary" target="_blank" download>
+                            <i class="bi bi-download"></i> Descargar Archivo
+                        </a>
+                    {% endif %}
+                    <div class="mt-3">
+                        <a href="{% url 'presupuestos:ver_gasto' gasto.id %}" class="btn btn-sm btn-info">
+                            <i class="bi bi-eye"></i> Ver
+                        </a>
+                        <a href="{% url 'presupuestos:editar_gasto' gasto.id %}" class="btn btn-sm btn-warning">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        <a href="{% url 'presupuestos:eliminar_gasto' gasto.id %}" class="btn btn-sm btn-danger">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                No hay gastos registrados
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endblock %}

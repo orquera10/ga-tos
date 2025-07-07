@@ -1,0 +1,22 @@
+{% extends 'presupuestos/base.html' %}
+{% block title %}Eliminar Categoría{% endblock %}
+{% block content %}
+    <h2>Eliminar Categoría</h2>
+    <div class="alert alert-warning">
+        <p>¿Estás seguro de que deseas eliminar la categoría "{{ object.nombre }}"?</p>
+        <p>Descripción: {{ object.descripcion }}</p>
+        <p>Gastos asociados: {{ object.gastos_count }}</p>
+    </div>
+
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'presupuestos:listar_categorias' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Cancelar
+            </a>
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-trash"></i> Eliminar
+            </button>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'presupuestos/base.html' %}
+{% block title %}Eliminar Presupuesto{% endblock %}
+{% block content %}
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Confirmar eliminación</h5>
+            <p class="card-text">
+                ¿Estás seguro de que deseas eliminar el presupuesto "{{ object.nombre }}"?
+                <br><br>
+                <strong>Período:</strong> {{ object.fecha_inicio|date:"d/m/Y" }} - {{ object.fecha_fin|date:"d/m/Y" }}
+                <br>
+                <strong>Monto total:</strong> ${{ object.monto_total }}
+                <br>
+                <strong>Monto restante:</strong> ${{ object.monto_restante }}
+                <br>
+                <strong>Creado el:</strong> {{ object.fecha_creacion|date:"d/m/Y H:i" }}
+            </p>
+            
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Eliminar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

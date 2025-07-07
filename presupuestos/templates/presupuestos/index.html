@@ -1,0 +1,80 @@
+{% extends 'presupuestos/base.html' %}
+{% block title %}Listado de Presupuestos{% endblock %}
+{% block content %}
+    <h2>Listado de Presupuestos</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{% url 'presupuestos:crear_presupuesto' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuevo Presupuesto
+        </a>
+    </div>
+
+    {% if presupuestos %}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for presupuesto in presupuestos %}
+                <div class="col">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h5 class="card-title">{{ presupuesto.nombre }}</h5>
+                                <p class="card-subtitle mb-2 text-muted">
+                                    {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
+                                </p>
+                                
+                                {% if presupuesto.descripcion %}
+                                    <p class="card-text">{{ presupuesto.descripcion }}</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h4 class="mb-0">{{ presupuesto.monto_total|floatformat:"2" }} {{ presupuesto.get_moneda_display }}</h4>
+                                    <small class="text-muted">Monto Total</small>
+                                </div>
+                                <div>
+                                    <h4 class="mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
+                                        {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+                                    </h4>
+                                    <small class="text-muted">Restante</small>
+                                </div>
+                            </div>
+
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar {% if presupuesto.porcentaje_gastado < 50 %}progress-bar-success{% elif presupuesto.porcentaje_gastado < 75 %}progress-bar-warning{% else %}progress-bar-danger{% endif %}"
+                                     role="progressbar" 
+                                     style="width: {{ presupuesto.porcentaje_gastado|floatformat:"0" }}%;" 
+                                     aria-valuenow="{{ presupuesto.porcentaje_gastado|floatformat:"0" }}" 
+                                     aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+
+                            <div class="text-center mt-3">
+                                <span class="badge bg-info text-dark">
+                                    {{ presupuesto.gastos.count }} gastos registrados
+                                </span>
+                            </div>
+
+                            <hr class="my-2">
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.id %}" class="btn btn-sm btn-info">
+                                    <i class="bi bi-eye"></i> Ver
+                                </a>
+                                <a href="{% url 'presupuestos:editar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-warning">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </a>
+                                <a href="{% url 'presupuestos:eliminar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-trash"></i> Eliminar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            No hay presupuestos registrados.
+        </div>
+    {% endif %}
+{% endblock %}
