@@ -1,0 +1,217 @@
+{% extends 'calculadoras/base.html' %}
+
+{% block calculadora_title %}{% if calculadora %}{{ calculadora.nombre }}{% else %}Nueva Conversión{% endif %}{% endblock %}
+{% block calculadora_heading %}{% if calculadora %}{{ calculadora.nombre }}{% else %}Nueva Conversión{% endif %}{% endblock %}
+
+{% block calculadora_content %}
+<div class="card">
+    <div class="card-body">
+        <form method="post" id="conversion-form">
+            {% csrf_token %}
+            <div class="row">
+                {% if not calculadora %}
+                <div class="col-md-5">
+                    <div class="mb-3">
+                        {{ form.calculadora.label_tag }}
+                        {{ form.calculadora }}
+                        {% if form.calculadora.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.calculadora.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                    {{ form.calculadora }}
+                {% endif %}
+                
+                <div class="col-md-5">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label for="id_monto" class="form-label mb-0">
+                                {% if resultado and resultado.es_inversa %}
+                                    {{ calculadora.get_moneda_destino_display_name }}
+                                {% else %}
+                                    {{ calculadora.get_moneda_origen_display_name }}
+                                {% endif %}
+                            </label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="invertirConversion" 
+                                       {% if resultado and resultado.es_inversa %}checked{% endif %}>
+                                <input type="hidden" name="direccion" id="direccion" 
+                                       value="{% if resultado and resultado.es_inversa %}inversa{% else %}directa{% endif %}">
+                                <label class="form-check-label small" for="invertirConversion">Invertir</label>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text" id="moneda-origen">
+                                {% if resultado and resultado.es_inversa %}
+                                    {{ calculadora.moneda_destino }}
+                                {% else %}
+                                    {{ calculadora.moneda_origen|default:'MON' }}
+                                {% endif %}
+                            </span>
+                            {{ form.monto }}
+                        </div>
+                        {% if form.monto.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.monto.errors }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="col-md-2 d-flex flex-column justify-content-end">
+                    <button type="submit" class="btn btn-primary mb-2">
+                        <i class="bi bi-arrow-repeat"></i> Calcular
+                    </button>
+                    {% if resultado %}
+                    <div class="text-center small text-muted">
+                        {{ resultado.relacion|floatformat:4 }} {{ resultado.moneda_origen }} = 1 {{ resultado.moneda_destino }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+        
+        {% if resultado %}
+        <div class="mt-4 p-4 bg-light rounded">
+            <div class="text-center">
+                <h3 class="mb-4">
+                    {{ resultado.monto_original|floatformat:2 }} 
+                    <span class="fw-bold">{{ resultado.moneda_origen }}</span> = 
+                    <span class="text-primary">{{ resultado.monto_convertido|floatformat:2 }}</span> 
+                    <span class="fw-bold">{{ resultado.moneda_destino }}</span>
+                </h3>
+                
+                <div class="text-muted mb-3">
+                    <div>1 {{ resultado.moneda_origen }} = {{ resultado.relacion|floatformat:6 }} {{ resultado.moneda_destino }}</div>
+                    <div>1 {{ resultado.moneda_destino }} = {{ resultado.relacion_inversa|floatformat:6 }} {{ resultado.moneda_origen }}</div>
+                </div>
+                
+                <div class="text-muted small">
+                    <i class="bi bi-clock"></i> Actualizado: {{ resultado.fecha|date:"d/m/Y H:i" }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if calculadora %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Información de la Calculadora</h5>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Nombre:</dt>
+            <dd class="col-sm-9">{{ calculadora.nombre }}</dd>
+            
+            <dt class="col-sm-3">Relación:</dt>
+            <dd class="col-sm-9">1 {{ calculadora.moneda_origen }} = {{ calculadora.relacion|floatformat:6 }} {{ calculadora.moneda_destino }}</dd>
+            
+            <dt class="col-sm-3">Creada el:</dt>
+            <dd class="col-sm-9">{{ calculadora.fecha_creacion|date:"d/m/Y H:i" }}</dd>
+            
+            <dt class="col-sm-3">Última actualización:</dt>
+            <dd class="col-sm-9">{{ calculadora.fecha_actualizacion|date:"d/m/Y H:i" }}</dd>
+        </dl>
+        
+        <div class="mt-3">
+            <a href="{% url 'calculadoras:crear_calculadora' %}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para actualizar la moneda mostrada
+    function updateCurrencyDisplay(calculadoraId, esInversa = false) {
+        if (!calculadoraId) return;
+        
+        // Hacer una petición para obtener los detalles de la calculadora
+        fetch(`/calculadoras/api/calculadora/${calculadoraId}/`)
+            .then(response => response.json())
+            .then(data => {
+                const monedaOrigenSpan = document.getElementById('moneda-origen');
+                const montoLabel = document.querySelector('label[for="id_monto"]');
+                
+                if (esInversa) {
+                    if (monedaOrigenSpan) monedaOrigenSpan.textContent = data.moneda_destino;
+                    if (montoLabel) montoLabel.textContent = data.moneda_destino;
+                    document.title = `Conversión: ${data.moneda_destino} a ${data.moneda_origen} | Tu Aplicación`;
+                } else {
+                    if (monedaOrigenSpan) monedaOrigenSpan.textContent = data.moneda_origen;
+                    if (montoLabel) montoLabel.textContent = data.moneda_origen;
+                    document.title = `Conversión: ${data.moneda_origen} a ${data.moneda_destino} | Tu Aplicación`;
+                }
+            })
+            .catch(error => console.error('Error al cargar la calculadora:', error));
+    }
+    
+    // Manejar el cambio de dirección de conversión
+    const invertirCheckbox = document.getElementById('invertirConversion');
+    const direccionInput = document.getElementById('direccion');
+    
+    if (invertirCheckbox && direccionInput) {
+        invertirCheckbox.addEventListener('change', function() {
+            const esInversa = this.checked;
+            direccionInput.value = esInversa ? 'inversa' : 'directa';
+            
+            // Actualizar la interfaz sin recargar la página
+            const calculadoraSelect = document.getElementById('id_calculadora');
+            const calculadoraId = calculadoraSelect ? calculadoraSelect.value : 
+                                document.querySelector('input[name="calculadora"]')?.value;
+            
+            if (calculadoraId) {
+                updateCurrencyDisplay(calculadoraId, esInversa);
+            }
+        });
+    }
+    
+    // Manejar el cambio de calculadora
+    const calculadoraSelect = document.getElementById('id_calculadora');
+    if (calculadoraSelect) {
+        // Actualizar al cargar
+        if (calculadoraSelect.value) {
+            const esInversa = direccionInput && direccionInput.value === 'inversa';
+            updateCurrencyDisplay(calculadoraSelect.value, esInversa);
+        }
+        
+        // Actualizar cuando cambia la selección
+        calculadoraSelect.addEventListener('change', function() {
+            const esInversa = direccionInput && direccionInput.value === 'inversa';
+            updateCurrencyDisplay(this.value, esInversa);
+        });
+    }
+    
+    // Si hay una calculadora específica, actualizar la moneda
+    const hiddenCalculadora = document.querySelector('input[name="calculadora"]');
+    if (hiddenCalculadora && hiddenCalculadora.value) {
+        const esInversa = direccionInput && direccionInput.value === 'inversa';
+        updateCurrencyDisplay(hiddenCalculadora.value, esInversa);
+    }
+    
+    // Manejar el envío del formulario
+    const form = document.getElementById('conversion-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            // Validar que se haya seleccionado una calculadora
+            const calculadoraId = calculadoraSelect ? calculadoraSelect.value : 
+                                hiddenCalculadora?.value;
+            
+            if (!calculadoraId) {
+                e.preventDefault();
+                alert('Por favor, selecciona una calculadora');
+                return false;
+            }
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}

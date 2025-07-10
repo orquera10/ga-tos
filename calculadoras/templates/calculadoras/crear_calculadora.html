@@ -1,0 +1,174 @@
+{% extends 'calculadoras/base.html' %}
+
+{% block calculadora_title %}Nueva Calculadora{% endblock %}
+{% block calculadora_heading %}Nueva Calculadora de Divisas{% endblock %}
+
+{% block calculadora_content %}
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row mb-3">
+                <div class="col-md-12 mb-3">
+                    {{ form.nombre.label_tag }}
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.nombre.errors }}
+                        </div>
+                    {% endif %}
+                    <small class="form-text text-muted">Ej: Dólar a Peso Argentino</small>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    {{ form.moneda_origen.label_tag }}
+                    {{ form.moneda_origen }}
+                    {% if form.moneda_origen.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.moneda_origen.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    {{ form.moneda_destino.label_tag }}
+                    {{ form.moneda_destino }}
+                    {% if form.moneda_destino.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.moneda_destino.errors }}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-12 mb-3">
+                    <label class="form-label">Relación de conversión</label>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-5">
+                            <div class="input-group">
+                                {{ form.monto_origen }}
+                                <span class="input-group-text">{{ form.moneda_origen.value|default:'MON' }}</span>
+                            </div>
+                            {% if form.monto_origen.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.monto_origen.errors }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Monto en moneda de origen</small>
+                        </div>
+                        
+                        <div class="col-md-1 text-center">
+                            <div class="fs-4">=</div>
+                        </div>
+                        
+                        <div class="col-md-5">
+                            <div class="input-group">
+                                {{ form.monto_destino }}
+                                <span class="input-group-text">{{ form.moneda_destino.value|default:'MON' }}</span>
+                            </div>
+                            {% if form.monto_destino.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.monto_destino.errors }}
+                                </div>
+                            {% endif %}
+                            <small class="form-text text-muted">Monto equivalente en moneda de destino</small>
+                        </div>
+                        
+                        <div class="col-12 mt-2">
+                            <div class="alert alert-info py-2 mb-0">
+                                <small>
+                                    <i class="bi bi-info-circle"></i> 
+                                    La relación se calculará automáticamente como: 
+                                    <span id="relacion-text">1 {{ form.moneda_origen.value|default:'MON' }} = {{ form.relacion.value|default:'0' }} {{ form.moneda_destino.value|default:'MON' }}</span>
+                                    {{ form.relacion }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-12 mt-3">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Guardar Calculadora
+                    </button>
+                    <a href="{% url 'calculadoras:index' %}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Cancelar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos del formulario
+    const form = document.querySelector('form');
+    const monedaOrigenSelect = document.getElementById('id_moneda_origen');
+    const monedaDestinoSelect = document.getElementById('id_moneda_destino');
+    const montoOrigenInput = document.getElementById('id_monto_origen');
+    const montoDestinoInput = document.getElementById('id_monto_destino');
+    const relacionInput = document.getElementById('id_relacion');
+    const relacionText = document.getElementById('relacion-text');
+    
+    // Actualizar las etiquetas de moneda y recalcular relación
+    function updateCurrencyDisplay() {
+        const origen = monedaOrigenSelect.value || 'MON';
+        const destino = monedaDestinoSelect.value || 'MON';
+        
+        // Actualizar etiquetas de moneda
+        document.querySelectorAll('.input-group-text').forEach((el, index) => {
+            if (el.closest('.input-group').contains(montoOrigenInput)) {
+                el.textContent = origen;
+            } else if (el.closest('.input-group').contains(montoDestinoInput)) {
+                el.textContent = destino;
+            }
+        });
+        
+        // Recalcular relación si hay valores
+        if (montoOrigenInput.value && montoDestinoInput.value) {
+            updateRelacion();
+        }
+    }
+    
+    // Calcular y actualizar la relación
+    function updateRelacion() {
+        const montoOrigen = parseFloat(montoOrigenInput.value) || 0;
+        const montoDestino = parseFloat(montoDestinoInput.value) || 0;
+        
+        if (montoOrigen > 0 && montoDestino > 0) {
+            const relacion = montoDestino / montoOrigen;
+            relacionInput.value = relacion.toFixed(10);
+            
+            // Actualizar texto de relación
+            const origen = monedaOrigenSelect.options[monedaOrigenSelect.selectedIndex].text;
+            const destino = monedaDestinoSelect.options[monedaDestinoSelect.selectedIndex].text;
+            relacionText.textContent = `1 ${origen} = ${relacion.toFixed(6)} ${destino}`;
+        }
+    }
+    
+    // Event listeners
+    monedaOrigenSelect.addEventListener('change', updateCurrencyDisplay);
+    monedaDestinoSelect.addEventListener('change', updateCurrencyDisplay);
+    montoOrigenInput.addEventListener('input', updateRelacion);
+    montoDestinoInput.addEventListener('input', updateRelacion);
+    
+    // Inicializar
+    updateCurrencyDisplay();
+    
+    // Validar que no sean la misma moneda
+    form.addEventListener('submit', function(e) {
+        if (monedaOrigenSelect.value === monedaDestinoSelect.value) {
+            e.preventDefault();
+            alert('La moneda de origen y destino no pueden ser iguales');
+            return false;
+        }
+        
+        if (!montoOrigenInput.value || !montoDestinoInput.value) {
+            e.preventDefault();
+            alert('Por favor ingrese ambos montos para calcular la relación');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

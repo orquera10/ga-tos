@@ -1,0 +1,67 @@
+{% extends 'calculadoras/base.html' %}
+
+{% block calculadora_title %}Inicio{% endblock %}
+
+{% block calculadora_content %}
+<div class="card">
+    <div class="card-header">
+        <h4>Bienvenido a las Calculadoras de Divisas</h4>
+    </div>
+    <div class="card-body">
+        <p class="card-text">Selecciona una calculadora guardada del menú lateral o crea una nueva.</p>
+        
+        {% if calculadoras %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Conversión</th>
+                            <th>Relación</th>
+                            <th>Creada</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for calc in calculadoras %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}">
+                                    {{ calc.nombre }}
+                                </a>
+                            </td>
+                            <td>{{ calc.moneda_origen }} → {{ calc.moneda_destino }}</td>
+                            <td>1 {{ calc.moneda_origen }} = {{ calc.relacion|floatformat:6 }} {{ calc.moneda_destino }}</td>
+                            <td>{{ calc.fecha_creacion|date:"d/m/Y" }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-calculator"></i> Usar
+                                    </a>
+                                    <a href="{% url 'calculadoras:borrar_calculadora' calc.id %}" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       title="Eliminar calculadora">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No hay calculadoras guardadas. 
+                <a href="{% url 'calculadoras:crear_calculadora' %}">Crea tu primera calculadora</a>.
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-footer text-end">
+        <a href="{% url 'calculadoras:calcular_divisa' %}" class="btn btn-primary">
+            <i class="bi bi-calculator"></i> Nueva Conversión
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -25,7 +25,10 @@ SECRET_KEY = 'django-insecure-7l$1wo_4z#@o6j-4dcvad-snt_#64!rhp--a*3q!smct!mvzf9
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']  # Permite todas las direcciones IP (solo para desarrollo)
+
+# O si prefieres ser más específico, puedes usar:
+# ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.16', '192.168.5.96', '192.168.101.18']
 
 
 # Application definition
@@ -39,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',
     'presupuestos',
+    'calculadoras',
 ]
 
 MIDDLEWARE = [
@@ -49,6 +53,22 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -104,13 +124,31 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'es'
+# Configuración de idioma y zona horaria para Argentina
+LANGUAGE_CODE = 'es-ar'  # Español de Argentina
+LANGUAGES = [
+    ('es', 'Español'),
+]
 
-TIME_ZONE = 'UTC'
+# Zona horaria de Argentina (Buenos Aires)
+TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
+# Configuración de internacionalización
 USE_I18N = True
+USE_L10N = True
 
+# Usar la zona horaria configurada en TIME_ZONE
 USE_TZ = True
+
+# Formatos de fecha y hora para Argentina
+DATE_FORMAT = 'd/m/Y'
+TIME_FORMAT = 'H:i'
+DATETIME_FORMAT = 'd/m/Y H:i'
+SHORT_DATE_FORMAT = 'd/m/Y'
+SHORT_DATETIME_FORMAT = 'd/m/Y H:i'
+
+# Primer día de la semana (0=domingo, 1=lunes)
+FIRST_DAY_OF_WEEK = 1  # Lunes
 
 
 # Static files (CSS, JavaScript, Images)

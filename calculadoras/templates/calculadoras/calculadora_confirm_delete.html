@@ -1,0 +1,32 @@
+{% extends 'calculadoras/base.html' %}
+
+{% block calculadora_title %}Eliminar Calculadora{% endblock %}
+
+{% block calculadora_content %}
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Confirmar eliminación</h5>
+        <p class="card-text">
+            ¿Estás seguro de que deseas eliminar la calculadora "{{ object.nombre }}"?
+            <br><br>
+            <strong>Conversión:</strong> {{ object.moneda_origen }} → {{ object.moneda_destino }}
+            <br>
+            <strong>Relación:</strong> 1 {{ object.moneda_origen }} = {{ object.relacion|floatformat:6 }} {{ object.moneda_destino }}
+            <br>
+            <strong>Creada:</strong> {{ object.fecha_creacion|date:"d/m/Y" }}
+        </p>
+        
+        <form method="post" class="mt-4">
+            {% csrf_token %}
+            <div class="d-flex justify-content-between">
+                <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Eliminar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

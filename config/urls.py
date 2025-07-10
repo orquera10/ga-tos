@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('presupuestos.urls')),
+    path('calculadoras/', include('calculadoras.urls')),
 ]
 
 # Configuración para servir archivos estáticos y medios en desarrollo
