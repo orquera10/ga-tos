@@ -99,10 +99,55 @@
 </div>
 
 {% if calculadora %}
-<div class="card mt-4">
-    <div class="card-header">
-        <h5 class="mb-0">Información de la Calculadora</h5>
+<div class="row mt-4">
+    <!-- Sección de Historial de Conversiones -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history me-2"></i>Conversiones Recientes
+                </h5>
+                <a href="{% url 'calculadoras:historial_conversiones' calculadora.id %}" class="btn btn-sm btn-outline-primary">
+                    Ver todo <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if conversiones_recientes %}
+                    <div class="list-group list-group-flush">
+                        {% for conversion in conversiones_recientes %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-bold">{{ conversion.monto_origen|floatformat:2 }} {{ conversion.get_moneda_origen_display }}</span>
+                                    <i class="bi bi-arrow-right mx-2 text-muted"></i>
+                                    <span class="text-primary fw-bold">{{ conversion.monto_destino|floatformat:2 }} {{ conversion.get_moneda_destino_display }}</span>
+                                </div>
+                                <small class="text-muted">{{ conversion.fecha_conversion|timesince }}</small>
+                            </div>
+                            {% if conversion.direccion == 'inversa' %}
+                                <div class="small text-muted mt-1">
+                                    <i class="bi bi-arrow-left-right"></i> Conversión inversa
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center p-4 text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        No hay conversiones recientes
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
+    
+    <!-- Sección de Información de la Calculadora -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Información de la Calculadora</h5>
+            </div>
     <div class="card-body">
         <dl class="row">
             <dt class="col-sm-3">Nombre:</dt>
@@ -122,6 +167,7 @@
             <a href="{% url 'calculadoras:crear_calculadora' %}" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-pencil"></i> Editar
             </a>
+        </div>
         </div>
     </div>
 </div>

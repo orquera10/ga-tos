@@ -36,8 +36,14 @@
                             <td>
                                 <div class="btn-group" role="group">
                                     <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}" 
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-calculator"></i> Usar
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Usar calculadora">
+                                        <i class="bi bi-calculator"></i>
+                                    </a>
+                                    <a href="{% url 'calculadoras:historial_conversiones' calc.id %}" 
+                                       class="btn btn-sm btn-outline-info"
+                                       title="Ver historial">
+                                        <i class="bi bi-clock-history"></i>
                                     </a>
                                     <a href="{% url 'calculadoras:borrar_calculadora' calc.id %}" 
                                        class="btn btn-sm btn-outline-danger"

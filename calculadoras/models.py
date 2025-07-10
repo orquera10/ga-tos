@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 class CalculadoraDivisa(models.Model):
     MONEDAS = [
@@ -56,3 +57,75 @@ class CalculadoraDivisa(models.Model):
     def get_moneda_destino_display_name(self):
         """Devuelve el nombre completo de la moneda de destino"""
         return dict(self.MONEDAS).get(self.moneda_destino, self.moneda_destino)
+
+
+class HistorialConversion(models.Model):
+    """
+    Registra el historial de conversiones realizadas con cada calculadora
+    """
+    calculadora = models.ForeignKey(
+        CalculadoraDivisa,
+        on_delete=models.CASCADE,
+        related_name='conversiones',
+        verbose_name='Calculadora'
+    )
+    monto_origen = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        verbose_name='Monto origen'
+    )
+    moneda_origen = models.CharField(
+        max_length=3,
+        choices=CalculadoraDivisa.MONEDAS,
+        verbose_name='Moneda origen'
+    )
+    monto_destino = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        verbose_name='Monto destino'
+    )
+    moneda_destino = models.CharField(
+        max_length=3,
+        choices=CalculadoraDivisa.MONEDAS,
+        verbose_name='Moneda destino'
+    )
+    relacion_conversion = models.DecimalField(
+        max_digits=20,
+        decimal_places=10,
+        verbose_name='Relación de conversión'
+    )
+    direccion = models.CharField(
+        max_length=10,
+        choices=[('directa', 'Directa'), ('inversa', 'Inversa')],
+        verbose_name='Dirección de conversión'
+    )
+    fecha_conversion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de conversión'
+    )
+    ip_usuario = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name='IP del usuario'
+    )
+    user_agent = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='User Agent'
+    )
+    
+    # Nota: Este campo se mantiene para compatibilidad, pero no se usará
+    usuario = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name='Usuario'
+    )
+
+    class Meta:
+        ordering = ['-fecha_conversion']
+        verbose_name = 'Historial de Conversión'
+        verbose_name_plural = 'Historial de Conversiones'
+
+    def __str__(self):
+        return f"{self.monto_origen} {self.moneda_origen} → {self.monto_destino} {self.moneda_destino} ({self.fecha_conversion.strftime('%d/%m/%Y %H:%M')})"

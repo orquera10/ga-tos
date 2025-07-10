@@ -2,9 +2,19 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from .models import CalculadoraDivisa
-from .forms import CalculadoraDivisaForm, ConversionForm
 from django.utils import timezone
+from django.db import transaction
+from .models import CalculadoraDivisa, HistorialConversion
+from .forms import CalculadoraDivisaForm, ConversionForm
+
+def get_client_ip(request):
+    """Obtiene la IP del cliente"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 def index(request):
     calculadoras = CalculadoraDivisa.objects.all().order_by('-fecha_creacion')
@@ -77,6 +87,21 @@ def calcular_divisa(request, calculadora_id=None):
             # Obtener la fecha/hora actual con la zona horaria configurada
             fecha_actual = timezone.localtime(timezone.now())
             
+            # Crear el registro de historial
+            with transaction.atomic():
+                HistorialConversion.objects.create(
+                    calculadora=calculadora,
+                    monto_origen=monto,
+                    moneda_origen=moneda_origen,
+                    monto_destino=monto_convertido,
+                    moneda_destino=moneda_destino,
+                    relacion_conversion=relacion,
+                    direccion='inversa' if es_conversion_inversa else 'directa',
+                    ip_usuario=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],  # Limitamos la longitud
+                    usuario='Anónimo'  # Valor por defecto ya que no hay autenticación
+                )
+            
             resultado = {
                 'monto_original': float(monto),
                 'moneda_origen': moneda_origen,
@@ -89,10 +114,58 @@ def calcular_divisa(request, calculadora_id=None):
     else:
         form = ConversionForm(calculadora=calculadora)
     
-    return render(request, 'calculadoras/calcular_divisa.html', {
+    # Preparar el contexto base
+    context = {
         'form': form,
         'calculadoras': calculadoras,
         'calculadora': calculadora,
         'resultado': resultado,
         'titulo': 'Nueva Conversión de Divisas'
+    }
+    
+    # Si hay una calculadora, agregar las últimas conversiones al contexto
+    if calculadora:
+        context['conversiones_recientes'] = HistorialConversion.objects.filter(
+            calculadora=calculadora
+        ).order_by('-fecha_conversion')[:5]
+    
+    return render(request, 'calculadoras/calcular_divisa.html', context)
+
+
+def historial_conversiones(request, calculadora_id):
+    """Muestra el historial de conversiones para una calculadora específica"""
+    calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)
+    
+    # Obtener las últimas 50 conversiones para esta calculadora
+    conversiones = HistorialConversion.objects.filter(
+        calculadora=calculadora
+    ).select_related('calculadora').order_by('-fecha_conversion')[:50]
+    
+    # Estadísticas básicas
+    total_conversiones = conversiones.count()
+    
+    # Agrupar por día para el gráfico
+    from django.db.models.functions import TruncDay
+    from django.db.models import Count, Sum
+    
+    conversiones_por_dia = (
+        HistorialConversion.objects
+        .filter(calculadora=calculadora)
+        .annotate(dia=TruncDay('fecha_conversion'))
+        .values('dia')
+        .annotate(total=Count('id'))
+        .order_by('dia')
+    )
+    
+    # Preparar datos para el gráfico
+    dias = [c['dia'].strftime('%d/%m') for c in conversiones_por_dia]
+    totales = [c['total'] for c in conversiones_por_dia]
+    
+    return render(request, 'calculadoras/historial_conversiones.html', {
+        'calculadora': calculadora,
+        'conversiones': conversiones,
+        'total_conversiones': total_conversiones,
+        'dias': dias,
+        'totales': totales,
+        'titulo': f'Historial de Conversiones - {calculadora.nombre}'
     })
