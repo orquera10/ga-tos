@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# Ajustamos la ruta BASE_DIR para que apunte al directorio src
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -55,31 +56,20 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'presupuestos' / 'templates',
+            BASE_DIR / 'calculadoras' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -94,10 +84,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+import os
+
+# Ruta absoluta para la base de datos
+DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'db')
+os.makedirs(DB_DIR, exist_ok=True)  # Asegurarse de que el directorio existe
+DB_PATH = os.path.join(DB_DIR, 'db.sqlite3')
+print(f"\n\n[DEBUG] Ruta de la base de datos: {DB_PATH}\n\n")
+print(f"[DEBUG] Ruta absoluta: {os.path.abspath(DB_PATH)}\n\n")
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DB_PATH,
     }
 }
 
@@ -150,6 +149,10 @@ FIRST_DAY_OF_WEEK = 1  # Lunes
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para producción
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',  # Directorio global de archivos estáticos
+]
 
 # Configuración para archivos medios
 MEDIA_URL = '/media/'

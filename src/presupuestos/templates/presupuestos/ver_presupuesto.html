@@ -112,3 +112,16 @@
         {% endfor %}
     </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Manejar clic en los botones de eliminar
+        document.querySelectorAll('.gasto-accion a[title="Eliminar"]').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                // No hacer nada más, dejar que el enlace se comporte normalmente
+            });
+        });
+    });
+</script>
+{% endblock %}
