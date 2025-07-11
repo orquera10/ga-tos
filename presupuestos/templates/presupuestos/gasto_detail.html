@@ -1,38 +1,23 @@
 {% extends 'presupuestos/base.html' %}
+
 {% block title %}Detalles del Gasto{% endblock %}
+
 {% block content %}
-    <h2>Detalles del Gasto</h2>
     
     <div class="card">
         <div class="card-body">
-            <h5 class="card-title">Información del Gasto</h5>
+            <h5 class="card-title gasto-nombre">Información del Gasto</h5>
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <p class="mb-2">
                         <strong>Nombre:</strong> {{ gasto.nombre }}<br>
                         <strong>Categoría:</strong> {{ gasto.categoria.nombre|default:"Sin categoría" }}<br>
                         <strong>Monto:</strong> {{ gasto.monto|floatformat:"2" }} {{ gasto.get_moneda_display }}<br>
-                        <strong>Fecha:</strong> {{ gasto.fecha|date:"d/m/Y" }}<br>
-                        <strong>Descripción:</strong> {{ gasto.descripcion|default:"" }}
-                    </p>
-                </div>
-                <div class="col-md-6">
-                    <div class="mt-3">
-                        <h5 class="card-title">Archivo Adjunto</h5>
-                        {% if gasto.adjunto %}
-                            <div class="list-group">
-                                <a href="{{ gasto.adjunto.url }}" class="list-group-item list-group-item-action" download>
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1">{{ gasto.adjunto.name }}</h6>
-                                        <small class="text-muted">{{ gasto.adjunto.size|filesizeformat }}</small>
-                                    </div>
-                                    <small class="text-muted">Fecha: {{ gasto.fecha|date:"d/m/Y" }}</small>
-                                </a>
-                            </div>
-                        {% else %}
-                            <p class="text-muted">Sin archivo adjunto</p>
+                        <strong>Fecha y Hora:</strong> {{ gasto.fecha|date:"d/m/Y H:i" }}<br>
+                        {% if gasto.descripcion %}
+                            <strong>Descripción:</strong> {{ gasto.descripcion }}
                         {% endif %}
-                    </div>
+                    </p>
                 </div>
             </div>
         </div>

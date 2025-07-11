@@ -1,22 +1,56 @@
 {% extends 'presupuestos/base.html' %}
-{% block title %}Eliminar Categoría{% endblock %}
-{% block content %}
-    <h2>Eliminar Categoría</h2>
-    <div class="alert alert-warning">
-        <p>¿Estás seguro de que deseas eliminar la categoría "{{ object.nombre }}"?</p>
-        <p>Descripción: {{ object.descripcion }}</p>
-        <p>Gastos asociados: {{ object.gastos_count }}</p>
-    </div>
 
-    <form method="post" class="mt-4">
-        {% csrf_token %}
-        <div class="d-flex justify-content-between">
-            <a href="{% url 'presupuestos:listar_categorias' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left"></i> Cancelar
-            </a>
-            <button type="submit" class="btn btn-danger">
-                <i class="bi bi-trash"></i> Eliminar
-            </button>
+{% block title %}Eliminar Categoría{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h5 class="alert-heading">¿Eliminar la categoría "{{ object.nombre }}"?</h5>
+                    <hr>
+                    <div class="mb-2">
+                        <strong>Descripción:</strong>
+                        <p class="mb-0">{% if object.descripcion %}{{ object.descripcion }}{% else %}<span class="text-muted">Sin descripción</span>{% endif %}</p>
+                    </div>
+                    <div class="mb-0">
+                        <strong>Gastos asociados:</strong>
+                        <span class="badge {% if object.gastos_count > 0 %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill">
+                            {{ object.gastos_count }}
+                        </span>
+                        {% if object.gastos_count > 0 %}
+                            <div class="alert alert-danger mt-2 mb-0">
+                                <i class="bi bi-exclamation-circle"></i> No se puede eliminar una categoría que tiene gastos asociados.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'presupuestos:listar_categorias' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        {% if object.gastos_count == 0 %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Confirmar Eliminación
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-danger" disabled>
+                            <i class="bi bi-lock"></i> No se puede eliminar
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
         </div>
-    </form>
+    </div>
+</div>
 {% endblock %}

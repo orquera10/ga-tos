@@ -1,12 +1,22 @@
 {% extends 'calculadoras/base.html' %}
 
-{% block calculadora_title %}Nueva Calculadora{% endblock %}
-{% block calculadora_heading %}Nueva Calculadora de Divisas{% endblock %}
+{% block calculadora_title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} Calculadora{% endblock %}
+
+{% block calculadora_heading %}
+    <div class="d-flex justify-content-between align-items-center w-100">
+        <span>{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} Calculadora de Divisas</span>
+        {% if form.instance.pk %}
+            <a href="{% url 'calculadoras:index' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+        {% endif %}
+    </div>
+{% endblock %}
 
 {% block calculadora_content %}
 <div class="card">
     <div class="card-body">
-        <form method="post">
+        <form method="post" action="{% if form.instance.pk %}{% url 'calculadoras:editar_calculadora' form.instance.pk %}{% else %}{% url 'calculadoras:crear_calculadora' %}{% endif %}">
             {% csrf_token %}
             <div class="row mb-3">
                 <div class="col-md-12 mb-3">
@@ -86,14 +96,13 @@
                     </div>
                 </div>
                 
-                <div class="col-12 mt-3">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Guardar Calculadora
-                    </button>
-                    <a href="{% url 'calculadoras:index' %}" class="btn btn-secondary">
-                        <i class="bi bi-x-circle"></i> Cancelar
-                    </a>
-                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                <a href="{% url 'calculadoras:index' %}" class="btn btn-secondary me-md-2">
+                    <i class="bi bi-x-lg"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> {% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}
+                </button>
             </div>
         </form>
     </div>

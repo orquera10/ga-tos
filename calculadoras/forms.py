@@ -87,6 +87,12 @@ class ConversionForm(forms.Form):
             self.fields['monto_origen'].initial = 1
             self.fields['monto_destino'].initial = float(self.instance.relacion)
             self.fields['monto_destino'].widget.attrs['readonly'] = True
+            
+            # Establecer valores iniciales para los campos del modelo
+            self.fields['nombre'].initial = self.instance.nombre
+            self.fields['moneda_origen'].initial = self.instance.moneda_origen
+            self.fields['moneda_destino'].initial = self.instance.moneda_destino
+            self.fields['relacion'].initial = self.instance.relacion
         else:
             # Para nueva calculadora, ambos campos deben estar habilitados
             self.fields['monto_destino'].widget.attrs['readonly'] = False

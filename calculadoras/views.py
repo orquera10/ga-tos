@@ -28,12 +28,20 @@ def borrar_calculadora(request, calculadora_id):
     calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)
     
     if request.method == 'POST':
-        nombre_calculadora = calculadora.nombre
-        calculadora.delete()
-        messages.success(request, f'Calculadora "{nombre_calculadora}" eliminada correctamente.')
-        return redirect('calculadoras:index')
-        
-    return render(request, 'calculadoras/calculadora_confirm_delete.html', {'object': calculadora})
+        try:
+            nombre_calculadora = calculadora.nombre
+            calculadora.delete()
+            messages.success(request, f'Calculadora "{nombre_calculadora}" eliminada correctamente.')
+            return redirect('calculadoras:index')
+        except Exception as e:
+            messages.error(request, f'Error al eliminar la calculadora: {str(e)}')
+            return redirect('calculadoras:index')
+    
+    # Mostrar la página de confirmación para peticiones GET
+    return render(request, 'calculadoras/calculadora_confirm_delete.html', {
+        'object': calculadora,
+        'titulo': f'Eliminar Calculadora: {calculadora.nombre}'
+    })
 
 def crear_calculadora(request):
     if request.method == 'POST':
@@ -53,6 +61,43 @@ def crear_calculadora(request):
     return render(request, 'calculadoras/crear_calculadora.html', {
         'form': form,
         'titulo': 'Nueva Calculadora de Divisas'
+    })
+
+def editar_calculadora(request, calculadora_id):
+    calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)
+    
+    if request.method == 'POST':
+        form = CalculadoraDivisaForm(request.POST, instance=calculadora)
+        if form.is_valid():
+            try:
+                calculadora = form.save(commit=False)
+                # Asegurarse de que los campos se guarden correctamente
+                calculadora.nombre = form.cleaned_data['nombre']
+                calculadora.moneda_origen = form.cleaned_data['moneda_origen']
+                calculadora.moneda_destino = form.cleaned_data['moneda_destino']
+                calculadora.relacion = form.cleaned_data['relacion']
+                calculadora.save()
+                
+                messages.success(request, f'Calculadora actualizada exitosamente: {calculadora.nombre}')
+                return redirect('calculadoras:index')
+            except Exception as e:
+                messages.error(request, f'Error al actualizar la calculadora: {str(e)}')
+        else:
+            messages.error(request, 'Por favor, verifica los datos ingresados')
+    else:
+        # Inicializar el formulario con los datos de la calculadora
+        form = CalculadoraDivisaForm(initial={
+            'nombre': calculadora.nombre,
+            'moneda_origen': calculadora.moneda_origen,
+            'moneda_destino': calculadora.moneda_destino,
+            'relacion': calculadora.relacion,
+            'monto_origen': 1,
+            'monto_destino': calculadora.relacion
+        }, instance=calculadora)
+    
+    return render(request, 'calculadoras/crear_calculadora.html', {
+        'form': form,
+        'titulo': f'Editar Calculadora: {calculadora.nombre}'
     })
 
 def calcular_divisa(request, calculadora_id=None):
@@ -161,8 +206,12 @@ def historial_conversiones(request, calculadora_id):
     dias = [c['dia'].strftime('%d/%m') for c in conversiones_por_dia]
     totales = [c['total'] for c in conversiones_por_dia]
     
+    # Obtener todas las calculadoras para el menú de navegación
+    calculadoras = CalculadoraDivisa.objects.all().order_by('-fecha_creacion')
+    
     return render(request, 'calculadoras/historial_conversiones.html', {
         'calculadora': calculadora,
+        'calculadoras': calculadoras,  # Añadimos la lista de calculadoras al contexto
         'conversiones': conversiones,
         'total_conversiones': total_conversiones,
         'dias': dias,

@@ -38,6 +38,16 @@ class PresupuestoUpdateView(UpdateView):
     success_url = reverse_lazy('presupuestos:index')
 
     def form_valid(self, form):
+        # Guardar el objeto para tener acceso a los datos anteriores
+        self.object = form.save(commit=False)
+        
+        # Si el monto total ha cambiado, actualizar el monto restante
+        if 'monto_total' in form.changed_data:
+            # Guardar primero para que el objeto tenga el nuevo monto_total
+            self.object.save()
+            # Actualizar el monto restante basado en los gastos actuales
+            self.object.actualizar_monto_restante()
+        
         messages.success(self.request, 'Presupuesto actualizado exitosamente')
         return super().form_valid(form)
 
@@ -55,20 +65,14 @@ class CategoriaCreateView(CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'presupuestos/categoria_form.html'
+    success_url = reverse_lazy('presupuestos:listar_categorias')
 
     def get_success_url(self):
-        # Redirigir a la página anterior si existe en los parámetros GET
-        next_url = self.request.GET.get('next', 'presupuestos:index')
+        # Si se está creando desde el formulario de gastos, volver allí
         presupuesto_pk = self.request.GET.get('presupuesto_pk')
-        
         if presupuesto_pk:
             return reverse_lazy('presupuestos:crear_gasto', kwargs={'presupuesto_pk': presupuesto_pk})
-        elif next_url == 'presupuestos:crear_gasto':
-            presupuesto_pk = self.request.GET.get('presupuesto_pk')
-            if presupuesto_pk:
-                return reverse_lazy('presupuestos:crear_gasto', kwargs={'presupuesto_pk': presupuesto_pk})
-        
-        return reverse_lazy(next_url)
+        return super().get_success_url()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -81,7 +85,7 @@ class CategoriaUpdateView(UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'presupuestos/categoria_form.html'
-    success_url = reverse_lazy('presupuestos:index')
+    success_url = reverse_lazy('presupuestos:listar_categorias')
 
     def form_valid(self, form):
         messages.success(self.request, 'Categoría actualizada exitosamente')
@@ -90,7 +94,7 @@ class CategoriaUpdateView(UpdateView):
 class CategoriaDeleteView(DeleteView):
     model = Categoria
     template_name = 'presupuestos/categoria_confirm_delete.html'
-    success_url = reverse_lazy('presupuestos:index')
+    success_url = reverse_lazy('presupuestos:listar_categorias')
 
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'Categoría eliminada exitosamente')

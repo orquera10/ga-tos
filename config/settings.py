@@ -124,13 +124,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-# Configuración de idioma y zona horaria para Argentina
 LANGUAGE_CODE = 'es-ar'  # Español de Argentina
-LANGUAGES = [
-    ('es', 'Español'),
-]
 
-# Zona horaria de Argentina (Buenos Aires)
 TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 # Configuración de internacionalización

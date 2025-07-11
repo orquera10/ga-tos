@@ -1,3 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap');
+
+/* Aplicar Jost a todo el proyecto */
+body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
+    font-family: 'Jost', sans-serif;
+}
+
+:root {
+    /* Colores de texto */
+    --tx-primary: #199478;         /* Texto principal - blanco */
+    --tx-secondary: #BF5656;      /* Texto secundario - gris claro */
+    --tx-ternary: #FFBE46;        /* Texto terciario - gris más oscuro */
+    
+    /* Colores de fondo */
+    --bg-primary: #000000;        /* Fondo principal - negro oscuro */
+    --bg-secondary: #3D3D3D;      /* Fondo secundario - gris oscuro */
+    
+    /* Colores de acento (puedes personalizarlos) */
+    --accent-primary: #a0ffe9;    /* Azul Bootstrap por defecto */
+    --accent-secondary: #6c757d;  /* Gris Bootstrap por defecto */
+}
+
 /* Estilos para la barra de progreso */
 .progress {
     height: 1.5rem;
@@ -15,15 +37,15 @@
 }
 
 .progress-bar-success {
-    background-color: #198754;
+    background-color: var(--tx-primary);
 }
 
 .progress-bar-warning {
-    background-color: #ffc107;
+    background-color: var(--tx-ternary);
 }
 
 .progress-bar-danger {
-    background-color: #dc3545;
+    background-color: var(--tx-secondary);
 }
 
 /* Botón flotante de calculadoras */
@@ -34,7 +56,7 @@
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background-color: #0d6efd;
+    background-color: var(--tx-primary);
     color: white;
     text-align: center;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -49,7 +71,7 @@
 }
 
 .floating-calculator-btn:hover {
-    background-color: #0b5ed7;
+    background-color: var(--tx-primary);
     color: white;
     transform: translateY(-3px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
@@ -57,6 +79,41 @@
 
 .floating-calculator-btn:active {
     transform: translateY(1px);
+}
+
+/* Estilos para centrar el logo en el navbar */
+.navbar-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* Ajustes para el contenedor del navbar */
+.navbar > .container {
+    position: relative;
+}
+
+/* Asegurar que el botón del menú hamburguesa se mantenga a la izquierda */
+.navbar-toggler {
+    margin-left: auto;
+    margin-right: 0;
+}
+
+/* Ajustes para pantallas pequeñas */
+@media (max-width: 991.98px) {
+    .navbar-brand {
+        position: static;
+        transform: none;
+        margin: 0 auto;
+        display: block;
+        text-align: center;
+        width: 100%;
+    }
+    
+    .navbar-toggler {
+        position: absolute;
+        right: 1rem;
+    }
 }
 
 /* Asegurar que el botón sea visible en móviles */
@@ -68,4 +125,160 @@
         bottom: 20px;
         right: 20px;
     }
+    
+    /* Asegurar que el contenido no quede oculto detrás del botón flotante */
+    body {
+        margin-bottom: 80px;
+    }
 }
+
+/* Asegurar que el contenido no quede oculto detrás del botón flotante en pantallas grandes */
+@media (min-width: 769px) {
+    body {
+        margin-bottom: 100px;
+    }
+}
+
+.card{
+    background-color: var(--bg-secondary) !important;
+    color: white !important;
+}
+
+.btn-primary{
+    background-color: var(--tx-primary);
+    border: none;
+}
+
+.btn-primary:hover{
+    background-color: var(--tx-primary);
+    border-color: var(--tx-primary) !important;
+}
+
+.btn-danger{
+    background-color: var(--tx-secondary);
+    border: none;
+}
+
+.btn-danger:hover{
+    background-color: var(--tx-secondary);
+}
+
+.btn-warning{
+    background-color: var(--tx-ternary);
+    border: none;
+}
+
+.btn-warning:hover{
+    background-color: var(--tx-ternary);
+}
+
+.text-muted{
+    color: rgb(175, 175, 175) !important;
+}
+
+.text-danger{
+    color: var(--tx-secondary) !important;
+}
+
+.separador{
+    background-color: white;
+}
+
+.bg-info {
+    background-color: var(--tx-secondary) !important;
+}
+
+/* Estilos para la vista de presupuesto */
+.gastos-container {
+    max-width: 100%;
+}
+
+.gasto-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s ease;
+}
+
+.gasto-item:last-child {
+    border-bottom: none;
+}
+
+.gasto-accion {
+    width: 24px;
+    text-align: center;
+}
+
+.gasto-contenido {
+    color: inherit;
+    flex-grow: 1;
+    text-decoration: none;
+}
+
+.gasto-contenido:hover {
+    color: inherit;
+}
+
+.gasto-nombre {
+    margin: 0;
+    color: var(--tx-primary);
+    font-weight: 500;
+}
+
+.gasto-categoria {
+    font-size: 0.85rem;
+    color: var(--tx-secondary);
+}
+
+.gasto-descripcion {
+    font-size: 0.8rem;
+    color: var(--tx-ternary);
+    margin-bottom: 0;
+}
+
+.gasto-monto {
+    min-width: 120px;
+    text-align: right;
+}
+
+.gasto-item:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+}
+
+.btn-outline-warning {
+    color: var(--tx-ternary);
+    border-color: var(--tx-ternary);
+}
+
+.btn-outline-danger {
+    color: var(--tx-secondary);
+    border-color: var(--tx-secondary);
+}
+
+.btn-outline-primary {
+    color: var(--tx-primary);
+    border-color: var(--tx-primary);
+}
+
+.list-group-item {
+    color: white;
+    background-color: var(--bg-secondary);
+}
+
+.bg-primary{
+    color: white !important;
+    background-color: var(--tx-primary) !important;
+}
+
+.text-primary{
+    color: var(--tx-primary) !important;
+}
+    
+.bg-ternary{
+    background-color: var(--accent-primary) !important;
+}
+    

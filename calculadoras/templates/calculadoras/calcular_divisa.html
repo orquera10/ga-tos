@@ -75,7 +75,7 @@
         </form>
         
         {% if resultado %}
-        <div class="mt-4 p-4 bg-light rounded">
+        <div class="mt-4 p-4 bg-black rounded">
             <div class="text-center">
                 <h3 class="mb-4">
                     {{ resultado.monto_original|floatformat:2 }} 
@@ -118,11 +118,13 @@
                         <div class="list-group-item">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <span class="fw-bold">{{ conversion.monto_origen|floatformat:2 }} {{ conversion.get_moneda_origen_display }}</span>
+                                    <span class="fw-bold">{{ conversion.monto_origen|floatformat:2 }} {{ conversion.moneda_origen }}</span>
                                     <i class="bi bi-arrow-right mx-2 text-muted"></i>
-                                    <span class="text-primary fw-bold">{{ conversion.monto_destino|floatformat:2 }} {{ conversion.get_moneda_destino_display }}</span>
+                                    <span class="text-primary fw-bold">{{ conversion.monto_destino|floatformat:2 }} {{ conversion.moneda_destino }}</span>
                                 </div>
-                                <small class="text-muted">{{ conversion.fecha_conversion|timesince }}</small>
+                                <small class="text-muted" title="{{ conversion.fecha_conversion|date:'d/m/Y H:i' }}">
+                                    {{ conversion.fecha_conversion|date:'d/m/Y H:i' }}
+                                </small>
                             </div>
                             {% if conversion.direccion == 'inversa' %}
                                 <div class="small text-muted mt-1">
@@ -164,7 +166,7 @@
         </dl>
         
         <div class="mt-3">
-            <a href="{% url 'calculadoras:crear_calculadora' %}" class="btn btn-outline-primary btn-sm">
+            <a href="{% url 'calculadoras:editar_calculadora' calculadora.id %}" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-pencil"></i> Editar
             </a>
         </div>

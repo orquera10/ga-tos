@@ -4,23 +4,14 @@
 {% block calculadora_title %}{{ titulo }}{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css">
 <style>
     .conversion-card {
         transition: all 0.3s ease;
         border-left: 4px solid #0d6efd;
     }
-    .conversion-card:hover {
-        transform: translateX(5px);
-        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
+    
     .conversion-inversa {
         border-left-color: #6f42c1;
-    }
-    .chart-container {
-        position: relative;
-        height: 300px;
-        margin-bottom: 2rem;
     }
 </style>
 {% endblock %}
@@ -37,32 +28,18 @@
         </a>
     </div>
     <div class="card-body">
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h6 class="card-title">Resumen</h6>
-                        <div class="d-flex justify-content-between">
-                            <div class="text-center">
-                                <div class="display-6 fw-bold text-primary">{{ total_conversiones }}</div>
-                                <small class="text-muted">Conversiones totales</small>
-                            </div>
-                            <div class="vr"></div>
-                            <div class="text-center">
-                                <div class="h4 fw-bold">{{ calculadora.moneda_origen }} → {{ calculadora.moneda_destino }}</div>
-                                <small class="text-muted">Tipo de conversión</small>
-                            </div>
-                        </div>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h6 class="card-title mb-4">Resumen</h6>
+                <div class="d-flex justify-content-around">
+                    <div class="text-center">
+                        <div class="display-6 fw-bold text-primary">{{ total_conversiones }}</div>
+                        <small class="text-muted">Conversiones totales</small>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <h6 class="card-title">Actividad Reciente</h6>
-                        <div class="chart-container">
-                            <canvas id="actividadChart"></canvas>
-                        </div>
+                    <div class="vr"></div>
+                    <div class="text-center">
+                        <div class="h4 fw-bold">{{ calculadora.get_moneda_origen_display }} → {{ calculadora.get_moneda_destino_display }}</div>
+                        <small class="text-muted">Tipo de conversión</small>
                     </div>
                 </div>
             </div>
@@ -78,12 +55,12 @@
                         <div class="d-flex align-items-center">
                             <div class="me-3 text-center">
                                 <div class="h5 mb-0 fw-bold">{{ conversion.monto_origen|floatformat:2 }}</div>
-                                <small class="text-muted">{{ conversion.get_moneda_origen_display }}</small>
+                                <small class="text-muted">{{ conversion.moneda_origen }}</small>
                             </div>
                             <i class="bi bi-arrow-right mx-3 text-muted"></i>
                             <div class="text-center">
                                 <div class="h5 mb-0 fw-bold">{{ conversion.monto_destino|floatformat:2 }}</div>
-                                <small class="text-muted">{{ conversion.get_moneda_destino_display }}</small>
+                                <small class="text-muted">{{ conversion.moneda_destino }}</small>
                             </div>
                         </div>
                         <div class="text-end">
@@ -117,46 +94,6 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Configuración del gráfico de actividad
-    const ctx = document.getElementById('actividadChart').getContext('2d');
-    const actividadChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ dias|safe }},
-            datasets: [{
-                label: 'Conversiones por día',
-                data: {{ totales|safe }},
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                borderColor: 'rgba(13, 110, 253, 0.8)',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    }
-                }
-            }
-        }
-    });
-});
+// El gráfico de actividad ha sido eliminado
 </script>
 {% endblock %}

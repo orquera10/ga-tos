@@ -1,79 +1,212 @@
 {% extends 'calculadoras/base.html' %}
 
-{% block calculadora_content %}
-<div class="card">
-    <div class="card-header">
-        <h4>Calculadora de Divisas</h4>
+{% block calculadora_title %}Conversor de Divisas{% endblock %}
+
+{% block calculadora_heading %}
+    <div class="d-flex justify-content-between align-items-center w-100">
+        <span><i class="bi bi-currency-exchange"></i> Conversor de Divisas</span>
+        <a href="{% url 'calculadoras:historial_conversiones' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-clock-history"></i> Ver Historial
+        </a>
     </div>
-    <div class="card-body">
-        <form method="post" action="{% url 'calculadoras:calculadora_divisas' %}">
-            {% csrf_token %}
-            <div class="row mb-3">
-                <div class="col-md-5">
-                    <label for="monto" class="form-label">Monto</label>
-                    <input type="number" step="0.01" min="0" class="form-control" id="monto" name="monto" 
-                           value="{{ resultado.monto_original|default:'1' }}" required>
-                </div>
-                <div class="col-md-3">
-                    <label for="moneda_origen" class="form-label">De</label>
-                    <select class="form-select" id="moneda_origen" name="moneda_origen" required>
-                        {% for moneda in monedas %}
-                            <option value="{{ moneda }}" 
-                                    {% if resultado and resultado.moneda_origen == moneda %}selected{% endif %}>
-                                {{ moneda }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-1 d-flex align-items-center justify-content-center">
-                    <button type="button" id="swapBtn" class="btn btn-outline-secondary mt-4">
-                        <i class="bi bi-arrow-left-right"></i>
-                    </button>
-                </div>
-                <div class="col-md-3">
-                    <label for="moneda_destino" class="form-label">A</label>
-                    <select class="form-select" id="moneda_destino" name="moneda_destino" required>
-                        {% for moneda in monedas %}
-                            <option value="{{ moneda }}" 
-                                    {% if resultado and resultado.moneda_destino == moneda %}selected{% endif %}
-                                    {% if not resultado and moneda == 'EUR' %}selected{% endif %}>
-                                {{ moneda }}
-                            </option>
-                        {% endfor %}
-                    </select>
+{% endblock %}
+
+{% block calculadora_content %}
+<div class="conversor-container">
+    <form method="post" action="{% url 'calculadoras:calculadora_divisas' %}" class="mb-4">
+        {% csrf_token %}
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="monto" class="form-label fw-medium">Monto</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-currency-dollar"></i>
+                    </span>
+                    <input type="number" 
+                           step="0.01" 
+                           min="0" 
+                           class="form-control form-control-lg" 
+                           id="monto" 
+                           name="monto" 
+                           value="{{ resultado.monto_original|default:'1' }}" 
+                           required>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Convertir</button>
-        </form>
-
-        {% if resultado %}
-        <div class="mt-4 p-3 bg-light rounded">
-            <h5>Resultado:</h5>
-            <p class="h3">
-                {{ resultado.monto_original|floatformat:2 }} {{ resultado.moneda_origen }} = 
-                <strong>{{ resultado.monto_convertido|floatformat:2 }} {{ resultado.moneda_destino }}</strong>
-            </p>
-            <p class="text-muted mt-2">
-                Tasa de cambio: 1 {{ resultado.moneda_origen }} = 
-                {{ resultado.monto_convertido|floatformat:6|default:'1.000000' }} {{ resultado.moneda_destino }}
-            </p>
+            
+            <div class="col-md-3">
+                <label for="moneda_origen" class="form-label fw-medium">De</label>
+                <select class="form-select" id="moneda_origen" name="moneda_origen" required>
+                    {% for codigo, nombre in monedas.items %}
+                        <option value="{{ codigo }}" 
+                                {% if resultado and resultado.moneda_origen == codigo %}selected{% endif %}>
+                            {{ codigo }} - {{ nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-1 d-flex justify-content-center">
+                <button type="button" id="swapBtn" class="btn btn-outline-secondary rounded-circle" 
+                        style="width: 42px; height: 42px;"
+                        title="Intercambiar monedas">
+                    <i class="bi bi-arrow-left-right"></i>
+                </button>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="moneda_destino" class="form-label fw-medium">A</label>
+                <select class="form-select" id="moneda_destino" name="moneda_destino" required>
+                    {% for codigo, nombre in monedas.items %}
+                        <option value="{{ codigo }}" 
+                                {% if resultado and resultado.moneda_destino == codigo %}selected{% endif %}
+                                {% if not resultado and codigo == 'EUR' %}selected{% endif %}>
+                            {{ codigo }} - {{ nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-arrow-repeat"></i> Convertir
+                </button>
+            </div>
         </div>
-        {% endif %}
+    </form>
+
+    {% if resultado %}
+    <div class="resultado-conversion p-4 rounded-3 shadow-sm border">
+        <div class="text-center mb-3">
+            <h4 class="mb-0">
+                <span class="text-primary">{{ resultado.monto_original|floatformat:2 }} {{ resultado.moneda_origen }}</span>
+                <i class="bi bi-arrow-right mx-2 text-muted"></i>
+                <span class="text-success">{{ resultado.monto_convertido|floatformat:2 }} {{ resultado.moneda_destino }}</span>
+            </h4>
+        </div>
+        
+        <div class="row text-center">
+            <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                    <small class="text-muted d-block">Tasa de cambio</small>
+                    <strong>1 {{ resultado.moneda_origen }} = {{ resultado.tasa_cambio|floatformat:6 }} {{ resultado.moneda_destino }}</strong>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                    <small class="text-muted d-block">Tasa inversa</small>
+                    <strong>1 {{ resultado.moneda_destino }} = {{ resultado.tasa_inversa|floatformat:6 }} {{ resultado.moneda_origen }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-center">
+            <small class="text-muted">
+                <i class="bi bi-info-circle"></i> 
+                Tasa de cambio del {{ resultado.fecha_actualizacion|date:"d/m/Y H:i" }}
+            </small>
+        </div>
     </div>
+    {% endif %}
+    
+    {% if historial %}
+    <div class="mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Historial reciente</h5>
+            <a href="{% url 'calculadoras:historial_conversiones' %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-list-ul"></i> Ver todo
+            </a>
+        </div>
+        <div class="list-group">
+            {% for item in historial|slice:":5" %}
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">
+                        {{ item.monto_original|floatformat:2 }} {{ item.moneda_origen }} 
+                        <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                        {{ item.monto_convertido|floatformat:2 }} {{ item.moneda_destino }}
+                    </h6>
+                    <small class="text-muted">{{ item.fecha|timesince }} atrás</small>
+                </div>
+                <small class="text-muted">
+                    Tasa: 1 {{ item.moneda_origen }} = {{ item.tasa_cambio|floatformat:6 }} {{ item.moneda_destino }}
+                </small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<style>
+    .conversor-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    
+    .resultado-conversion {
+        background-color: #f8f9fa;
+        border: 1px solid rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .resultado-conversion:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.05);
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 0.675rem 1rem;
+        border: 1px solid #dee2e6;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: var(--tx-primary);
+        box-shadow: 0 0 0 0.25rem rgba(25, 148, 120, 0.15);
+    }
+    
+    .btn-primary {
+        background-color: var(--tx-primary);
+        border-color: var(--tx-primary);
+    }
+    
+    .btn-primary:hover {
+        background-color: #157a63;
+        border-color: #157a63;
+    }
+    
+    .btn-outline-secondary {
+        border-color: #dee2e6;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+</style>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Intercambiar monedas
-        document.getElementById('swapBtn').addEventListener('click', function() {
-            const monedaOrigen = document.getElementById('moneda_origen');
-            const monedaDestino = document.getElementById('moneda_destino');
-            const temp = monedaOrigen.value;
-            monedaOrigen.value = monedaDestino.value;
-            monedaDestino.value = temp;
-        });
+        const swapBtn = document.getElementById('swapBtn');
+        if (swapBtn) {
+            swapBtn.addEventListener('click', function() {
+                const monedaOrigen = document.getElementById('moneda_origen');
+                const monedaDestino = document.getElementById('moneda_destino');
+                const temp = monedaOrigen.value;
+                monedaOrigen.value = monedaDestino.value;
+                monedaDestino.value = temp;
+            });
+        }
+        
+        // Enfocar el campo de monto al cargar
+        const montoInput = document.getElementById('monto');
+        if (montoInput) {
+            montoInput.focus();
+            montoInput.select();
+        }
     });
 </script>
 {% endblock %}

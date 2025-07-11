@@ -1,73 +1,129 @@
 {% extends 'calculadoras/base.html' %}
 
-{% block calculadora_title %}Inicio{% endblock %}
+{% block calculadora_title %}Mis Calculadoras{% endblock %}
+
+
 
 {% block calculadora_content %}
-<div class="card">
-    <div class="card-header">
-        <h4>Bienvenido a las Calculadoras de Divisas</h4>
-    </div>
-    <div class="card-body">
-        <p class="card-text">Selecciona una calculadora guardada del menú lateral o crea una nueva.</p>
-        
-        {% if calculadoras %}
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Conversión</th>
-                            <th>Relación</th>
-                            <th>Creada</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for calc in calculadoras %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}">
-                                    {{ calc.nombre }}
-                                </a>
-                            </td>
-                            <td>{{ calc.moneda_origen }} → {{ calc.moneda_destino }}</td>
-                            <td>1 {{ calc.moneda_origen }} = {{ calc.relacion|floatformat:6 }} {{ calc.moneda_destino }}</td>
-                            <td>{{ calc.fecha_creacion|date:"d/m/Y" }}</td>
-                            <td>
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}" 
-                                       class="btn btn-sm btn-outline-primary"
-                                       title="Usar calculadora">
-                                        <i class="bi bi-calculator"></i>
-                                    </a>
-                                    <a href="{% url 'calculadoras:historial_conversiones' calc.id %}" 
-                                       class="btn btn-sm btn-outline-info"
-                                       title="Ver historial">
-                                        <i class="bi bi-clock-history"></i>
-                                    </a>
-                                    <a href="{% url 'calculadoras:borrar_calculadora' calc.id %}" 
-                                       class="btn btn-sm btn-outline-danger"
-                                       title="Eliminar calculadora">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+<div class="mb-4">
+    <p class="lead">Gestiona tus conversiones de divisas favoritas para acceder rápidamente a las tasas de cambio más utilizadas.</p>
+</div>
+
+{% if calculadoras %}
+    <div class="row g-4">
+        {% for calc in calculadoras %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border border-white shadow-sm hover-shadow">
+                <div class="card-body position-relative">
+                    <!-- Botones de acción -->
+                    <div class="btn-group position-absolute top-0 end-0 mt-2 me-2">
+                        <a href="{% url 'calculadoras:historial_conversiones' calc.id %}" 
+                           class="btn btn-sm btn-outline-info"
+                           title="Ver historial">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
+                        <a href="{% url 'calculadoras:editar_calculadora' calc.id %}" 
+                           class="btn btn-sm btn-outline-warning"
+                           title="Editar">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'calculadoras:borrar_calculadora' calc.id %}" 
+                           class="btn btn-sm btn-outline-danger"
+                           title="Eliminar">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                    
+                    <!-- Título de la calculadora -->
+                    <h5 class="card-title mb-3">{{ calc.nombre }}</h5>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-ternary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" 
+                             style="width: 40px; height: 40px;">
+                            <i class="bi bi-currency-exchange"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="h5 mb-0">
+                                {{ calc.moneda_origen }} <i class="bi bi-arrow-right mx-1 text-muted"></i> {{ calc.moneda_destino }}
+                            </div>
+                            <small class="text-muted">
+                                1 {{ calc.moneda_origen }} = {{ calc.relacion|floatformat:6 }} {{ calc.moneda_destino }}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                        <small class="text-muted">
+                            <i class="bi bi-calendar3 me-1"></i>
+                            Creada el {{ calc.fecha_creacion|date:"d/m/Y" }}
+                        </small>
+                        <a href="{% url 'calculadoras:calcular_con_calculadora' calc.id %}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
             </div>
-        {% else %}
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> No hay calculadoras guardadas. 
-                <a href="{% url 'calculadoras:crear_calculadora' %}">Crea tu primera calculadora</a>.
-            </div>
-        {% endif %}
+        </div>
+        {% endfor %}
     </div>
-    <div class="card-footer text-end">
-        <a href="{% url 'calculadoras:calcular_divisa' %}" class="btn btn-primary">
-            <i class="bi bi-calculator"></i> Nueva Conversión
+{% else %}
+    <div class="text-center py-5 my-5">
+        <div class="mb-4
+            <i class="bi bi-calculator" style="font-size: 4rem; color: var(--tx-ternary);"></i>
+        </div>
+        <h4 class="mb-3">No tienes calculadoras guardadas</h4>
+        <p class="text-muted mb-4">Crea tu primera calculadora para realizar conversiones rápidas entre divisas.</p>
+        <a href="{% url 'calculadoras:crear_calculadora' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Crear Calculadora
         </a>
     </div>
-</div>
+{% endif %}
+
+
+<style>
+    .hover-shadow {
+        transition: all 0.3s ease;
+    }
+    .hover-shadow:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+    }
+    .card {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        background-color: rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+    .dropdown-toggle::after {
+        display: none;
+    }
+    
+    .btn-outline-warning {
+        --bs-btn-color: #ffc107;
+        --bs-btn-border-color: #ffc107;
+        --bs-btn-hover-bg: #ffc107;
+        --bs-btn-hover-border-color: #ffc107;
+        --bs-btn-active-bg: #ffc107;
+        --bs-btn-active-border-color: #ffc107;
+        --bs-btn-active-color: #000;
+    }
+    
+    .btn-outline-danger {
+        --bs-btn-color: #dc3545;
+        --bs-btn-border-color: #dc3545;
+        --bs-btn-hover-bg: #dc3545;
+        --bs-btn-hover-border-color: #dc3545;
+        --bs-btn-active-bg: #dc3545;
+        --bs-btn-active-border-color: #dc3545;
+        --bs-btn-active-color: #fff;
+    }
+</style>
 {% endblock %}
