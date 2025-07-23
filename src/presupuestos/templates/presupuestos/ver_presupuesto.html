@@ -1,5 +1,24 @@
 {% extends 'presupuestos/base.html' %}
 {% load tz %}
+{% load filters %}
+
+{% block extra_head %}
+{{ block.super }}
+<style>
+    .dia-header {
+        position: sticky;
+        top: 56px; /* Altura del navbar */
+        z-index: 10;
+        background-color: #f8f9fa !important;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .total-dia {
+        background-color: #f8f9fa !important;
+        border-top: 2px solid #dee2e6;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
     <div class="card mb-4">
@@ -36,6 +55,12 @@
                     <small class="text-muted">Total</small>
                 </div>
                 <div class="text-center">
+                    <div class="h5 mb-0 text-primary">
+                        {{ presupuesto.monto_total|add:presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+                    </div>
+                    <small class="text-muted">Gastado</small>
+                </div>
+                <div class="text-center">
                     <div class="h5 mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
                         {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
                     </div>
@@ -70,46 +95,66 @@
     </div>
 
     <div class="gastos-container">
-        {% for gasto in presupuesto.gastos.all %}
-        <div class="gasto-item">
-            <!-- Columna 1: Botón de eliminar -->
-            <div class="gasto-accion">
-                <a href="{% url 'presupuestos:eliminar_gasto' gasto.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar">
-                    <i class="bi bi-trash-fill"></i>
-                </a>
-            </div>
+        {% if gastos %}
+            {% regroup gastos by fecha.date as gastos_por_dia %}
             
-            <!-- Columna 2: Contenido clickeable -->
-            <a href="{% url 'presupuestos:ver_gasto' gasto.id %}" class="gasto-contenido text-decoration-none">
-                <div class="gasto-info">
-                    <h6 class="gasto-nombre mb-1">{{ gasto.nombre }}</h6>
-                    <p class="gasto-categoria text-muted small mb-1">
-                        {{ gasto.categoria.nombre|default:"Sin categoría" }}
-                    </p>
-                    <p class="gasto-descripcion small text-muted mb-0">
-                        {{ gasto.descripcion|default:""|truncatechars:60 }}
-                    </p>
+            {% for dia in gastos_por_dia %}
+                <div class="dia-gastos">
+                    <div class="dia-header bg-light p-2 mb-2 rounded">
+                        <h5 class="mb-0">{{ dia.grouper|date:"l, d \d\e F \d\e Y"|title }}</h5>
+                    </div>
+                    
+                    {% for gasto in dia.list %}
+                    <div class="gasto-item">
+                        <!-- Columna 1: Botón de eliminar -->
+                        <div class="gasto-accion">
+                            <a href="{% url 'presupuestos:eliminar_gasto' gasto.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar">
+                                <i class="bi bi-trash-fill"></i>
+                            </a>
+                        </div>
+                        
+                        <!-- Columna 2: Contenido clickeable -->
+                        <a href="{% url 'presupuestos:ver_gasto' gasto.id %}" class="gasto-contenido text-decoration-none">
+                            <div class="gasto-info">
+                                <h6 class="gasto-nombre mb-1">{{ gasto.nombre }}</h6>
+                                <p class="gasto-categoria text-muted small mb-1">
+                                    {{ gasto.categoria.nombre|default:"Sin categoría" }}
+                                </p>
+                                <p class="gasto-descripcion small text-muted mb-0">
+                                    {{ gasto.descripcion|default:""|truncatechars:60 }}
+                                </p>
+                            </div>
+                        </a>
+                        
+                        <!-- Columna 3: Monto y hora -->
+                        <div class="gasto-monto text-end">
+                            <div class="text-danger fw-bold">
+                                -{{ gasto.monto|floatformat:2 }} {{ gasto.get_moneda_display }}
+                            </div>
+                            <div class="text-muted small">
+                                {{ gasto.fecha|time:"H:i" }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Total del día -->
+                    <div class="total-dia p-2 mb-4 rounded text-end">
+                        <strong>Total del día:</strong>
+                        <span class="text-danger fw-bold ms-2">
+                            -{{ dia.list|sumar_montos|floatformat:2 }} {{ presupuesto.get_moneda_display }}
+                        </span>
+                    </div>
                 </div>
-            </a>
-            
-            <!-- Columna 3: Monto y fecha -->
-            <div class="gasto-monto text-end">
-                <div class="text-danger fw-bold">
-                    -{{ gasto.monto|floatformat:2 }} {{ gasto.get_moneda_display }}
-                </div>
-                <div class="text-muted small">
-                    {{ gasto.fecha|date:"d/m/Y H:i" }}
+            {% endfor %}
+        {% else %}
+            <div class="my-4 col-12 text-center">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    No hay gastos registrados para este presupuesto.
                 </div>
             </div>
-        </div>
-        {% empty %}
-        <div class="my-4 col-12 text-center">
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle me-2"></i>
-                No hay gastos registrados para este presupuesto.
-            </div>
-        </div>
-        {% endfor %}
+        {% endif %}
     </div>
 {% endblock %}
 

@@ -29,14 +29,20 @@
                                 </div>
                                 
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <h4 class="mb-0">{{ presupuesto.monto_total|floatformat:"2" }} {{ presupuesto.get_moneda_display }}</h4>
-                                        <small class="text-muted">Monto Total</small>
+                                    <div class="text-center">
+                                        <h5 class="mb-0">{{ presupuesto.monto_total|floatformat:"2" }} {{ presupuesto.get_moneda_display }}</h5>
+                                        <small class="text-muted">Total</small>
                                     </div>
-                                    <div>
-                                        <h4 class="mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
+                                    <div class="text-center">
+                                        <h5 class="mb-0 text-primary">
+                                            {{ presupuesto.monto_total|add:presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+                                        </h5>
+                                        <small class="text-muted">Gastado</small>
+                                    </div>
+                                    <div class="text-center">
+                                        <h5 class="mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
                                             {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
-                                        </h4>
+                                        </h5>
                                         <small class="text-muted">Restante</small>
                                     </div>
                                 </div>
