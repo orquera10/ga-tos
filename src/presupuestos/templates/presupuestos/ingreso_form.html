@@ -1,0 +1,107 @@
+{% extends 'presupuestos/base.html' %}
+
+{% block title %}{% if ingreso %}Editar{% else %}Nuevo{% endif %} Ingreso{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-cash-stack"></i>
+                    {% if ingreso %}Editar{% else %}Nuevo{% endif %} Ingreso
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="post" class="mt-4">
+                    {{ form.non_field_errors }}
+                    <input type="hidden" name="presupuesto_pk" value="{{ presupuesto.pk }}">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {% for error in form.non_field_errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="row g-3">
+                        <!-- Nombre -->
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">Concepto</label>
+                                {{ form.nombre }}
+                                {% if form.nombre.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.nombre.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <!-- Monto -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.monto.id_for_label }}" class="form-label">Monto ({{ presupuesto.get_moneda_display }})</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.monto }}
+                                </div>
+                                {% if form.monto.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.monto.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Fecha (solo para edición) -->
+                        {% if form.instance.pk %}
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.fecha.id_for_label }}" class="form-label">Fecha y Hora</label>
+                                <div class="input-group">
+                                    {{ form.fecha }}
+                                    <span class="input-group-text"><i class="bi bi-calendar3"></i></span>
+                                </div>
+                                {% if form.fecha.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.fecha.errors.0 }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                            {{ form.fecha }}
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Descripción -->
+                    <div class="mb-4">
+                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripción (opcional)</label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.descripcion.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Botones -->
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Volver
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> {% if ingreso %}Actualizar{% else %}Guardar{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

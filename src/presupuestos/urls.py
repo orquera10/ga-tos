@@ -19,14 +19,17 @@ urlpatterns = [
     path('categoria/<int:pk>/eliminar/', views.CategoriaDeleteView.as_view(), name='eliminar_categoria'),
 
     # URLs de Gasto
-    path('presupuesto/<int:presupuesto_pk>/gasto/nuevo/', views.GastoCreateView.as_view(), name='crear_gasto'),
-
-    # URLs de Gasto
     path('presupuesto/<int:presupuesto_pk>/gastos/', views.GastoListView.as_view(), name='listar_gastos'),
     path('presupuesto/<int:presupuesto_pk>/gasto/nuevo/', views.GastoCreateView.as_view(), name='crear_gasto'),
     path('gasto/<int:pk>/', views.GastoDetailView.as_view(), name='ver_gasto'),
     path('gasto/<int:pk>/editar/', views.GastoUpdateView.as_view(), name='editar_gasto'),
     path('gasto/<int:pk>/eliminar/', views.GastoDeleteView.as_view(), name='eliminar_gasto'),
+    
+    # URLs de Ingreso
+    path('presupuesto/<int:presupuesto_pk>/ingreso/nuevo/', views.IngresoCreateView.as_view(), name='crear_ingreso'),
+    path('ingreso/<int:pk>/', views.IngresoDetailView.as_view(), name='ver_ingreso'),
+    path('ingreso/<int:pk>/editar/', views.IngresoUpdateView.as_view(), name='editar_ingreso'),
+    path('ingreso/<int:pk>/eliminar/', views.IngresoDeleteView.as_view(), name='eliminar_ingreso'),
 
     # Redirección de la raíz a la lista de presupuestos
     path('', RedirectView.as_view(pattern_name='presupuestos:index', permanent=True)),

@@ -2,6 +2,125 @@
 {% load tz %}
 {% load filters %}
 
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .dia-header {
+        background-color: #6c757d;
+    }
+    
+    .transaccion-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #e9ecef;
+        transition: background-color 0.2s;
+    }
+    
+    .transaccion-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .transaccion-accion {
+        width: 40px;
+        text-align: center;
+    }
+    
+    .transaccion-contenido {
+        flex: 1;
+        padding-right: 1rem;
+    }
+    
+    .transaccion-monto {
+        min-width: 120px;
+    }
+    
+    .transaccion-nombre {
+        font-size: 1rem;
+        margin: 0;
+    }
+    
+    .transaccion-detalle {
+        font-size: 0.8rem;
+        margin: 0;
+    }
+    
+    .transaccion-detalle i {
+        margin-right: 0.25rem;
+    }
+    
+    .transaccion-descripcion {
+        font-size: 0.8rem;
+        margin: 0;
+        margin-top: 0.25rem;
+    }
+    
+    .total-dia {
+        background-color: #f8f9fa;
+        font-size: 0.9rem;
+        border-radius: 0.25rem;
+    }
+    
+    /* Estilos para el saldo del día */
+    .saldo-positivo {
+        color: #198754;
+    }
+    
+    .saldo-negativo {
+        color: #dc3545;
+    }
+    
+    @media (max-width: 768px) {
+        .transaccion-item {
+            flex-wrap: wrap;
+            position: relative;
+            padding-left: 40px;
+        }
+        
+        .transaccion-accion {
+            position: absolute;
+            left: 0;
+            top: 1rem;
+        }
+        
+        .transaccion-monto {
+            width: 100%;
+            text-align: left !important;
+            margin-top: 0.5rem;
+            padding-left: 0;
+            border-top: 1px dashed #e9ecef;
+            padding-top: 0.5rem;
+        }
+        
+        .total-dia .d-flex {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .total-dia .d-flex > div {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .transaccion-item {
+            padding: 0.75rem 0 0.75rem 40px;
+        }
+        
+        .transaccion-monto {
+            font-size: 0.9rem;
+        }
+    }
+    
+    /* Estilos para el tooltip de eliminar */
+    [data-bs-toggle="tooltip"] {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
 {% block extra_head %}
 {{ block.super }}
 <style>
@@ -35,8 +154,7 @@
                     {% endif %}
                     <p class="text-muted mb-2">
                         {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
-                    </p>
-                </div>
+                  </div>
                 
                 <div class="btn-group">
                     <a href="{% url 'presupuestos:editar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-outline-warning" title="Editar">
@@ -48,102 +166,226 @@
                 </div>
             </div>
 
-            <!-- Montos -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div class="text-center">
-                    <div class="h5 mb-0">{{ presupuesto.monto_total|floatformat:"2" }} {{ presupuesto.get_moneda_display }}</div>
-                    <small class="text-muted">Total</small>
-                </div>
-                <div class="text-center">
-                    <div class="h5 mb-0 text-primary">
-                        {{ presupuesto.monto_total|add:presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="me-2">
+                            <i class="bi bi-calendar-date fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Fecha de inicio</div>
+                            <div>{{ presupuesto.fecha_inicio|date:"d/m/Y" }}</div>
+                        </div>
                     </div>
-                    <small class="text-muted">Gastado</small>
                 </div>
-                <div class="text-center">
-                    <div class="h5 mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
-                        {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="me-2">
+                            <i class="bi bi-calendar-check fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Fecha de fin</div>
+                            <div>{{ presupuesto.fecha_fin|date:"d/m/Y" }}</div>
+                        </div>
                     </div>
-                    <small class="text-muted">Restante</small>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="me-2">
+                            <i class="bi bi-currency-exchange fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Moneda</div>
+                            <div>{{ presupuesto.get_moneda_display }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="me-2">
+                            <i class="bi bi-cash-coin fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <div class="text-muted small">Ingresos</div>
+                            <div>{{ total_ingresos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Barra de progreso -->
-            <div class="mb-2">
-                <div class="progress" style="height: 10px;">
-                    <div class="progress-bar {% if presupuesto.porcentaje_gastado < 50 %}bg-success{% elif presupuesto.porcentaje_gastado < 75 %}bg-warning{% else %}bg-danger{% endif %}"
-                         role="progressbar" 
-                         style="width: {{ presupuesto.porcentaje_gastado|floatformat:"0" }}%" 
-                         aria-valuenow="{{ presupuesto.porcentaje_gastado|floatformat:"0" }}" 
-                         aria-valuemin="0" 
-                         aria-valuemax="100">
-                    </div>
-                </div>
-                <div class="text-end small text-muted">
-                    {{ presupuesto.porcentaje_gastado|floatformat:"0" }}% gastado
-                </div>
-            </div>
-
             
+            <div class="progress mt-4" style="height: 20px;">
+                <div class="progress-bar bg-{{ presupuesto.porcentaje_gastado|progress_bar_color }}" 
+                     role="progressbar" 
+                     style="width: {{ presupuesto.porcentaje_gastado|floatformat:0 }}%" 
+                     aria-valuenow="{{ presupuesto.porcentaje_gastado|floatformat:0 }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                    {{ presupuesto.porcentaje_gastado|floatformat:0 }}%
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="text-muted small">Presupuesto Inicial</div>
+                        <h5 class="mb-0">{{ presupuesto.monto_total|floatformat:2 }} {{ presupuesto.get_moneda_display }}</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="text-muted small">Ingresos</div>
+                        <h5 class="text-success mb-0">+{{ total_ingresos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="text-muted small">Total Disponible</div>
+                        <h5 class="text-primary mb-0">{{ monto_total_con_ingresos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <div class="text-muted small">Gastado</div>
+                        <h5 class="text-danger mb-0">-{{ total_gastos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</h5>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="text-center">
+                        <div class="text-muted small">Saldo Restante</div>
+                        <h3 class="mb-0 {% if monto_total_con_ingresos > total_gastos %}text-success{% else %}text-danger{% endif %}">
+                            {{ monto_total_con_ingresos|sub:total_gastos|floatformat:2 }} {{ presupuesto.get_moneda_display }}
+                        </h3>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="mt-4">
-        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger w-100 py-2">
-            <i class="bi bi-plus-circle"></i> Ga$to
+    <div class="my-4 d-flex gap-2">
+        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger flex-grow-1 py-2">
+            <i class="bi bi-plus-circle"></i> Gasto
+        </a>
+        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success flex-grow-1 py-2">
+            <i class="bi bi-plus-circle"></i> Ingreso
         </a>
     </div>
 
-    <div class="gastos-container">
-        {% if gastos %}
-            {% regroup gastos by fecha.date as gastos_por_dia %}
+    <div class="transacciones-container">
+        {% with transacciones=ingresos|add:gastos %}
+        {% if transacciones %}
+            {% regroup transacciones|dictsortreversed:"fecha" by fecha.date as transacciones_por_dia %}
             
-            {% for dia in gastos_por_dia %}
-                <div class="dia-gastos">
-                    <div class="dia-header bg-light p-2 mb-2 rounded">
+            {% for dia in transacciones_por_dia %}
+                <div class="dia-transacciones">
+                    <div class="dia-header p-2 mb-2 rounded text-white">
                         <h5 class="mb-0">{{ dia.grouper|date:"l, d \d\e F \d\e Y"|title }}</h5>
                     </div>
                     
-                    {% for gasto in dia.list %}
-                    <div class="gasto-item">
+                    {% for transaccion in dia.list %}
+                    <div class="transaccion-item">
                         <!-- Columna 1: Botón de eliminar -->
-                        <div class="gasto-accion">
-                            <a href="{% url 'presupuestos:eliminar_gasto' gasto.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar">
+                        <div class="transaccion-accion">
+                            {% if transaccion|model_name == 'gasto' %}
+                            <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar gasto">
                                 <i class="bi bi-trash-fill"></i>
                             </a>
+                            {% else %}
+                            <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar ingreso">
+                                <i class="bi bi-trash-fill"></i>
+                            </a>
+                            {% endif %}
                         </div>
                         
-                        <!-- Columna 2: Contenido clickeable -->
-                        <a href="{% url 'presupuestos:ver_gasto' gasto.id %}" class="gasto-contenido text-decoration-none">
-                            <div class="gasto-info">
-                                <h6 class="gasto-nombre mb-1">{{ gasto.nombre }}</h6>
-                                <p class="gasto-categoria text-muted small mb-1">
-                                    {{ gasto.categoria.nombre|default:"Sin categoría" }}
+                        <!-- Columna 2: Contenido -->
+                        {% if transaccion|model_name == 'gasto' %}
+                        <a href="{% url 'presupuestos:ver_gasto' transaccion.id %}" class="transaccion-contenido text-decoration-none">
+                            <div class="transaccion-info">
+                                <h6 class="transaccion-nombre mb-1">{{ transaccion.nombre }}</h6>
+                                <p class="transaccion-detalle text-muted small mb-1">
+                                    <i class="bi bi-credit-card text-danger"></i> {{ transaccion.categoria.nombre|default:"Sin categoría" }}
                                 </p>
-                                <p class="gasto-descripcion small text-muted mb-0">
-                                    {{ gasto.descripcion|default:""|truncatechars:60 }}
+                                {% if transaccion.descripcion %}
+                                <p class="transaccion-descripcion small text-muted mb-0">
+                                    {{ transaccion.descripcion|truncatechars:60 }}
                                 </p>
+                                {% endif %}
                             </div>
                         </a>
+                        {% else %}
+                        <a href="{% url 'presupuestos:ver_ingreso' transaccion.id %}" class="transaccion-contenido text-decoration-none">
+                            <div class="transaccion-info">
+                                <h6 class="transaccion-nombre mb-1">{{ transaccion.nombre }}</h6>
+                                <p class="transaccion-detalle text-muted small mb-1">
+                                    <i class="bi bi-cash-coin text-success"></i> Ingreso
+                                </p>
+                                {% if transaccion.descripcion %}
+                                <p class="transaccion-descripcion small text-muted mb-0">
+                                    {{ transaccion.descripcion|truncatechars:60 }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </a>
+                        {% endif %}
                         
                         <!-- Columna 3: Monto y hora -->
-                        <div class="gasto-monto text-end">
+                        <div class="transaccion-monto text-end">
+                            {% if transaccion|model_name == 'gasto' %}
                             <div class="text-danger fw-bold">
-                                -{{ gasto.monto|floatformat:2 }} {{ gasto.get_moneda_display }}
+                                -{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}
                             </div>
+                            {% else %}
+                            <div class="text-success fw-bold">
+                                +{{ transaccion.monto|floatformat:2 }}
+                            </div>
+                            {% endif %}
                             <div class="text-muted small">
-                                {{ gasto.fecha|time:"H:i" }}
+                                {{ transaccion.fecha|time:"H:i" }}
                             </div>
                         </div>
                     </div>
                     {% endfor %}
                     
                     <!-- Total del día -->
-                    <div class="total-dia p-2 mb-4 rounded text-end">
-                        <strong>Total del día:</strong>
-                        <span class="text-danger fw-bold ms-2">
-                            -{{ dia.list|sumar_montos|floatformat:2 }} {{ presupuesto.get_moneda_display }}
-                        </span>
+                    <div class="total-dia p-2 mb-4 rounded">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                {% with gastos_dia=dia.list|select_model:'gasto' %}
+                                {% if gastos_dia %}
+                                <span class="me-3">
+                                    <strong>Gastos:</strong>
+                                    <span class="text-danger fw-bold ms-1">-{{ gastos_dia|sumar_montos|floatformat:2 }}</span>
+                                </span>
+                                {% endif %}
+                                {% endwith %}
+                                
+                                {% with ingresos_dia=dia.list|select_model:'ingreso' %}
+                                {% if ingresos_dia %}
+                                <span class="me-3">
+                                    <strong>Ingresos:</strong>
+                                    <span class="text-success fw-bold ms-1">+{{ ingresos_dia|sumar_montos|floatformat:2 }}</span>
+                                </span>
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                            
+                            <div>
+                                <strong>Total del día:</strong>
+                                {% with ingresos_dia=dia.list|select_model:'ingreso' %}
+                                {% with gastos_dia=dia.list|select_model:'gasto' %}
+                                {% with total_ingresos=ingresos_dia|sumar_montos total_gastos=gastos_dia|sumar_montos %}
+                                {% with saldo_dia=total_ingresos|sub:total_gastos %}
+                                <span class="fw-bold ms-2 {% if saldo_dia > 0 %}text-success{% elif saldo_dia < 0 %}text-danger{% endif %}">
+                                    {% if saldo_dia > 0 %}+{% endif %}{{ saldo_dia|floatformat:2 }}
+                                </span>
+                                {% endwith %}
+                                {% endwith %}
+                                {% endwith %}
+                                {% endwith %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             {% endfor %}
@@ -151,10 +393,11 @@
             <div class="my-4 col-12 text-center">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle me-2"></i>
-                    No hay gastos registrados para este presupuesto.
+                    No hay transacciones registradas para este presupuesto.
                 </div>
             </div>
         {% endif %}
+        {% endwith %}
     </div>
 {% endblock %}
 

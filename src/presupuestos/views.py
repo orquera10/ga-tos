@@ -3,8 +3,9 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
 from django.db import models
-from .models import Presupuesto, Categoria, Gasto
-from .forms import PresupuestoForm, CategoriaForm, GastoForm
+from django.core.exceptions import ValidationError
+from .models import Presupuesto, Categoria, Gasto, Ingreso
+from .forms import PresupuestoForm, CategoriaForm, GastoForm, IngresoForm
 
 # Vistas de Presupuesto
 def presupuestos_list(request):
@@ -18,7 +19,26 @@ class PresupuestoDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['gastos'] = self.object.gastos.all().order_by('-fecha')
+        
+        # Obtener gastos e ingresos ordenados
+        gastos = list(self.object.gastos.all().order_by('-fecha'))
+        ingresos = list(self.object.ingresos.all().order_by('-fecha'))
+        
+        # Calcular totales
+        total_gastos = sum(gasto.monto for gasto in gastos)
+        total_ingresos = sum(ingreso.monto for ingreso in ingresos)
+        
+        # Agregar al contexto
+        context['gastos'] = gastos
+        context['ingresos'] = ingresos
+        context['total_gastos'] = total_gastos
+        context['total_ingresos'] = total_ingresos
+        context['monto_total_con_ingresos'] = self.object.monto_total + total_ingresos
+        
+        # Para depuración
+        context['debug_gastos_count'] = len(gastos)
+        context['debug_ingresos_count'] = len(ingresos)
+        
         return context
 
 class PresupuestoCreateView(CreateView):
@@ -195,6 +215,114 @@ class GastoDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
         return context
+
+class IngresoDetailView(DetailView):
+    model = Ingreso
+    template_name = 'presupuestos/ingreso_detail.html'
+    context_object_name = 'ingreso'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['presupuesto'] = self.object.presupuesto
+        return context
+
+
+class IngresoUpdateView(UpdateView):
+    model = Ingreso
+    form_class = IngresoForm
+    template_name = 'presupuestos/ingreso_form.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('presupuestos:ver_ingreso', kwargs={'pk': self.object.pk})
+    
+    def form_valid(self, form):
+        # Guardar el monto anterior para el cálculo
+        old_monto = self.get_object().monto
+        
+        # Guardar el formulario para obtener el nuevo ingreso
+        response = super().form_valid(form)
+        
+        # Actualizar el monto restante del presupuesto usando el método del modelo
+        self.object.presupuesto.actualizar_monto_restante()
+        
+        messages.success(self.request, 'Ingreso actualizado correctamente')
+        return response
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['presupuesto'] = self.object.presupuesto
+        context['editing'] = True
+        return context
+
+
+class IngresoDeleteView(DeleteView):
+    model = Ingreso
+    template_name = 'presupuestos/ingreso_confirm_delete.html'
+    
+    def get_success_url(self):
+        return reverse_lazy('presupuestos:ver_presupuesto', 
+                          kwargs={'pk': self.object.presupuesto.pk})
+    
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        presupuesto = self.object.presupuesto
+        
+        # Guardar el monto antes de eliminar
+        monto_ingreso = self.object.monto
+        
+        # Eliminar el ingreso
+        response = super().delete(request, *args, **kwargs)
+        
+        # Actualizar el monto restante del presupuesto usando el método del modelo
+        presupuesto.actualizar_monto_restante()
+        
+        messages.success(self.request, 'Ingreso eliminado correctamente')
+        return response
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['presupuesto'] = self.object.presupuesto
+        return context
+
+
+class IngresoCreateView(CreateView):
+    model = Ingreso
+    form_class = IngresoForm
+    template_name = 'presupuestos/ingreso_form.html'
+
+    def get_success_url(self):
+        return reverse_lazy('presupuestos:ver_presupuesto', kwargs={'pk': self.kwargs['presupuesto_pk']})
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['initial'] = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        return kwargs
+
+    def form_valid(self, form):
+        try:
+            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+            form.instance.presupuesto = presupuesto
+            
+            # Guardar el ingreso
+            ingreso = form.save()
+            
+            # Actualizar el monto restante usando el método del modelo
+            presupuesto.actualizar_monto_restante()
+            
+            messages.success(self.request, 'Ingreso registrado exitosamente')
+            return super().form_valid(form)
+        except ValidationError as e:
+            form.add_error(None, str(e))
+            return self.form_invalid(form)
+        except Exception as e:
+            form.add_error(None, f'Error inesperado: {str(e)}')
+            return self.form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+        return context
+
 
 class GastoListView(ListView):
     model = Gasto

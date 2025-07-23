@@ -1,5 +1,5 @@
 from django import forms
-from .models import Presupuesto, Categoria, Gasto
+from .models import Presupuesto, Categoria, Gasto, Ingreso
 from django.utils import timezone
 
 class CapitalizeFieldsMixin:
@@ -77,6 +77,53 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
     
     def save(self, commit=True):
         # Para nuevos gastos, la fecha ya se establece en el modelo
+        # Para ediciones, usar la fecha del formulario sin conversión de zona horaria
+        if 'fecha' in self.changed_data and self.cleaned_data.get('fecha'):
+            self.instance.fecha = self.cleaned_data['fecha']
+        return super().save(commit)
+
+    def clean_monto(self):
+        monto = self.cleaned_data.get('monto')
+        if monto is not None and monto <= 0:
+            raise forms.ValidationError('El monto debe ser mayor a cero')
+        return monto
+
+
+class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
+    presupuesto_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    fecha = forms.DateTimeField(
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'datetime-local',
+                'class': 'form-control',
+                'step': '1'  # Permite segundos
+            },
+            format='%Y-%m-%dT%H:%M:%S'
+        ),
+        required=False  # No requerido para nuevos ingresos
+    )
+
+    class Meta:
+        model = Ingreso
+        fields = ['nombre', 'monto', 'fecha', 'descripcion', 'presupuesto_pk']
+        widgets = {
+            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'})
+        }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Solo mostrar el campo de fecha si estamos editando un ingreso existente
+        if not self.instance or not self.instance.pk:
+            self.fields['fecha'].widget = forms.HiddenInput()
+        elif self.instance.fecha:
+            # Asegurarse de que la fecha esté en la zona horaria local para mostrarla correctamente
+            local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+    
+    def save(self, commit=True):
+        # Para nuevos ingresos, la fecha ya se establece en el modelo
         # Para ediciones, usar la fecha del formulario sin conversión de zona horaria
         if 'fecha' in self.changed_data and self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']

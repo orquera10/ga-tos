@@ -1,0 +1,119 @@
+{% extends 'presupuestos/base.html' %}
+{% load static %}
+
+{% block title %}Detalle de Ingreso - {{ ingreso.nombre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ingreso-header {
+        background-color: #19875415;
+        border-left: 4px solid #198754;
+    }
+    .btn-back {
+        color: #198754;
+        border-color: #198754;
+    }
+    .btn-back:hover {
+        background-color: #198754;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <a href="{% url 'presupuestos:ver_presupuesto' ingreso.presupuesto.id %}" class="btn btn-outline-secondary btn-sm mb-3">
+                <i class="bi bi-arrow-left"></i> Volver al presupuesto
+            </a>
+            
+            <div class="card">
+                <div class="card-header ingreso-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-cash-coin text-success me-2"></i>
+                            {{ ingreso.nombre }}
+                        </h4>
+                        <div>
+                            <a href="{% url 'presupuestos:editar_ingreso' ingreso.id %}" class="btn btn-sm btn-outline-primary me-2">
+                                <i class="bi bi-pencil"></i> Editar
+                            </a>
+                            <a href="{% url 'presupuestos:eliminar_ingreso' ingreso.id %}" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                                    <i class="bi bi-cash-coin fs-3 text-success"></i>
+                                </div>
+                                <div>
+                                    <h2 class="mb-0 text-success">+{{ ingreso.monto|floatformat:2 }} {{ ingreso.presupuesto.get_moneda_display }}</h2>
+                                    <div class="text-muted">Monto del ingreso</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="d-flex flex-column h-100 justify-content-between">
+                                <div class="mb-2">
+                                    <span class="text-muted">Fecha:</span>
+                                    <strong>{{ ingreso.fecha|date:"d/m/Y H:i" }}</strong>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="text-muted">Presupuesto:</span>
+                                    <strong>{{ ingreso.presupuesto.nombre }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if ingreso.descripcion %}
+                    <div class="card bg-light mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Descripción</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="mb-0">{{ ingreso.descripcion|linebreaksbr }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <div class="text-muted small">
+                            Creado el {{ ingreso.fecha_creacion|date:"d/m/Y" }}
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'presupuestos:eliminar_ingreso' ingreso.id %}" class="btn btn-outline-danger">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </a>
+                            <a href="{% url 'presupuestos:editar_ingreso' ingreso.id %}" class="btn btn-primary">
+                                <i class="bi bi-pencil"></i> Editar Ingreso
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Código JavaScript adicional si es necesario
+    document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar tooltips de Bootstrap
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}
