@@ -281,3 +281,11 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 .bg-ternary{
     background-color: var(--accent-primary) !important;
 }
+
+.texto-chico{
+    font-size: 0.8rem !important;
+}
+
+.texto-chico h5{
+    font-size: 0.8rem !important;
+}
