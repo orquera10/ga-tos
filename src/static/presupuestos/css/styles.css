@@ -233,10 +233,176 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     color: var(--tx-secondary);
 }
 
+/* Estilos para categorías */
+.categoria-card {
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+    background: transparent;
+    box-shadow: none;
+}
+
+.categoria-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.categoria-card .card-body {
+    padding: 1.25rem;
+}
+
+.categoria-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.categoria-descripcion {
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+}
+
+.categoria-badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+}
+
+.categoria-actions {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #dee2e6;
+}
+
 .gasto-descripcion {
     font-size: 0.8rem;
     color: var(--tx-ternary);
     margin-bottom: 0;
+}
+
+/* Estilos para transacciones */
+.transaccion-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem 0;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s;
+}
+
+.transaccion-item:hover {
+    background-color: #f8f9fa;
+}
+
+.transaccion-accion {
+    width: 40px;
+    text-align: center;
+}
+
+.transaccion-contenido {
+    flex: 1;
+    padding-right: 1rem;
+}
+
+.transaccion-monto {
+    min-width: 120px;
+}
+
+.transaccion-nombre {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.transaccion-detalle {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.transaccion-detalle i {
+    margin-right: 0.25rem;
+}
+
+.transaccion-descripcion {
+    font-size: 0.8rem;
+    margin: 0;
+    margin-top: 0.25rem;
+}
+
+/* Estilos para el encabezado del día */
+.dia-header {
+    background-color: var(--bg-primary);
+    position: sticky;
+    top: 56px; /* Altura del navbar */
+    z-index: 10;
+    
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Estilos para el total del día */
+.total-dia {
+    
+    border-top: 2px solid #dee2e6;
+    font-weight: 500;
+    font-size: 0.9rem;
+    border-radius: 0.25rem;
+}
+
+/* Estilos para el saldo */
+.saldo-positivo {
+    color: #198754;
+}
+
+.saldo-negativo {
+    color: #dc3545;
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .transaccion-item {
+        flex-wrap: wrap;
+        position: relative;
+        padding-left: 40px;
+    }
+    
+    .transaccion-accion {
+        position: absolute;
+        left: 0;
+        top: 1rem;
+    }
+    
+    .transaccion-monto {
+        width: 100%;
+        text-align: left !important;
+        margin-top: 0.5rem;
+        padding-left: 0;
+        border-top: 1px dashed #e9ecef;
+        padding-top: 0.5rem;
+    }
+    
+    .total-dia .d-flex {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .total-dia .d-flex > div {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 576px) {
+    .transaccion-item {
+        padding: 0.75rem 0 0.75rem 40px;
+    }
+    
+    .transaccion-monto {
+        font-size: 0.9rem;
+    }
+}
+
+/* Estilos para el tooltip de eliminar */
+[data-bs-toggle="tooltip"] {
+    cursor: pointer;
 }
 
 .gasto-monto {

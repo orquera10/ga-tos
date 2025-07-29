@@ -14,42 +14,6 @@
     </div>
     
     {% if categorias %}
-                    <style>
-                        .categoria-card {
-                            border: 1px solid rgba(0,0,0,0.1);
-                            border-radius: 8px;
-                            transition: all 0.3s ease;
-                            margin-bottom: 1rem;
-                            background: transparent;
-                            box-shadow: none;
-                        }
-                        .categoria-card:hover {
-                            transform: translateY(-2px);
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                        }
-                        .categoria-card .card-body {
-                            padding: 1.25rem;
-                        }
-                        .categoria-title {
-                            font-size: 1.1rem;
-                            font-weight: 500;
-                            margin-bottom: 0.5rem;
-                        }
-                        .categoria-descripcion {
-                            color: #6c757d;
-                            margin-bottom: 0.75rem;
-                        }
-                        .categoria-badge {
-                            font-size: 0.85rem;
-                            padding: 0.35em 0.65em;
-                        }
-                        .categoria-actions {
-                            margin-top: 0.75rem;
-                            padding-top: 0.75rem;
-                            border-top: 1px dashed #dee2e6;
-                        }
-                    </style>
-
                     <div class="row g-3">
                         {% for categoria in categorias %}
                         <div class="col-12 col-md-6 col-lg-4">
