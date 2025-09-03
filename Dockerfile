@@ -14,4 +14,4 @@ RUN pip install -r requirements.txt
 
 COPY ./ ./
 
-CMD ["python", "src/manage.py", "runserver", "0.0.0.0:8001"]
+CMD ["python", "src/manage.py", "runserver", "0.0.0.0:8005"]
