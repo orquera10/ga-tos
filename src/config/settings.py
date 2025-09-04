@@ -28,6 +28,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']  # Permite todas las direcciones IP (solo para desarrollo)
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://gastos.darioapp.online"
+]
 # O si prefieres ser más específico, puedes usar:
 # ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.16', '192.168.5.96', '192.168.101.18']
 
