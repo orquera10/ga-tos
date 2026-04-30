@@ -1,0 +1,4 @@
+Watching for file changes with StatReloader
+[30/Apr/2026 13:17:47] "GET / HTTP/1.1" 301 0
+[30/Apr/2026 13:17:47] "GET /presupuestos/ HTTP/1.1" 200 6288
+[30/Apr/2026 13:17:47,599] - Broken pipe from ('127.0.0.1', 56755)

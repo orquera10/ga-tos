@@ -152,15 +152,15 @@
                     </div>
                     
                     {% for transaccion in dia.list %}
-                    <div class="transaccion-item gasto-item">
+                    <div class="transaccion-item gasto-item {% if transaccion|model_name == 'gasto' %}transaccion-gasto{% else %}transaccion-ingreso{% endif %}">
                         <!-- Columna 1: Botón de eliminar -->
                         <div class="transaccion-accion gasto-accion">
                             {% if transaccion|model_name == 'gasto' %}
-                            <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar gasto">
+                            <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar gasto" aria-label="Eliminar gasto">
                                 <i class="bi bi-trash-fill"></i>
                             </a>
                             {% else %}
-                            <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar ingreso">
+                            <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar ingreso" aria-label="Eliminar ingreso">
                                 <i class="bi bi-trash-fill"></i>
                             </a>
                             {% endif %}
@@ -169,6 +169,9 @@
                         <!-- Columna 2: Contenido -->
                         {% if transaccion|model_name == 'gasto' %}
                         <a href="{% url 'presupuestos:ver_gasto' transaccion.id %}" class="transaccion-contenido text-decoration-none gasto-contenido">
+                            <span class="transaccion-icono" aria-hidden="true">
+                                <i class="bi bi-credit-card"></i>
+                            </span>
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
@@ -183,6 +186,9 @@
                         </a>
                         {% else %}
                         <a href="{% url 'presupuestos:ver_ingreso' transaccion.id %}" class="transaccion-contenido text-decoration-none gasto-contenido">
+                            <span class="transaccion-icono" aria-hidden="true">
+                                <i class="bi bi-cash-coin"></i>
+                            </span>
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
@@ -219,7 +225,7 @@
                     <hr class="separador my-0">
                     <div class="p-2 mb-4 rounded">
                         <div>
-                            <div class="d-flex justify-content-between">
+                            <div class="resumen-dia">
                                 {% with gastos_dia=dia.list|select_model:'gasto' %}
                                 {% if gastos_dia %}
                                 <span class="me-3">

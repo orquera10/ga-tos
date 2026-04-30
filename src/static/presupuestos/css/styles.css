@@ -301,10 +301,40 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 .transaccion-contenido {
     flex: 1;
     padding-right: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
 }
 
 .transaccion-monto {
     min-width: 120px;
+}
+
+.transaccion-icono {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--tx-primary);
+}
+
+.transaccion-gasto .transaccion-icono {
+    color: var(--tx-secondary);
+    background: rgba(191, 86, 86, 0.14);
+}
+
+.transaccion-ingreso .transaccion-icono {
+    color: var(--tx-primary);
+    background: rgba(25, 148, 120, 0.16);
+}
+
+.transaccion-info {
+    min-width: 0;
 }
 
 .transaccion-nombre {
@@ -346,6 +376,17 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     border-radius: 0.25rem;
 }
 
+.resumen-dia {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1.5rem;
+    text-align: right;
+}
+
+.resumen-dia > span {
+    min-width: 92px;
+}
+
 /* Estilos para el saldo */
 .saldo-positivo {
     color: #198754;
@@ -357,25 +398,126 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 /* Estilos responsivos */
 @media (max-width: 768px) {
+    .transacciones-container {
+        margin-left: -0.25rem;
+        margin-right: -0.25rem;
+    }
+
+    .dia-header {
+        top: 56px;
+        margin-left: -0.25rem;
+        margin-right: -0.25rem;
+    }
+
+    .dia-header h5 {
+        font-size: 0.95rem;
+    }
+
     .transaccion-item {
-        flex-wrap: wrap;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.55rem;
         position: relative;
-        padding-left: 40px;
+        align-items: center;
+        padding: 0.85rem 0.25rem;
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+        border-radius: 0;
+    }
+
+    .transaccion-item:hover {
+        background-color: transparent;
     }
     
     .transaccion-accion {
-        position: absolute;
-        left: 0;
-        top: 1rem;
+        flex: 0 0 28px;
+        width: 28px;
+        text-align: center;
+        padding-left: 0;
+        margin-top: 0;
+        opacity: 0.78;
+    }
+
+    .transaccion-accion .btn {
+        font-size: 0.9rem;
+    }
+
+    .transaccion-accion .btn i {
+        margin-right: 0;
+    }
+
+    .transaccion-accion .btn::after {
+        content: "";
+    }
+
+    .transaccion-contenido {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding-right: 0;
+        gap: 0.65rem;
     }
     
     .transaccion-monto {
-        width: 100%;
-        text-align: left !important;
-        margin-top: 0.5rem;
+        flex: 0 0 98px;
+        min-width: 82px;
+        max-width: 98px;
+        text-align: right !important;
+        margin-top: 0;
         padding-left: 0;
-        border-top: 1px dashed #e9ecef;
-        padding-top: 0.5rem;
+        border-top: 0;
+        padding-top: 0;
+        font-size: 0.9rem;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+    }
+
+    .transaccion-monto .small {
+        font-size: 0.75rem;
+    }
+
+    .transaccion-icono {
+        width: 40px;
+        height: 40px;
+        flex-basis: 40px;
+        font-size: 1.05rem;
+    }
+
+    .transaccion-nombre {
+        max-width: 100%;
+        font-size: 0.98rem;
+        line-height: 1.15;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .transaccion-detalle,
+    .transaccion-descripcion {
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .transaccion-detalle {
+        margin-bottom: 0 !important;
+    }
+
+    .gasto-item:hover {
+        background-color: transparent;
+    }
+
+    .resumen-dia {
+        gap: 0.75rem;
+        justify-content: flex-end;
+    }
+
+    .resumen-dia > span {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    .resumen-dia p {
+        font-size: 0.76rem;
     }
     
     .total-dia .d-flex {
@@ -392,11 +534,29 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 @media (max-width: 576px) {
     .transaccion-item {
-        padding: 0.75rem 0 0.75rem 40px;
+        gap: 0.45rem;
+        padding: 0.78rem 0;
     }
     
     .transaccion-monto {
-        font-size: 0.9rem;
+        flex-basis: 84px;
+        min-width: 76px;
+        max-width: 84px;
+        font-size: 0.84rem;
+    }
+
+    .transaccion-icono {
+        width: 36px;
+        height: 36px;
+        flex-basis: 36px;
+        font-size: 0.95rem;
+    }
+
+    .transaccion-accion {
+        flex-basis: 24px;
+        width: 24px;
+        padding-left: 0;
+        font-size: 0.78rem;
     }
 }
 
