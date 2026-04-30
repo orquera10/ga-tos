@@ -2,3 +2,51 @@ Watching for file changes with StatReloader
 [30/Apr/2026 13:17:47] "GET / HTTP/1.1" 301 0
 [30/Apr/2026 13:17:47] "GET /presupuestos/ HTTP/1.1" 200 6288
 [30/Apr/2026 13:17:47,599] - Broken pipe from ('127.0.0.1', 56755)
+[30/Apr/2026 13:21:56] "GET / HTTP/1.1" 301 0
+[30/Apr/2026 13:21:57] "GET /presupuestos/ HTTP/1.1" 200 6288
+[30/Apr/2026 13:21:57] "GET /static/presupuestos/css/styles.css HTTP/1.1" 200 9230
+[30/Apr/2026 13:21:57] "GET /static/presupuestos/img/logoGa%24tos.png HTTP/1.1" 200 4115
+[30/Apr/2026 13:21:59] "GET /presupuesto/2/ HTTP/1.1" 200 122710
+Not Found: /favicon.ico
+[30/Apr/2026 13:22:00] "GET /favicon.ico HTTP/1.1" 404 7911
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:22:09] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:23:43] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:23:43] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:24:38] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:24:38] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:24:39] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:24:39] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:24:41] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:24:41] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:24:46] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:24:46] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:25:48] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:25:48] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:25:49] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:25:49] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:25:50] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:25:50] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:25:50] "GET /static/presupuestos/img/logoGa%24tos.png HTTP/1.1" 200 4115
+[30/Apr/2026 13:25:50] "GET /static/presupuestos/css/styles.css HTTP/1.1" 200 12092
+Not Found: /favicon.ico
+[30/Apr/2026 13:25:50] "GET /favicon.ico HTTP/1.1" 404 7911
+[30/Apr/2026 13:26:01] "GET /gasto/50/ HTTP/1.1" 200 4285
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:26:01] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:26:01] "GET /static/presupuestos/css/styles.css HTTP/1.1" 304 0
+[30/Apr/2026 13:26:03] "GET /presupuesto/2/ HTTP/1.1" 200 135022
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:26:03] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:26:56] "GET /presupuesto/2/ HTTP/1.1" 200 134908
+Not Found: /.well-known/appspecific/com.chrome.devtools.json
+[30/Apr/2026 13:26:56] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
+[30/Apr/2026 13:26:56] "GET /static/presupuestos/css/styles.css HTTP/1.1" 200 12250

@@ -16,6 +16,12 @@ env/
 media/
 staticfiles/
 
+# Local databases
+*.sqlite3
+*.sqlite
+*.db
+src/db/
+
 # Environment variables
 .env
 .env.*
