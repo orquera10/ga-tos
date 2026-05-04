@@ -141,10 +141,7 @@
     </div>
 
     <div class="transacciones-container">
-        {% with transacciones=ingresos|add:gastos %}
-        {% if transacciones %}
-            {% regroup transacciones|dictsortreversed:"fecha" by fecha.date as transacciones_por_dia %}
-            
+        {% if transacciones_por_dia %}
             {% for dia in transacciones_por_dia %}
                 <div class="dia-transacciones gastos-container">
                     <div class="dia-header p-2 mb-2 rounded text-white">
@@ -215,7 +212,7 @@
                             </div>
                             {% endif %}
                             <div class="text-muted small">
-                                {{ transaccion.fecha|time:"H:i" }}
+                                {{ transaccion.fecha_local|time:"H:i" }}
                             </div>
                         </div>
                     </div>
@@ -271,7 +268,6 @@
                 </div>
             </div>
         {% endif %}
-        {% endwith %}
     </div>
 {% endblock %}
 

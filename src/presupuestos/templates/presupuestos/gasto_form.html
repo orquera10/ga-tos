@@ -76,8 +76,7 @@
                             </div>
                         </div>
                         
-                        <!-- Fecha (solo para edición) -->
-                        {% if form.instance.pk %}
+                        <!-- Fecha -->
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="{{ form.fecha.id_for_label }}" class="form-label">Fecha y Hora</label>
@@ -92,9 +91,6 @@
                                 {% endif %}
                             </div>
                         </div>
-                        {% else %}
-                            {{ form.fecha }}
-                        {% endif %}
                     </div>
                     
                     <!-- Descripción -->

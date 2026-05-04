@@ -4,6 +4,8 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+from itertools import groupby
 from .models import Presupuesto, Categoria, Gasto, Ingreso
 from .forms import PresupuestoForm, CategoriaForm, GastoForm, IngresoForm
 
@@ -17,6 +19,12 @@ class PresupuestoDetailView(DetailView):
     template_name = 'presupuestos/ver_presupuesto.html'
     context_object_name = 'presupuesto'
 
+    def _fecha_local(self, transaccion):
+        fecha = transaccion.fecha
+        if timezone.is_aware(fecha):
+            return timezone.localtime(fecha)
+        return fecha
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
@@ -27,10 +35,20 @@ class PresupuestoDetailView(DetailView):
         # Calcular totales
         total_gastos = sum(gasto.monto for gasto in gastos)
         total_ingresos = sum(ingreso.monto for ingreso in ingresos)
+
+        transacciones = ingresos + gastos
+        for transaccion in transacciones:
+            transaccion.fecha_local = self._fecha_local(transaccion)
+        transacciones.sort(key=lambda transaccion: transaccion.fecha_local, reverse=True)
+        transacciones_por_dia = [
+            {'grouper': fecha, 'list': list(items)}
+            for fecha, items in groupby(transacciones, key=lambda transaccion: transaccion.fecha_local.date())
+        ]
         
         # Agregar al contexto
         context['gastos'] = gastos
         context['ingresos'] = ingresos
+        context['transacciones_por_dia'] = transacciones_por_dia
         context['total_gastos'] = total_gastos
         context['total_ingresos'] = total_ingresos
         context['monto_total_con_ingresos'] = self.object.monto_total + total_ingresos

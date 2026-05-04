@@ -20,14 +20,18 @@ class CapitalizeFieldsMixin:
 class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
     fecha_inicio = forms.DateField(
         widget=forms.DateInput(
-            attrs={'type': 'date', 'class': 'form-control', 'value': timezone.now().date().isoformat()}
+            attrs={'type': 'date', 'class': 'form-control'},
+            format='%Y-%m-%d'
         ),
+        input_formats=['%Y-%m-%d'],
         initial=timezone.now().date()
     )
     fecha_fin = forms.DateField(
         widget=forms.DateInput(
-            attrs={'type': 'date', 'class': 'form-control', 'value': timezone.now().date().isoformat()}
+            attrs={'type': 'date', 'class': 'form-control'},
+            format='%Y-%m-%d'
         ),
+        input_formats=['%Y-%m-%d'],
         initial=timezone.now().date()
     )
     
@@ -38,6 +42,12 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
             'monto_total': forms.NumberInput(attrs={'class': 'form-control'})
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial['fecha_inicio'] = self.instance.fecha_inicio
+            self.initial['fecha_fin'] = self.instance.fecha_fin
 
 class CategoriaForm(CapitalizeFieldsMixin, forms.ModelForm):
     class Meta:
@@ -55,7 +65,8 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             },
             format='%Y-%m-%dT%H:%M:%S'
         ),
-        required=False  # No requerido para nuevos gastos
+        input_formats=['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'],
+        required=True
     )
 
     class Meta:
@@ -67,18 +78,17 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Solo mostrar el campo de fecha si estamos editando un gasto existente
-        if not self.instance or not self.instance.pk:
-            self.fields['fecha'].widget = forms.HiddenInput()
-        elif self.instance.fecha:
+        # Mostrar la fecha existente al editar, o la fecha actual al crear.
+        if self.instance and self.instance.pk and self.instance.fecha:
             # Asegurarse de que la fecha esté en la zona horaria local para mostrarla correctamente
             local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
-            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+        else:
+            local_dt = timezone.localtime(timezone.now())
+        self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True):
-        # Para nuevos gastos, la fecha ya se establece en el modelo
-        # Para ediciones, usar la fecha del formulario sin conversión de zona horaria
-        if 'fecha' in self.changed_data and self.cleaned_data.get('fecha'):
+        # Usar siempre la fecha enviada por el formulario.
+        if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)
 

@@ -50,3 +50,4 @@ Not Found: /.well-known/appspecific/com.chrome.devtools.json
 Not Found: /.well-known/appspecific/com.chrome.devtools.json
 [30/Apr/2026 13:26:56] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 8022
 [30/Apr/2026 13:26:56] "GET /static/presupuestos/css/styles.css HTTP/1.1" 200 12250
+E:\datos\Documentos\proyectoGastos\src\presupuestos\forms.py changed, reloading.

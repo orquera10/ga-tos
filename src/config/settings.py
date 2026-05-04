@@ -10,27 +10,65 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+
+def env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def env_list(name, default=None):
+    value = os.environ.get(name)
+    if value is None:
+        return default or []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+def env_int(name, default):
+    value = os.environ.get(name)
+    if value is None or value.strip() == '':
+        return default
+    return int(value)
+
+
+def load_env_file(path):
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # Ajustamos la ruta BASE_DIR para que apunte al directorio src
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_env_file(BASE_DIR.parent / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7l$1wo_4z#@o6j-4dcvad-snt_#64!rhp--a*3q!smct!mvzf9'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-7l$1wo_4z#@o6j-4dcvad-snt_#64!rhp--a*3q!smct!mvzf9'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DJANGO_DEBUG', default=True)
 
-ALLOWED_HOSTS = ['*']  # Permite todas las direcciones IP (solo para desarrollo)
+ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', default=['*'])
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://gastos.darioapp.online"
-]
+CSRF_TRUSTED_ORIGINS = env_list(
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+    default=['https://gastos.darioapp.online']
+)
 # O si prefieres ser más específico, puedes usar:
 # ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.16', '192.168.5.96', '192.168.101.18']
 
@@ -87,19 +125,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import os
-
-# Ruta absoluta para la base de datos
-DB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'db')
-os.makedirs(DB_DIR, exist_ok=True)  # Asegurarse de que el directorio existe
-DB_PATH = os.path.join(DB_DIR, 'db.sqlite3')
-print(f"\n\n[DEBUG] Ruta de la base de datos: {DB_PATH}\n\n")
-print(f"[DEBUG] Ruta absoluta: {os.path.abspath(DB_PATH)}\n\n")
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DB_PATH,
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'gastos_app'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', '192.168.1.25'),
+        'PORT': env_int('POSTGRES_PORT', 5432),
     }
 }
 
