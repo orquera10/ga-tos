@@ -3,10 +3,13 @@
 
 {% block title %}Listado de Presupuestos{% endblock %}
 {% block content %}
-    <h2 class="text-primary mb-4"><i class="bi bi-wallet2 me-2"></i>Listado de Presupuestos</h2>
-    <div class="d-flex justify-content-between align-items-center mb-4 w-100">
-        <a href="{% url 'presupuestos:crear_presupuesto' %}" class="btn btn-primary w-100 py-2">
-            <i class="bi bi-plus-circle"></i> Nuevo Presupuesto
+    <div class="page-toolbar">
+        <div>
+            <p class="section-kicker mb-1">Panel</p>
+            <h2 class="page-title mb-0"><i class="bi bi-wallet2 me-2"></i>Presupuestos</h2>
+        </div>
+        <a href="{% url 'presupuestos:crear_presupuesto' %}" class="btn btn-primary py-2 px-3">
+            <i class="bi bi-plus-circle"></i> Nuevo
         </a>
     </div>
 
@@ -15,31 +18,37 @@
             {% for presupuesto in presupuestos %}
                 <div class="col">
                     <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.id %}" class="text-decoration-none text-reset d-block h-100">
-                        <div class="card h-100">
+                        <div class="card presupuesto-card h-100">
                             <div class="card-body">
-                                <div class="mb-3">
-                                    <h5 class="card-title">{{ presupuesto.nombre }}</h5>
-                                    
-                                    <p class="card-subtitle mb-2 text-muted">
-                                        {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
-                                    </p>
-                                    <hr class="my-2 separador">
-                                    
+                                <div class="presupuesto-card-header">
+                                    <div>
+                                        <h5 class="card-title mb-1">{{ presupuesto.nombre }}</h5>
+                                        <p class="card-subtitle mb-0 text-muted">
+                                            <i class="bi bi-calendar-range me-1"></i>
+                                            {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
+                                        </p>
+                                    </div>
+                                    <span class="presupuesto-chip">{{ presupuesto.get_moneda_display }}</span>
+                                </div>
+
+                                <div class="presupuesto-descripcion">
                                     {% if presupuesto.descripcion %}
-                                        <p class="card-text">{{ presupuesto.descripcion }}</p>
+                                        {{ presupuesto.descripcion }}
+                                    {% else %}
+                                        Sin descripción
                                     {% endif %}
                                 </div>
                                 
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="text-center">
-                                        <h5 class="mb-0 text-primary">{{ presupuesto.monto_total|add:presupuesto.total_ingresos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</h5>
-                                        <small class="text-muted">Disponible</small>
+                                <div class="metric-grid mb-3">
+                                    <div class="metric-box">
+                                        <span class="metric-label">Disponible</span>
+                                        <strong class="text-primary">{{ presupuesto.monto_total|add:presupuesto.total_ingresos|floatformat:2 }}</strong>
                                     </div>
-                                    <div class="text-center">
-                                        <h5 class="mb-0 {% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
-                                            {{ presupuesto.monto_restante|floatformat:"2" }} {{ presupuesto.get_moneda_display }}
-                                        </h5>
-                                        <small class="text-muted">Restante</small>
+                                    <div class="metric-box">
+                                        <span class="metric-label">Restante</span>
+                                        <strong class="{% if presupuesto.porcentaje_gastado < 50 %}text-success{% elif presupuesto.porcentaje_gastado < 75 %}text-warning{% else %}text-danger{% endif %}">
+                                            {{ presupuesto.monto_restante|floatformat:"2" }}
+                                        </strong>
                                     </div>
                                 </div>
 
@@ -54,10 +63,9 @@
                                     </div>
                                 </div>
 
-                                <div class="text-center mt-3">
-                                    <span class="badge bg-info">
-                                        {{ presupuesto.gastos.count }} gastos
-                                    </span>
+                                <div class="presupuesto-footer">
+                                    <span><i class="bi bi-receipt me-1"></i>{{ presupuesto.gastos.count }} gastos</span>
+                                    <span>{{ presupuesto.porcentaje_gastado|floatformat:"0" }}% usado</span>
                                 </div>
                             </div>
                         </div>

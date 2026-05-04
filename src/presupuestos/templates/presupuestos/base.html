@@ -62,6 +62,67 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
     
     <!-- Botón flotante de calculadoras -->
+    <div class="modal fade delete-modal" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" id="deleteConfirmForm">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <div>
+                            <p class="section-kicker mb-1">Confirmacion</p>
+                            <h5 class="modal-title" id="deleteConfirmModalLabel">Eliminar movimiento</h5>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="delete-modal-icon">
+                            <i class="bi bi-trash-fill"></i>
+                        </div>
+                        <p class="delete-modal-title mb-1">¿Eliminar este registro?</p>
+                        <p class="text-muted mb-0" id="deleteConfirmText">Esta accion no se puede deshacer.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.openDeleteModal = function(trigger) {
+            var modalElement = document.getElementById('deleteConfirmModal');
+            var form = document.getElementById('deleteConfirmForm');
+            var text = document.getElementById('deleteConfirmText');
+            if (!modalElement || !form || !window.bootstrap) {
+                window.location.href = trigger.href;
+                return;
+            }
+
+            var type = trigger.dataset.deleteType || 'registro';
+            var name = trigger.dataset.deleteName || 'este registro';
+            var amount = trigger.dataset.deleteAmount || '';
+            form.action = trigger.href;
+            text.textContent = amount
+                ? 'Vas a eliminar ' + type + ' "' + name + '" por ' + amount + '.'
+                : 'Vas a eliminar ' + type + ' "' + name + '".';
+
+            bootstrap.Modal.getOrCreateInstance(modalElement).show();
+        };
+
+        document.addEventListener('click', function(event) {
+            var trigger = event.target.closest('.js-delete-modal');
+            if (!trigger) {
+                return;
+            }
+            event.preventDefault();
+            window.openDeleteModal(trigger);
+        });
+    </script>
+
     <a href="{% url 'calculadoras:index' %}" class="floating-calculator-btn" title="Ir a Calculadoras">
         <i class="bi bi-calculator"></i>
     </a>

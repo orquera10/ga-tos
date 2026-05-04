@@ -140,6 +140,15 @@
         </a>
     </div>
 
+    <section class="transactions-panel">
+        <div class="transactions-panel-header">
+            <div>
+                <p class="section-kicker mb-1">Movimientos</p>
+                <h3 class="transactions-title mb-0">Gastos e ingresos</h3>
+            </div>
+            <span class="transactions-count">{{ debug_gastos_count|add:debug_ingresos_count }} registros</span>
+        </div>
+
     <div class="transacciones-container">
         {% if transacciones_por_dia %}
             {% for dia in transacciones_por_dia %}
@@ -150,20 +159,23 @@
                     
                     {% for transaccion in dia.list %}
                     <div class="transaccion-item gasto-item {% if transaccion|model_name == 'gasto' %}transaccion-gasto{% else %}transaccion-ingreso{% endif %}">
-                        <!-- Columna 1: Botón de eliminar -->
-                        <div class="transaccion-accion gasto-accion">
-                            {% if transaccion|model_name == 'gasto' %}
-                            <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar gasto" aria-label="Eliminar gasto">
-                                <i class="bi bi-trash-fill"></i>
-                            </a>
-                            {% else %}
-                            <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0" title="Eliminar ingreso" aria-label="Eliminar ingreso">
-                                <i class="bi bi-trash-fill"></i>
-                            </a>
-                            {% endif %}
-                        </div>
-                        
-                        <!-- Columna 2: Contenido -->
+                        {% if transaccion|model_name == 'gasto' %}
+                        <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="swipe-delete-underlay js-delete-modal" aria-hidden="true" tabindex="-1" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
+                            <i class="bi bi-trash-fill"></i>
+                        </a>
+                        <a href="{% url 'presupuestos:editar_gasto' transaccion.id %}" class="swipe-edit-underlay" aria-hidden="true" tabindex="-1">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+                        {% else %}
+                        <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="swipe-delete-underlay js-delete-modal" aria-hidden="true" tabindex="-1" data-delete-type="ingreso" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="+{{ transaccion.monto|floatformat:2 }}">
+                            <i class="bi bi-trash-fill"></i>
+                        </a>
+                        <a href="{% url 'presupuestos:editar_ingreso' transaccion.id %}" class="swipe-edit-underlay" aria-hidden="true" tabindex="-1">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+                        {% endif %}
+                        <div class="transaccion-surface">
+                        <!-- Columna 1: Contenido -->
                         {% if transaccion|model_name == 'gasto' %}
                         <a href="{% url 'presupuestos:ver_gasto' transaccion.id %}" class="transaccion-contenido text-decoration-none gasto-contenido">
                             <span class="transaccion-icono" aria-hidden="true">
@@ -172,7 +184,7 @@
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
-                                    <i class="bi bi-credit-card text-danger"></i> {{ transaccion.categoria.nombre|default:"Sin categoría" }}
+                                    {{ transaccion.categoria.nombre|default:"Sin categoría" }}
                                 </p>
                                 {% if transaccion.descripcion %}
                                 <p class="transaccion-descripcion gasto-descripcion small text-muted mb-0">
@@ -189,7 +201,7 @@
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
-                                    <i class="bi bi-cash-coin text-success"></i> Ingreso
+                                    Ingreso
                                 </p>
                                 {% if transaccion.descripcion %}
                                 <p class="transaccion-descripcion gasto-descripcion small text-muted mb-0">
@@ -200,20 +212,34 @@
                         </a>
                         {% endif %}
                         
-                        <!-- Columna 3: Monto y hora -->
-                        <div class="transaccion-monto text-end gasto-monto">
-                            {% if transaccion|model_name == 'gasto' %}
-                            <div class="text-danger fw-bold">
-                                -{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}
+                        <!-- Columna 2: Monto, hora y accion -->
+                        <div class="transaccion-meta">
+                            <div class="transaccion-monto text-end gasto-monto">
+                                {% if transaccion|model_name == 'gasto' %}
+                                <div class="text-danger fw-bold">
+                                    -{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}
+                                </div>
+                                {% else %}
+                                <div class="text-success fw-bold">
+                                    +{{ transaccion.monto|floatformat:2 }}
+                                </div>
+                                {% endif %}
+                                <div class="text-muted small">
+                                    {{ transaccion.fecha_local|time:"H:i" }}
+                                </div>
                             </div>
-                            {% else %}
-                            <div class="text-success fw-bold">
-                                +{{ transaccion.monto|floatformat:2 }}
+                            <div class="transaccion-accion gasto-accion">
+                                {% if transaccion|model_name == 'gasto' %}
+                                <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0 js-delete-modal" title="Eliminar gasto" aria-label="Eliminar gasto" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
+                                    <i class="bi bi-trash-fill"></i>
+                                </a>
+                                {% else %}
+                                <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0 js-delete-modal" title="Eliminar ingreso" aria-label="Eliminar ingreso" data-delete-type="ingreso" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="+{{ transaccion.monto|floatformat:2 }}">
+                                    <i class="bi bi-trash-fill"></i>
+                                </a>
+                                {% endif %}
                             </div>
-                            {% endif %}
-                            <div class="text-muted small">
-                                {{ transaccion.fecha_local|time:"H:i" }}
-                            </div>
+                        </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -269,6 +295,7 @@
             </div>
         {% endif %}
     </div>
+    </section>
 {% endblock %}
 
 {% block extra_js %}
@@ -278,6 +305,91 @@
         document.querySelectorAll('.gasto-accion a[title="Eliminar"]').forEach(function(link) {
             link.addEventListener('click', function(e) {
                 // No hacer nada más, dejar que el enlace se comporte normalmente
+            });
+        });
+    });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var rows = document.querySelectorAll('.transaccion-item');
+        var maxSwipe = 96;
+        var deleteThreshold = 78;
+        var editThreshold = -78;
+
+        rows.forEach(function(row) {
+            var surface = row.querySelector('.transaccion-surface');
+            var deleteLink = row.querySelector('.swipe-delete-underlay');
+            var editLink = row.querySelector('.swipe-edit-underlay');
+            if (!surface || !deleteLink || !editLink) {
+                return;
+            }
+
+            var startX = 0;
+            var startY = 0;
+            var currentX = 0;
+            var isSwiping = false;
+            var didSwipe = false;
+
+            surface.addEventListener('touchstart', function(event) {
+                if (!window.matchMedia('(max-width: 768px)').matches) {
+                    return;
+                }
+                var touch = event.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                currentX = 0;
+                isSwiping = false;
+                didSwipe = false;
+                row.classList.add('is-swiping');
+            }, { passive: true });
+
+            surface.addEventListener('touchmove', function(event) {
+                if (!window.matchMedia('(max-width: 768px)').matches) {
+                    return;
+                }
+                var touch = event.touches[0];
+                var deltaX = touch.clientX - startX;
+                var deltaY = touch.clientY - startY;
+
+                if (Math.abs(deltaX) < 4 || Math.abs(deltaY) > Math.abs(deltaX)) {
+                    return;
+                }
+
+                event.preventDefault();
+                isSwiping = true;
+                didSwipe = true;
+                currentX = Math.max(Math.min(deltaX, maxSwipe), -maxSwipe);
+                surface.style.transform = 'translateX(' + currentX + 'px)';
+            }, { passive: false });
+
+            surface.addEventListener('touchend', function() {
+                row.classList.remove('is-swiping');
+
+                if (!isSwiping) {
+                    surface.style.transform = '';
+                    return;
+                }
+
+                if (currentX >= deleteThreshold) {
+                    window.openDeleteModal(deleteLink);
+                    surface.style.transform = '';
+                    return;
+                }
+
+                if (currentX <= editThreshold) {
+                    window.location.href = editLink.href;
+                    return;
+                }
+
+                surface.style.transform = '';
+            });
+
+            surface.addEventListener('click', function(event) {
+                if (didSwipe) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    didSwipe = false;
+                }
             });
         });
     });

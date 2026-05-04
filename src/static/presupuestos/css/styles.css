@@ -289,6 +289,19 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     transition: background-color 0.2s;
 }
 
+.transaccion-surface {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    transition: transform 0.18s ease;
+}
+
+.swipe-delete-underlay,
+.swipe-edit-underlay {
+    display: none;
+}
+
 .transaccion-item:hover {
     background-color: #f8f9fa;
 }
@@ -309,6 +322,14 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 .transaccion-monto {
     min-width: 120px;
+}
+
+.transaccion-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex: 0 0 auto;
 }
 
 .transaccion-icono {
@@ -414,14 +435,65 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     }
 
     .transaccion-item {
+        display: block;
+        position: relative;
+        padding: 0;
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+        border-radius: 0;
+        overflow: hidden;
+        touch-action: pan-y;
+    }
+
+    .transaccion-surface {
         display: flex;
         flex-wrap: nowrap;
         gap: 0.55rem;
-        position: relative;
         align-items: center;
+        min-height: 70px;
         padding: 0.85rem 0.25rem;
-        border-bottom-color: rgba(255, 255, 255, 0.08);
-        border-radius: 0;
+        background-color: #000;
+        position: relative;
+        z-index: 2;
+    }
+
+    .swipe-delete-underlay,
+    .swipe-edit-underlay {
+        position: absolute;
+        width: 84px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--tx-secondary);
+        color: white;
+        font-size: 1.15rem;
+        text-decoration: none;
+        z-index: 1;
+    }
+
+    .swipe-delete-underlay {
+        inset: 0 auto 0 0;
+        background: var(--tx-secondary);
+        border-radius: 8px 0 0 8px;
+    }
+
+    .swipe-edit-underlay {
+        inset: 0 0 0 auto;
+        background: var(--tx-ternary);
+        color: #111;
+        border-radius: 0 8px 8px 0;
+    }
+
+    .swipe-delete-underlay:hover,
+    .swipe-edit-underlay:hover {
+        color: white;
+    }
+
+    .transaccion-item.is-swiping .transaccion-surface {
+        transition: none;
+    }
+
+    .transaccion-meta .transaccion-accion {
+        display: none;
     }
 
     .transaccion-item:hover {
@@ -429,8 +501,8 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     }
     
     .transaccion-accion {
-        flex: 0 0 28px;
-        width: 28px;
+        flex: 0 0 24px;
+        width: 24px;
         text-align: center;
         padding-left: 0;
         margin-top: 0;
@@ -457,9 +529,9 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     }
     
     .transaccion-monto {
-        flex: 0 0 98px;
-        min-width: 82px;
-        max-width: 98px;
+        flex: 0 1 92px;
+        min-width: 76px;
+        max-width: 92px;
         text-align: right !important;
         margin-top: 0;
         padding-left: 0;
@@ -468,6 +540,11 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
         font-size: 0.9rem;
         line-height: 1.2;
         overflow-wrap: anywhere;
+    }
+
+    .transaccion-meta {
+        gap: 0.45rem;
+        flex: 0 0 auto;
     }
 
     .transaccion-monto .small {
@@ -534,14 +611,18 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 @media (max-width: 576px) {
     .transaccion-item {
+        padding: 0;
+    }
+
+    .transaccion-surface {
         gap: 0.45rem;
         padding: 0.78rem 0;
     }
     
     .transaccion-monto {
-        flex-basis: 84px;
-        min-width: 76px;
-        max-width: 84px;
+        flex-basis: 78px;
+        min-width: 70px;
+        max-width: 78px;
         font-size: 0.84rem;
     }
 
@@ -553,10 +634,14 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     }
 
     .transaccion-accion {
-        flex-basis: 24px;
-        width: 24px;
+        flex-basis: 22px;
+        width: 22px;
         padding-left: 0;
         font-size: 0.78rem;
+    }
+
+    .transaccion-meta {
+        gap: 0.35rem;
     }
 }
 
@@ -614,4 +699,496 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 .texto-chico h5{
     font-size: 0.8rem !important;
+}
+
+.page-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.page-title {
+    color: white;
+    font-weight: 700;
+}
+
+.section-kicker {
+    color: var(--tx-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.presupuesto-card {
+    border: 1px solid rgba(160, 255, 233, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.presupuesto-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(160, 255, 233, 0.35);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+
+.presupuesto-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.presupuesto-card .card-title {
+    color: white;
+    font-weight: 700;
+}
+
+.presupuesto-chip {
+    align-self: flex-start;
+    border: 1px solid rgba(160, 255, 233, 0.35);
+    border-radius: 999px;
+    color: var(--accent-primary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    white-space: nowrap;
+}
+
+.presupuesto-descripcion {
+    min-height: 2.5rem;
+    color: rgb(210, 210, 210);
+    font-size: 0.92rem;
+    margin-bottom: 1rem;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.metric-box {
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+.metric-label,
+.detail-label {
+    display: block;
+    color: rgb(175, 175, 175);
+    font-size: 0.78rem;
+    margin-bottom: 0.2rem;
+}
+
+.metric-box strong {
+    display: block;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+}
+
+.presupuesto-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: rgb(195, 195, 195);
+    font-size: 0.86rem;
+    margin-top: 0.85rem;
+}
+
+.form-shell,
+.detail-shell {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(160, 255, 233, 0.12);
+    border-radius: 8px;
+    color: white;
+    overflow: hidden;
+}
+
+.form-heading,
+.detail-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: rgba(0, 0, 0, 0.22);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.form-heading {
+    justify-content: flex-start;
+}
+
+.form-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 44px;
+    background: rgba(25, 148, 120, 0.18);
+    color: var(--tx-primary);
+    font-size: 1.2rem;
+}
+
+.form-icon-danger {
+    background: rgba(191, 86, 86, 0.16);
+    color: var(--tx-secondary);
+}
+
+.form-panel {
+    padding: 1.25rem;
+}
+
+.form-section {
+    margin-bottom: 1.15rem;
+}
+
+.form-label {
+    color: white;
+    font-weight: 600;
+}
+
+.form-control,
+.form-select {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+}
+
+.card .form-control,
+.card .form-select,
+.form-shell .form-control,
+.form-shell .form-select {
+    background-color: #f7f7f7;
+    color: #111;
+}
+
+.input-group-text {
+    border-color: rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+}
+
+.moneda-select-wrap {
+    padding: 0;
+    overflow: hidden;
+}
+
+.moneda-select {
+    border: 0;
+    min-width: 160px;
+}
+
+.form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.25rem;
+}
+
+.detail-hero {
+    align-items: flex-start;
+}
+
+.detail-amount {
+    font-size: 1.55rem;
+    font-weight: 800;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.detail-item {
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.detail-item-wide {
+    grid-column: 1 / -1;
+}
+
+.delete-modal .modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(191, 86, 86, 0.35);
+    border-radius: 8px;
+    color: white;
+    overflow: hidden;
+}
+
+.delete-modal .modal-header,
+.delete-modal .modal-footer {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.delete-modal .modal-header {
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.delete-modal .modal-body {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.delete-modal-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(191, 86, 86, 0.18);
+    color: var(--tx-secondary);
+    font-size: 1.35rem;
+    margin-bottom: 0.85rem;
+}
+
+.delete-modal-title {
+    color: white;
+    font-size: 1.08rem;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .page-toolbar,
+    .form-actions,
+    .detail-hero {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .page-toolbar .btn,
+    .form-actions .btn {
+        width: 100%;
+    }
+
+    .form-actions .d-flex {
+        width: 100%;
+    }
+
+    .form-actions .d-flex .btn {
+        flex: 1;
+    }
+
+    .detail-amount {
+        text-align: left;
+        white-space: normal;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.container > .card.mb-4 {
+    background: linear-gradient(145deg, rgba(61, 61, 61, 0.96), rgba(24, 24, 24, 0.96)) !important;
+    border: 1px solid rgba(160, 255, 233, 0.14);
+    border-radius: 8px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+.container > .card.mb-4 .card-body {
+    padding: 1.35rem;
+}
+
+.container > .card.mb-4 h2 {
+    color: white;
+    font-weight: 800;
+}
+
+.container > .card.mb-4 .card-text {
+    color: rgb(205, 205, 205);
+    max-width: 760px;
+}
+
+.container > .card.mb-4 .btn-group {
+    gap: 0.45rem;
+}
+
+.container > .card.mb-4 .btn-group .btn {
+    border-radius: 8px !important;
+    min-width: 36px;
+}
+
+.container > .card.mb-4 .row:first-of-type {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    margin: 1rem 0 0;
+    padding: 0.75rem 0;
+}
+
+.container > .card.mb-4 .progress {
+    height: 0.7rem !important;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.container > .card.mb-4 .progress-bar {
+    font-size: 0;
+    line-height: 0.7rem;
+    padding: 0;
+}
+
+.container > .card.mb-4 .texto-chico {
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    min-height: 68px;
+    padding: 0.7rem 0.35rem;
+}
+
+.container > .card.mb-4 .texto-chico h5 {
+    font-size: 0.95rem !important;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.container > .card.mb-4 h3 {
+    font-size: 2rem;
+    font-weight: 850;
+}
+
+.container > .my-4.d-flex.gap-2 {
+    background: rgba(61, 61, 61, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 0.55rem;
+}
+
+.transactions-panel {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(160, 255, 233, 0.12);
+    border-radius: 8px;
+    color: white;
+    overflow: hidden;
+    margin-top: 1.5rem;
+}
+
+.transactions-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: rgba(0, 0, 0, 0.24);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.transactions-title {
+    color: white;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.transactions-count {
+    border: 1px solid rgba(160, 255, 233, 0.28);
+    border-radius: 999px;
+    color: var(--accent-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.25rem 0.65rem;
+    white-space: nowrap;
+}
+
+.transactions-panel .transacciones-container {
+    padding: 0.75rem 1.1rem 1.1rem;
+}
+
+.transactions-panel .dia-transacciones {
+    margin-bottom: 1.25rem;
+}
+
+.transactions-panel .dia-header {
+    background: transparent;
+    border: 0;
+    border-radius: 0 !important;
+    color: var(--accent-primary) !important;
+    padding: 0.65rem 0 0.35rem !important;
+}
+
+.transactions-panel .dia-header h5 {
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.transactions-panel .transaccion-item {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.transactions-panel .transaccion-surface {
+    border-radius: 8px;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+}
+
+.transactions-panel .transaccion-surface:hover {
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.transactions-panel .resumen-dia {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    .container > .card.mb-4 .card-body {
+        padding: 1rem;
+    }
+
+    .container > .card.mb-4 .d-flex.justify-content-between.align-items-start {
+        gap: 0.75rem;
+    }
+
+    .container > .card.mb-4 h3 {
+        font-size: 1.55rem;
+    }
+
+    .container > .card.mb-4 .row.mt-3 {
+        row-gap: 0.65rem;
+    }
+
+    .container > .card.mb-4 .row.mt-3 .col-3 {
+        width: 50%;
+    }
+
+    .container > .my-4.d-flex.gap-2 {
+        position: sticky;
+        top: 62px;
+        z-index: 20;
+    }
+
+    .transactions-panel-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 0.9rem;
+    }
+
+    .transactions-panel .transacciones-container {
+        padding: 0.35rem 0.75rem 0.9rem;
+    }
+
+    .transactions-panel .transaccion-surface {
+        background-color: var(--bg-secondary);
+    }
 }

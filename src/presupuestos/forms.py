@@ -39,6 +39,7 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
         model = Presupuesto
         fields = ['nombre', 'descripcion', 'fecha_inicio', 'fecha_fin', 'monto_total', 'moneda']
         widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
             'monto_total': forms.NumberInput(attrs={'class': 'form-control'})
         }
@@ -73,6 +74,9 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         model = Gasto
         fields = ['nombre', 'categoria', 'monto', 'fecha', 'descripcion', 'presupuesto_pk']
         widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'categoria': forms.Select(attrs={'class': 'form-select'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'})
         }
         
