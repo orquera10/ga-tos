@@ -1,12 +1,12 @@
 {% load static %}
-const CACHE_NAME = 'gastos-pwa-v2';
+const CACHE_NAME = 'gastos-pwa-{{ app_version|default:"dev" }}';
 const STATIC_ASSETS = [
   "{% url 'presupuestos:index' %}",
-  "{% static 'presupuestos/css/styles.css' %}",
-  "{% static 'presupuestos/img/logoGa$tos.png' %}",
-  "{% static 'presupuestos/img/icons/icon-192.png' %}",
-  "{% static 'presupuestos/img/icons/icon-512.png' %}",
-  "{% static 'presupuestos/manifest.json' %}"
+  "{% static 'presupuestos/css/styles.css' %}?v={{ app_version|default:"dev" }}",
+  "{% static 'presupuestos/img/logoGa$tos.png' %}?v={{ app_version|default:"dev" }}",
+  "{% static 'presupuestos/img/icons/icon-192.png' %}?v={{ app_version|default:"dev" }}",
+  "{% static 'presupuestos/img/icons/icon-512.png' %}?v={{ app_version|default:"dev" }}",
+  "{% static 'presupuestos/manifest.json' %}?v={{ app_version|default:"dev" }}"
 ];
 
 self.addEventListener('install', function(event) {
