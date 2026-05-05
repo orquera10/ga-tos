@@ -1,5 +1,5 @@
 {% load static %}
-const CACHE_NAME = 'gastos-pwa-v1';
+const CACHE_NAME = 'gastos-pwa-v2';
 const STATIC_ASSETS = [
   "{% url 'presupuestos:index' %}",
   "{% static 'presupuestos/css/styles.css' %}",
@@ -38,19 +38,27 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then(function(response) {
-        var responseCopy = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, responseCopy);
-        });
-        return response;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(function() {
+        return caches.match("{% url 'presupuestos:index' %}");
       })
-      .catch(function() {
-        return caches.match(event.request).then(function(cachedResponse) {
-          return cachedResponse || caches.match("{% url 'presupuestos:index' %}");
+    );
+    return;
+  }
+
+  var requestUrl = new URL(event.request.url);
+  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.match(event.request).then(function(cachedResponse) {
+        return cachedResponse || fetch(event.request).then(function(response) {
+          var responseCopy = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, responseCopy);
+          });
+          return response;
         });
       })
-  );
+    );
+  }
 });
