@@ -468,16 +468,19 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
         font-size: 1.15rem;
         text-decoration: none;
         z-index: 1;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.12s ease;
     }
 
     .swipe-delete-underlay {
-        inset: 0 auto 0 0;
+        inset: 1px auto 1px 1px;
         background: var(--tx-secondary);
         border-radius: 8px 0 0 8px;
     }
 
     .swipe-edit-underlay {
-        inset: 0 0 0 auto;
+        inset: 1px 1px 1px auto;
         background: var(--tx-ternary);
         color: #111;
         border-radius: 0 8px 8px 0;
@@ -490,6 +493,11 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
     .transaccion-item.is-swiping .transaccion-surface {
         transition: none;
+    }
+
+    .transaccion-item.is-swiping .swipe-delete-underlay,
+    .transaccion-item.is-swiping .swipe-edit-underlay {
+        opacity: 1;
     }
 
     .transaccion-meta .transaccion-accion {
@@ -843,6 +851,11 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     color: var(--tx-secondary);
 }
 
+.form-icon-success {
+    background: rgba(25, 135, 84, 0.18);
+    color: #2ecc71;
+}
+
 .form-panel {
     padding: 1.25rem;
 }
@@ -922,6 +935,30 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     grid-column: 1 / -1;
 }
 
+.detail-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.detail-actions-group {
+    display: flex;
+    gap: 0.65rem;
+}
+
+.detail-actions .btn {
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+}
+
 .delete-modal .modal-content {
     background: var(--bg-secondary);
     border: 1px solid rgba(191, 86, 86, 0.35);
@@ -991,6 +1028,25 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
     .detail-grid {
         grid-template-columns: 1fr;
+    }
+
+    .detail-actions {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .detail-actions > .btn,
+    .detail-actions-group .btn {
+        width: 100%;
+    }
+
+    .detail-actions-group {
+        width: 100%;
+    }
+
+    .detail-actions-group .btn {
+        flex: 1;
     }
 }
 

@@ -114,7 +114,8 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             },
             format='%Y-%m-%dT%H:%M:%S'
         ),
-        required=False  # No requerido para nuevos ingresos
+        input_formats=['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'],
+        required=True
     )
 
     class Meta:
@@ -129,17 +130,17 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Solo mostrar el campo de fecha si estamos editando un ingreso existente
-        if not self.instance or not self.instance.pk:
-            self.fields['fecha'].widget = forms.HiddenInput()
-        elif self.instance.fecha:
+        if self.instance and self.instance.pk and self.instance.fecha:
             # Asegurarse de que la fecha esté en la zona horaria local para mostrarla correctamente
             local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
-            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+        else:
+            local_dt = timezone.localtime(timezone.now())
+        self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True):
         # Para nuevos ingresos, la fecha ya se establece en el modelo
         # Para ediciones, usar la fecha del formulario sin conversión de zona horaria
-        if 'fecha' in self.changed_data and self.cleaned_data.get('fecha'):
+        if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)
 

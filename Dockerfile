@@ -14,4 +14,4 @@ RUN pip install -r requirements.txt
 
 COPY ./ ./
 
-CMD ["sh", "-c", "python src/manage.py migrate --noinput && python src/manage.py runserver 0.0.0.0:${PORT:-8005}"]
+CMD ["sh", "-c", "python src/manage.py collectstatic --noinput && python src/manage.py migrate --noinput && python src/manage.py runserver 0.0.0.0:${PORT:-8005}"]

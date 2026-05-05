@@ -89,6 +89,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -189,6 +190,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para producción
 STATICFILES_DIRS = [
     BASE_DIR / 'static',  # Directorio global de archivos estáticos
 ]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Configuración para archivos medios
 MEDIA_URL = '/media/'

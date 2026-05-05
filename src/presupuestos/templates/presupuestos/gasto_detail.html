@@ -32,11 +32,11 @@
         </div>
     </div>
 
-    <div class="form-actions mt-4">
+    <div class="detail-actions">
         <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.id %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
-        <div class="d-flex gap-2">
+        <div class="detail-actions-group">
             <a href="{% url 'presupuestos:editar_gasto' gasto.id %}" class="btn btn-warning">
                 <i class="bi bi-pencil"></i> Editar
             </a>
