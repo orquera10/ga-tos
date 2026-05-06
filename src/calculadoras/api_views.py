@@ -1,7 +1,9 @@
 from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from .models import CalculadoraDivisa
 
+@login_required
 def calculadora_detalle_api(request, calculadora_id):
     try:
         calculadora = CalculadoraDivisa.objects.get(id=calculadora_id)

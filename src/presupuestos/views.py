@@ -1,20 +1,43 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from itertools import groupby
+from core.auth import asignar_presupuestos_sin_usuario
 from .models import Presupuesto, Categoria, Gasto, Ingreso
 from .forms import PresupuestoForm, CategoriaForm, GastoForm, IngresoForm
 
+class PresupuestoUsuarioMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        asignar_presupuestos_sin_usuario()
+        return Presupuesto.objects.filter(usuario=self.request.user)
+
+
+class GastoUsuarioMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        asignar_presupuestos_sin_usuario()
+        return Gasto.objects.filter(presupuesto__usuario=self.request.user)
+
+
+class IngresoUsuarioMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        asignar_presupuestos_sin_usuario()
+        return Ingreso.objects.filter(presupuesto__usuario=self.request.user)
+
+
 # Vistas de Presupuesto
+@login_required
 def presupuestos_list(request):
-    presupuestos = Presupuesto.objects.all().order_by('-fecha_creacion')
+    asignar_presupuestos_sin_usuario()
+    presupuestos = Presupuesto.objects.filter(usuario=request.user).order_by('-fecha_creacion')
     return render(request, 'presupuestos/index.html', {'presupuestos': presupuestos})
 
-class PresupuestoDetailView(DetailView):
+class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
     model = Presupuesto
     template_name = 'presupuestos/ver_presupuesto.html'
     context_object_name = 'presupuesto'
@@ -59,17 +82,18 @@ class PresupuestoDetailView(DetailView):
         
         return context
 
-class PresupuestoCreateView(CreateView):
+class PresupuestoCreateView(LoginRequiredMixin, CreateView):
     model = Presupuesto
     form_class = PresupuestoForm
     template_name = 'presupuestos/presupuesto_form.html'
     success_url = reverse_lazy('presupuestos:index')
 
     def form_valid(self, form):
+        form.instance.usuario = self.request.user
         messages.success(self.request, 'Presupuesto creado exitosamente')
         return super().form_valid(form)
 
-class PresupuestoUpdateView(UpdateView):
+class PresupuestoUpdateView(PresupuestoUsuarioMixin, UpdateView):
     model = Presupuesto
     form_class = PresupuestoForm
     template_name = 'presupuestos/presupuesto_form.html'
@@ -89,7 +113,7 @@ class PresupuestoUpdateView(UpdateView):
         messages.success(self.request, 'Presupuesto actualizado exitosamente')
         return super().form_valid(form)
 
-class PresupuestoDeleteView(DeleteView):
+class PresupuestoDeleteView(PresupuestoUsuarioMixin, DeleteView):
     model = Presupuesto
     template_name = 'presupuestos/presupuesto_confirm_delete.html'
     success_url = reverse_lazy('presupuestos:index')
@@ -99,7 +123,7 @@ class PresupuestoDeleteView(DeleteView):
         return super().delete(request, *args, **kwargs)
 
 # Vistas de Categoría
-class CategoriaCreateView(CreateView):
+class CategoriaCreateView(LoginRequiredMixin, CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'presupuestos/categoria_form.html'
@@ -119,7 +143,7 @@ class CategoriaCreateView(CreateView):
         context['presupuesto_pk'] = self.request.GET.get('presupuesto_pk')
         return context
 
-class CategoriaUpdateView(UpdateView):
+class CategoriaUpdateView(LoginRequiredMixin, UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = 'presupuestos/categoria_form.html'
@@ -129,7 +153,7 @@ class CategoriaUpdateView(UpdateView):
         messages.success(self.request, 'Categoría actualizada exitosamente')
         return super().form_valid(form)
 
-class CategoriaDeleteView(DeleteView):
+class CategoriaDeleteView(LoginRequiredMixin, DeleteView):
     model = Categoria
     template_name = 'presupuestos/categoria_confirm_delete.html'
     success_url = reverse_lazy('presupuestos:listar_categorias')
@@ -138,7 +162,7 @@ class CategoriaDeleteView(DeleteView):
         messages.success(self.request, 'Categoría eliminada exitosamente')
         return super().delete(request, *args, **kwargs)
 
-class CategoriaListView(ListView):
+class CategoriaListView(LoginRequiredMixin, ListView):
     model = Categoria
     template_name = 'presupuestos/categorias.html'
     context_object_name = 'categorias'
@@ -152,7 +176,7 @@ class CategoriaListView(ListView):
         return context
 
 # Vistas de ItemPresupuesto
-class GastoCreateView(CreateView):
+class GastoCreateView(LoginRequiredMixin, CreateView):
     model = Gasto
     form_class = GastoForm
     template_name = 'presupuestos/gasto_form.html'
@@ -167,7 +191,8 @@ class GastoCreateView(CreateView):
 
     def form_valid(self, form):
         try:
-            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+            asignar_presupuestos_sin_usuario()
+            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
             form.instance.presupuesto = presupuesto
             
             # Si no se especifica una moneda en el gasto, usar la del presupuesto
@@ -191,10 +216,11 @@ class GastoCreateView(CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+        asignar_presupuestos_sin_usuario()
+        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
         return context
 
-class GastoUpdateView(UpdateView):
+class GastoUpdateView(GastoUsuarioMixin, UpdateView):
     model = Gasto
     form_class = GastoForm
     template_name = 'presupuestos/gasto_form.html'
@@ -213,7 +239,7 @@ class GastoUpdateView(UpdateView):
         messages.success(self.request, 'Gasto actualizado exitosamente')
         return super().form_valid(form)
 
-class GastoDeleteView(DeleteView):
+class GastoDeleteView(GastoUsuarioMixin, DeleteView):
     model = Gasto
     template_name = 'presupuestos/gasto_confirm_delete.html'
 
@@ -224,7 +250,7 @@ class GastoDeleteView(DeleteView):
         messages.success(self.request, 'Gasto eliminado exitosamente')
         return super().delete(request, *args, **kwargs)
 
-class GastoDetailView(DetailView):
+class GastoDetailView(GastoUsuarioMixin, DetailView):
     model = Gasto
     template_name = 'presupuestos/gasto_detail.html'
     context_object_name = 'gasto'
@@ -234,7 +260,7 @@ class GastoDetailView(DetailView):
         context['presupuesto'] = self.object.presupuesto
         return context
 
-class IngresoDetailView(DetailView):
+class IngresoDetailView(IngresoUsuarioMixin, DetailView):
     model = Ingreso
     template_name = 'presupuestos/ingreso_detail.html'
     context_object_name = 'ingreso'
@@ -245,7 +271,7 @@ class IngresoDetailView(DetailView):
         return context
 
 
-class IngresoUpdateView(UpdateView):
+class IngresoUpdateView(IngresoUsuarioMixin, UpdateView):
     model = Ingreso
     form_class = IngresoForm
     template_name = 'presupuestos/ingreso_form.html'
@@ -273,7 +299,7 @@ class IngresoUpdateView(UpdateView):
         return context
 
 
-class IngresoDeleteView(DeleteView):
+class IngresoDeleteView(IngresoUsuarioMixin, DeleteView):
     model = Ingreso
     template_name = 'presupuestos/ingreso_confirm_delete.html'
     
@@ -303,7 +329,7 @@ class IngresoDeleteView(DeleteView):
         return context
 
 
-class IngresoCreateView(CreateView):
+class IngresoCreateView(LoginRequiredMixin, CreateView):
     model = Ingreso
     form_class = IngresoForm
     template_name = 'presupuestos/ingreso_form.html'
@@ -318,7 +344,8 @@ class IngresoCreateView(CreateView):
 
     def form_valid(self, form):
         try:
-            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+            asignar_presupuestos_sin_usuario()
+            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
             form.instance.presupuesto = presupuesto
             
             # Guardar el ingreso
@@ -338,20 +365,22 @@ class IngresoCreateView(CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+        asignar_presupuestos_sin_usuario()
+        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
         return context
 
 
-class GastoListView(ListView):
+class GastoListView(LoginRequiredMixin, ListView):
     model = Gasto
     template_name = 'presupuestos/gastos.html'
     context_object_name = 'gastos'
     ordering = ['-fecha']
 
     def get_queryset(self):
-        return Gasto.objects.filter(presupuesto_id=self.kwargs['presupuesto_pk'])
+        asignar_presupuestos_sin_usuario()
+        return Gasto.objects.filter(presupuesto_id=self.kwargs['presupuesto_pk'], presupuesto__usuario=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'])
+        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
         return context

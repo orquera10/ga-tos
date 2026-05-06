@@ -1,7 +1,6 @@
 {% load static %}
 const CACHE_NAME = 'gastos-pwa-{{ app_version|default:"dev" }}';
 const STATIC_ASSETS = [
-  "{% url 'presupuestos:index' %}",
   "{% static 'presupuestos/css/styles.css' %}?v={{ app_version|default:"dev" }}",
   "{% static 'presupuestos/img/logoGa$tos.png' %}?v={{ app_version|default:"dev" }}",
   "{% static 'presupuestos/img/icons/icon-192.png' %}?v={{ app_version|default:"dev" }}",
@@ -41,7 +40,10 @@ self.addEventListener('fetch', function(event) {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(function() {
-        return caches.match("{% url 'presupuestos:index' %}");
+        return new Response('Sin conexion.', {
+          status: 503,
+          headers: {'Content-Type': 'text/plain; charset=utf-8'}
+        });
       })
     );
     return;
@@ -50,14 +52,16 @@ self.addEventListener('fetch', function(event) {
   var requestUrl = new URL(event.request.url);
   if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith('/static/')) {
     event.respondWith(
-      caches.match(event.request).then(function(cachedResponse) {
-        return cachedResponse || fetch(event.request).then(function(response) {
+      fetch(event.request).then(function(response) {
+        if (response && response.ok) {
           var responseCopy = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
             cache.put(event.request, responseCopy);
           });
-          return response;
-        });
+        }
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
       })
     );
   }

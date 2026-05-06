@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -16,6 +17,7 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
+@login_required
 def index(request):
     calculadoras = CalculadoraDivisa.objects.all().order_by('-fecha_creacion')
     context = {
@@ -24,6 +26,7 @@ def index(request):
     }
     return render(request, 'calculadoras/index.html', context)
 
+@login_required
 def borrar_calculadora(request, calculadora_id):
     calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)
     
@@ -43,6 +46,7 @@ def borrar_calculadora(request, calculadora_id):
         'titulo': f'Eliminar Calculadora: {calculadora.nombre}'
     })
 
+@login_required
 def crear_calculadora(request):
     if request.method == 'POST':
         form = CalculadoraDivisaForm(request.POST)
@@ -63,6 +67,7 @@ def crear_calculadora(request):
         'titulo': 'Nueva Calculadora de Divisas'
     })
 
+@login_required
 def editar_calculadora(request, calculadora_id):
     calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)
     
@@ -100,6 +105,7 @@ def editar_calculadora(request, calculadora_id):
         'titulo': f'Editar Calculadora: {calculadora.nombre}'
     })
 
+@login_required
 def calcular_divisa(request, calculadora_id=None):
     calculadora = None
     resultado = None
@@ -143,8 +149,8 @@ def calcular_divisa(request, calculadora_id=None):
                     relacion_conversion=relacion,
                     direccion='inversa' if es_conversion_inversa else 'directa',
                     ip_usuario=get_client_ip(request),
-                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],  # Limitamos la longitud
-                    usuario='Anónimo'  # Valor por defecto ya que no hay autenticación
+                    user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+                    usuario=request.user.username
                 )
             
             resultado = {
@@ -177,6 +183,7 @@ def calcular_divisa(request, calculadora_id=None):
     return render(request, 'calculadoras/calcular_divisa.html', context)
 
 
+@login_required
 def historial_conversiones(request, calculadora_id):
     """Muestra el historial de conversiones para una calculadora específica"""
     calculadora = get_object_or_404(CalculadoraDivisa, id=calculadora_id)

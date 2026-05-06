@@ -1,4 +1,6 @@
 from django.db import models
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 class Categoria(models.Model):
@@ -16,6 +18,7 @@ class Presupuesto(models.Model):
         ('EUR', 'Euro'),
     ]
     
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name='presupuestos', null=True, blank=True)
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, null=True)
     fecha_inicio = models.DateField()

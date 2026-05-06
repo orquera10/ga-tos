@@ -1,0 +1,6 @@
+Hola {{ user.username }},
+
+Para activar tu cuenta en Ga$tos entra a este enlace:
+{{ verification_url }}
+
+Si no creaste esta cuenta, ignora este mensaje.
