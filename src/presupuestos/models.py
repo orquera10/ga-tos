@@ -63,6 +63,34 @@ class Presupuesto(models.Model):
         """Devuelve el monto total del presupuesto incluyendo los ingresos adicionales."""
         return self.monto_total + self.total_ingresos
 
+    def puede_ver(self, user):
+        if not user or not user.is_authenticated:
+            return False
+        return self.usuario_id == user.id or self.compartidos.filter(usuario=user).exists()
+
+    def puede_editar(self, user):
+        if not user or not user.is_authenticated:
+            return False
+        return self.usuario_id == user.id or self.compartidos.filter(usuario=user, permiso='editar').exists()
+
+
+class PresupuestoCompartido(models.Model):
+    PERMISOS = [
+        ('ver', 'Solo lectura'),
+        ('editar', 'Puede editar'),
+    ]
+
+    presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='compartidos')
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='presupuestos_compartidos')
+    permiso = models.CharField(max_length=10, choices=PERMISOS, default='ver')
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('presupuesto', 'usuario')
+
+    def __str__(self):
+        return f'{self.presupuesto} compartido con {self.usuario} ({self.permiso})'
+
 class Gasto(models.Model):
     presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='gastos')
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, null=True, blank=True)

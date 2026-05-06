@@ -1292,6 +1292,181 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     margin-top: 1.5rem;
 }
 
+.share-panel {
+    background: linear-gradient(145deg, rgba(55, 55, 55, 0.96), rgba(27, 27, 27, 0.96));
+    border: 1px solid rgba(160, 255, 233, 0.14);
+    border-radius: 8px;
+    color: white;
+    overflow: hidden;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
+}
+
+.share-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: rgba(0, 0, 0, 0.22);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.share-panel-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(25, 148, 120, 0.18);
+    color: var(--tx-primary);
+    font-size: 1.1rem;
+}
+
+.share-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 170px 145px;
+    gap: 0.9rem;
+    align-items: end;
+    padding: 1rem 1.1rem;
+}
+
+.share-field .form-label {
+    margin-bottom: 0.45rem;
+}
+
+.share-input-wrap {
+    position: relative;
+}
+
+.share-input-wrap i {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--tx-primary);
+    pointer-events: none;
+}
+
+.share-input-wrap .form-control {
+    padding-left: 2.45rem;
+}
+
+.share-form .form-control,
+.share-form .form-select {
+    min-height: 42px;
+    border-radius: 8px;
+}
+
+.share-submit {
+    min-height: 42px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    font-weight: 700;
+}
+
+.shared-users-list {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.45rem 1.1rem 1rem;
+}
+
+.shared-user-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.shared-user-item:last-child {
+    border-bottom: 0;
+}
+
+.shared-user-item span {
+    display: block;
+    font-size: 0.86rem;
+}
+
+.shared-user-main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.shared-user-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 38px;
+    background: rgba(25, 148, 120, 0.2);
+    color: var(--tx-primary);
+    font-weight: 800;
+}
+
+.shared-user-main strong,
+.shared-user-main .text-muted {
+    word-break: break-word;
+}
+
+.shared-user-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex: 0 0 auto;
+}
+
+.shared-permission {
+    border-radius: 999px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.shared-permission-edit {
+    background: rgba(255, 193, 7, 0.18);
+    color: #ffd76a;
+}
+
+.shared-permission-read {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgb(214, 214, 214);
+}
+
+.shared-remove {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+@media (max-width: 768px) {
+    .share-form {
+        grid-template-columns: 1fr;
+    }
+
+    .shared-user-item {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .shared-user-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
 .transactions-panel-header {
     display: flex;
     align-items: center;

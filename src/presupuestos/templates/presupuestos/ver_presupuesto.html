@@ -27,6 +27,7 @@
                         
                   </div>
                 
+                {% if es_duenio %}
                 <div class="btn-group">
                     <a href="{% url 'presupuestos:editar_presupuesto' presupuesto.id %}" class="btn btn-sm btn-outline-warning" title="Editar">
                         <i class="bi bi-pencil"></i>
@@ -35,6 +36,11 @@
                         <i class="bi bi-trash"></i>
                     </a>
                 </div>
+                {% elif puede_editar %}
+                <span class="badge bg-warning text-dark">Compartido editable</span>
+                {% else %}
+                <span class="badge bg-secondary">Compartido lectura</span>
+                {% endif %}
             </div>
 
             <div class="row">
@@ -131,6 +137,64 @@
         </div>
     </div>
 
+    {% if es_duenio %}
+    <section class="share-panel mb-4">
+        <div class="share-panel-header">
+            <div>
+                <p class="section-kicker mb-1">Compartir</p>
+                <h3 class="transactions-title mb-0">Usuarios con acceso</h3>
+            </div>
+            <span class="share-panel-icon">
+                <i class="bi bi-people"></i>
+            </span>
+        </div>
+        <form method="post" action="{% url 'presupuestos:compartir_presupuesto' presupuesto.id %}" class="share-form">
+            {% csrf_token %}
+            <div class="share-field share-field-main">
+                <label for="{{ compartir_form.usuario.id_for_label }}" class="form-label">Usuario o email</label>
+                <div class="share-input-wrap">
+                    <i class="bi bi-person-plus"></i>
+                    {{ compartir_form.usuario }}
+                </div>
+            </div>
+            <div class="share-field">
+                <label for="{{ compartir_form.permiso.id_for_label }}" class="form-label">Permiso</label>
+                {{ compartir_form.permiso }}
+            </div>
+            <button type="submit" class="btn btn-primary share-submit">
+                <i class="bi bi-share"></i> Compartir
+            </button>
+        </form>
+        {% if usuarios_compartidos %}
+            <div class="shared-users-list">
+                {% for compartido in usuarios_compartidos %}
+                    <div class="shared-user-item">
+                        <div class="shared-user-main">
+                            <span class="shared-user-avatar">{{ compartido.usuario.username|first|upper }}</span>
+                            <div>
+                                <strong>{{ compartido.usuario.username }}</strong>
+                                <span class="text-muted">{{ compartido.usuario.email }}</span>
+                            </div>
+                        </div>
+                        <div class="shared-user-actions">
+                            <span class="shared-permission {% if compartido.permiso == 'editar' %}shared-permission-edit{% else %}shared-permission-read{% endif %}">
+                                {{ compartido.get_permiso_display }}
+                            </span>
+                            <form method="post" action="{% url 'presupuestos:quitar_usuario_compartido' presupuesto.id compartido.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger shared-remove" title="Quitar">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if puede_editar %}
     <div class="my-4 d-flex gap-2">
         <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger flex-grow-1 py-2">
             <i class="bi bi-plus-circle"></i> Ga$to
@@ -139,6 +203,7 @@
             <i class="bi bi-plus-circle"></i> Ingreso
         </a>
     </div>
+    {% endif %}
 
     <section class="transactions-panel">
         <div class="transactions-panel-header">
@@ -159,14 +224,14 @@
                     
                     {% for transaccion in dia.list %}
                     <div class="transaccion-item gasto-item {% if transaccion|model_name == 'gasto' %}transaccion-gasto{% else %}transaccion-ingreso{% endif %}">
-                        {% if transaccion|model_name == 'gasto' %}
+                        {% if puede_editar and transaccion|model_name == 'gasto' %}
                         <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="swipe-delete-underlay js-delete-modal" aria-hidden="true" tabindex="-1" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
                             <i class="bi bi-trash-fill"></i>
                         </a>
                         <a href="{% url 'presupuestos:editar_gasto' transaccion.id %}" class="swipe-edit-underlay" aria-hidden="true" tabindex="-1">
                             <i class="bi bi-pencil-fill"></i>
                         </a>
-                        {% else %}
+                        {% elif puede_editar %}
                         <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="swipe-delete-underlay js-delete-modal" aria-hidden="true" tabindex="-1" data-delete-type="ingreso" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="+{{ transaccion.monto|floatformat:2 }}">
                             <i class="bi bi-trash-fill"></i>
                         </a>
@@ -228,6 +293,7 @@
                                     {{ transaccion.fecha_local|time:"H:i" }}
                                 </div>
                             </div>
+                            {% if puede_editar %}
                             <div class="transaccion-accion gasto-accion">
                                 {% if transaccion|model_name == 'gasto' %}
                                 <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0 js-delete-modal" title="Eliminar gasto" aria-label="Eliminar gasto" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
@@ -239,6 +305,7 @@
                                 </a>
                                 {% endif %}
                             </div>
+                            {% endif %}
                         </div>
                         </div>
                     </div>

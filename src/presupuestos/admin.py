@@ -1,6 +1,6 @@
 from django.contrib import admin
 from core.admin_mixins import JsonBackupAdminMixin
-from .models import Categoria, Gasto, Ingreso, Presupuesto
+from .models import Categoria, Gasto, Ingreso, Presupuesto, PresupuestoCompartido
 
 
 class GastoInline(admin.TabularInline):
@@ -16,6 +16,12 @@ class IngresoInline(admin.TabularInline):
     fields = ('nombre', 'monto', 'fecha')
 
 
+class PresupuestoCompartidoInline(admin.TabularInline):
+    model = PresupuestoCompartido
+    extra = 0
+    autocomplete_fields = ('usuario',)
+
+
 @admin.register(Presupuesto)
 class PresupuestoAdmin(JsonBackupAdminMixin, admin.ModelAdmin):
     list_display = ('nombre', 'usuario', 'monto_total', 'monto_restante', 'moneda', 'fecha_inicio', 'fecha_fin', 'fecha_creacion')
@@ -23,7 +29,7 @@ class PresupuestoAdmin(JsonBackupAdminMixin, admin.ModelAdmin):
     search_fields = ('nombre', 'descripcion', 'usuario__username', 'usuario__email')
     date_hierarchy = 'fecha_creacion'
     ordering = ('-fecha_creacion',)
-    inlines = (GastoInline, IngresoInline)
+    inlines = (PresupuestoCompartidoInline, GastoInline, IngresoInline)
 
 
 @admin.register(Gasto)
@@ -58,3 +64,11 @@ class IngresoAdmin(JsonBackupAdminMixin, admin.ModelAdmin):
 class CategoriaAdmin(JsonBackupAdminMixin, admin.ModelAdmin):
     list_display = ('nombre', 'descripcion')
     search_fields = ('nombre', 'descripcion')
+
+
+@admin.register(PresupuestoCompartido)
+class PresupuestoCompartidoAdmin(JsonBackupAdminMixin, admin.ModelAdmin):
+    list_display = ('presupuesto', 'usuario', 'permiso', 'fecha_creacion')
+    list_filter = ('permiso', 'fecha_creacion')
+    search_fields = ('presupuesto__nombre', 'usuario__username', 'usuario__email')
+    autocomplete_fields = ('presupuesto', 'usuario')

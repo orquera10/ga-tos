@@ -36,6 +36,7 @@
         <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.id %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Volver
         </a>
+        {% if puede_editar %}
         <div class="detail-actions-group">
             <a href="{% url 'presupuestos:editar_gasto' gasto.id %}" class="btn btn-warning">
                 <i class="bi bi-pencil"></i> Editar
@@ -44,6 +45,7 @@
                 <i class="bi bi-trash"></i> Eliminar
             </a>
         </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

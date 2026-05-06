@@ -3,38 +3,56 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
+from django.http import HttpResponseForbidden
 from django.views.generic import CreateView, UpdateView, DeleteView, ListView, DetailView
 from django.db import models
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from itertools import groupby
 from core.auth import asignar_presupuestos_sin_usuario
-from .models import Presupuesto, Categoria, Gasto, Ingreso
-from .forms import PresupuestoForm, CategoriaForm, GastoForm, IngresoForm
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
+from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm
+
+
+def presupuestos_visibles(user):
+    asignar_presupuestos_sin_usuario()
+    return Presupuesto.objects.filter(Q(usuario=user) | Q(compartidos__usuario=user)).distinct()
+
+
+def presupuestos_editables(user):
+    asignar_presupuestos_sin_usuario()
+    return Presupuesto.objects.filter(Q(usuario=user) | Q(compartidos__usuario=user, compartidos__permiso='editar')).distinct()
 
 class PresupuestoUsuarioMixin(LoginRequiredMixin):
     def get_queryset(self):
-        asignar_presupuestos_sin_usuario()
-        return Presupuesto.objects.filter(usuario=self.request.user)
+        return presupuestos_visibles(self.request.user)
 
 
 class GastoUsuarioMixin(LoginRequiredMixin):
     def get_queryset(self):
-        asignar_presupuestos_sin_usuario()
-        return Gasto.objects.filter(presupuesto__usuario=self.request.user)
+        return Gasto.objects.filter(presupuesto__in=presupuestos_visibles(self.request.user))
+
+
+class GastoEditableMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        return Gasto.objects.filter(presupuesto__in=presupuestos_editables(self.request.user))
 
 
 class IngresoUsuarioMixin(LoginRequiredMixin):
     def get_queryset(self):
-        asignar_presupuestos_sin_usuario()
-        return Ingreso.objects.filter(presupuesto__usuario=self.request.user)
+        return Ingreso.objects.filter(presupuesto__in=presupuestos_visibles(self.request.user))
+
+
+class IngresoEditableMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        return Ingreso.objects.filter(presupuesto__in=presupuestos_editables(self.request.user))
 
 
 # Vistas de Presupuesto
 @login_required
 def presupuestos_list(request):
-    asignar_presupuestos_sin_usuario()
-    presupuestos = Presupuesto.objects.filter(usuario=request.user).order_by('-fecha_creacion')
+    presupuestos = presupuestos_visibles(request.user).order_by('-fecha_creacion')
     return render(request, 'presupuestos/index.html', {'presupuestos': presupuestos})
 
 class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
@@ -75,6 +93,10 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context['total_gastos'] = total_gastos
         context['total_ingresos'] = total_ingresos
         context['monto_total_con_ingresos'] = self.object.monto_total + total_ingresos
+        context['puede_editar'] = self.object.puede_editar(self.request.user)
+        context['es_duenio'] = self.object.usuario_id == self.request.user.id
+        context['compartir_form'] = CompartirPresupuestoForm(presupuesto=self.object)
+        context['usuarios_compartidos'] = self.object.compartidos.select_related('usuario').order_by('usuario__username')
         
         # Para depuración
         context['debug_gastos_count'] = len(gastos)
@@ -99,6 +121,12 @@ class PresupuestoUpdateView(PresupuestoUsuarioMixin, UpdateView):
     template_name = 'presupuestos/presupuesto_form.html'
     success_url = reverse_lazy('presupuestos:index')
 
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.usuario_id != request.user.id:
+            return HttpResponseForbidden('Solo el dueño puede modificar el presupuesto.')
+        return super().dispatch(request, *args, **kwargs)
+
     def form_valid(self, form):
         # Guardar el objeto para tener acceso a los datos anteriores
         self.object = form.save(commit=False)
@@ -117,6 +145,12 @@ class PresupuestoDeleteView(PresupuestoUsuarioMixin, DeleteView):
     model = Presupuesto
     template_name = 'presupuestos/presupuesto_confirm_delete.html'
     success_url = reverse_lazy('presupuestos:index')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.usuario_id != request.user.id:
+            return HttpResponseForbidden('Solo el dueño puede eliminar el presupuesto.')
+        return super().dispatch(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'Presupuesto eliminado exitosamente')
@@ -191,8 +225,7 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         try:
-            asignar_presupuestos_sin_usuario()
-            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
+            presupuesto = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
             form.instance.presupuesto = presupuesto
             
             # Si no se especifica una moneda en el gasto, usar la del presupuesto
@@ -216,11 +249,10 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        asignar_presupuestos_sin_usuario()
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
+        context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
         return context
 
-class GastoUpdateView(GastoUsuarioMixin, UpdateView):
+class GastoUpdateView(GastoEditableMixin, UpdateView):
     model = Gasto
     form_class = GastoForm
     template_name = 'presupuestos/gasto_form.html'
@@ -231,6 +263,7 @@ class GastoUpdateView(GastoUsuarioMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
+        context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
         return context
 
     def form_valid(self, form):
@@ -239,7 +272,7 @@ class GastoUpdateView(GastoUsuarioMixin, UpdateView):
         messages.success(self.request, 'Gasto actualizado exitosamente')
         return super().form_valid(form)
 
-class GastoDeleteView(GastoUsuarioMixin, DeleteView):
+class GastoDeleteView(GastoEditableMixin, DeleteView):
     model = Gasto
     template_name = 'presupuestos/gasto_confirm_delete.html'
 
@@ -258,6 +291,7 @@ class GastoDetailView(GastoUsuarioMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
+        context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
         return context
 
 class IngresoDetailView(IngresoUsuarioMixin, DetailView):
@@ -271,7 +305,7 @@ class IngresoDetailView(IngresoUsuarioMixin, DetailView):
         return context
 
 
-class IngresoUpdateView(IngresoUsuarioMixin, UpdateView):
+class IngresoUpdateView(IngresoEditableMixin, UpdateView):
     model = Ingreso
     form_class = IngresoForm
     template_name = 'presupuestos/ingreso_form.html'
@@ -299,7 +333,7 @@ class IngresoUpdateView(IngresoUsuarioMixin, UpdateView):
         return context
 
 
-class IngresoDeleteView(IngresoUsuarioMixin, DeleteView):
+class IngresoDeleteView(IngresoEditableMixin, DeleteView):
     model = Ingreso
     template_name = 'presupuestos/ingreso_confirm_delete.html'
     
@@ -344,8 +378,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         try:
-            asignar_presupuestos_sin_usuario()
-            presupuesto = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
+            presupuesto = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
             form.instance.presupuesto = presupuesto
             
             # Guardar el ingreso
@@ -365,8 +398,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        asignar_presupuestos_sin_usuario()
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
+        context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
         return context
 
 
@@ -377,10 +409,32 @@ class GastoListView(LoginRequiredMixin, ListView):
     ordering = ['-fecha']
 
     def get_queryset(self):
-        asignar_presupuestos_sin_usuario()
-        return Gasto.objects.filter(presupuesto_id=self.kwargs['presupuesto_pk'], presupuesto__usuario=self.request.user)
+        return Gasto.objects.filter(presupuesto_id=self.kwargs['presupuesto_pk'], presupuesto__in=presupuestos_visibles(self.request.user))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['presupuesto'] = get_object_or_404(Presupuesto, pk=self.kwargs['presupuesto_pk'], usuario=self.request.user)
+        context['presupuesto'] = get_object_or_404(presupuestos_visibles(self.request.user), pk=self.kwargs['presupuesto_pk'])
         return context
+
+
+@login_required
+def compartir_presupuesto(request, pk):
+    presupuesto = get_object_or_404(Presupuesto, pk=pk, usuario=request.user)
+    if request.method != 'POST':
+        return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+    form = CompartirPresupuestoForm(request.POST, presupuesto=presupuesto)
+    if form.is_valid():
+        compartido = form.save()
+        messages.success(request, f'Presupuesto compartido con {compartido.usuario.username}.')
+    else:
+        messages.error(request, form.errors.as_text())
+    return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+
+@login_required
+def quitar_usuario_compartido(request, pk, compartido_id):
+    presupuesto = get_object_or_404(Presupuesto, pk=pk, usuario=request.user)
+    get_object_or_404(PresupuestoCompartido, pk=compartido_id, presupuesto=presupuesto).delete()
+    messages.success(request, 'Usuario quitado del presupuesto compartido.')
+    return redirect('presupuestos:ver_presupuesto', pk=pk)

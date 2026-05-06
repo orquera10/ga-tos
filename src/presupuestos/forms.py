@@ -1,5 +1,6 @@
 from django import forms
-from .models import Presupuesto, Categoria, Gasto, Ingreso
+from django.contrib.auth import get_user_model
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
 from django.utils import timezone
 
 class CapitalizeFieldsMixin:
@@ -54,6 +55,44 @@ class CategoriaForm(CapitalizeFieldsMixin, forms.ModelForm):
     class Meta:
         model = Categoria
         fields = ['nombre', 'descripcion']
+
+
+class CompartirPresupuestoForm(forms.ModelForm):
+    usuario = forms.CharField(
+        label='Usuario o email',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'usuario@email.com'})
+    )
+
+    class Meta:
+        model = PresupuestoCompartido
+        fields = ['usuario', 'permiso']
+        widgets = {
+            'permiso': forms.Select(attrs={'class': 'form-select'})
+        }
+
+    def __init__(self, *args, presupuesto=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.presupuesto = presupuesto
+
+    def clean_usuario(self):
+        value = self.cleaned_data['usuario'].strip()
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=value).first() or User.objects.filter(username__iexact=value).first()
+        if not user:
+            raise forms.ValidationError('No encontramos un usuario con ese usuario o email.')
+        if self.presupuesto and self.presupuesto.usuario_id == user.id:
+            raise forms.ValidationError('Ese usuario ya es el dueño del presupuesto.')
+        return user
+
+    def save(self, commit=True):
+        user = self.cleaned_data['usuario']
+        permiso = self.cleaned_data['permiso']
+        obj, _ = PresupuestoCompartido.objects.update_or_create(
+            presupuesto=self.presupuesto,
+            usuario=user,
+            defaults={'permiso': permiso},
+        )
+        return obj
 
 class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
     presupuesto_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)

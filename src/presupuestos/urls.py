@@ -10,6 +10,8 @@ urlpatterns = [
     path('presupuesto/nuevo/', views.PresupuestoCreateView.as_view(), name='crear_presupuesto'),
     path('presupuesto/<int:pk>/editar/', views.PresupuestoUpdateView.as_view(), name='editar_presupuesto'),
     path('presupuesto/<int:pk>/eliminar/', views.PresupuestoDeleteView.as_view(), name='eliminar_presupuesto'),
+    path('presupuesto/<int:pk>/compartir/', views.compartir_presupuesto, name='compartir_presupuesto'),
+    path('presupuesto/<int:pk>/compartir/<int:compartido_id>/quitar/', views.quitar_usuario_compartido, name='quitar_usuario_compartido'),
     path('presupuesto/<int:pk>/', views.PresupuestoDetailView.as_view(), name='ver_presupuesto'),
 
     # URLs de Categoría

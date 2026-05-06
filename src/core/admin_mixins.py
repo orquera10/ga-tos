@@ -1,6 +1,8 @@
 from django.core import serializers
-from django.contrib import admin, messages
+from django.contrib import messages
 from django.core.serializers.base import DeserializationError
+from django.core.management.color import no_style
+from django.db import connection
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import path
@@ -63,6 +65,7 @@ class JsonBackupAdminMixin(ExportSelectedJsonMixin):
                         return redirect(request.path)
                     obj.save()
                     imported += 1
+                self._reset_model_sequence()
             except (UnicodeDecodeError, DeserializationError, ValueError) as exc:
                 messages.error(request, f'No se pudo importar el archivo: {exc}')
                 return redirect(request.path)
@@ -71,3 +74,11 @@ class JsonBackupAdminMixin(ExportSelectedJsonMixin):
             return redirect(f'../')
 
         return render(request, 'admin/json_backup_import.html', context)
+
+    def _reset_model_sequence(self):
+        sql = connection.ops.sequence_reset_sql(no_style(), [self.model])
+        if not sql:
+            return
+        with connection.cursor() as cursor:
+            for statement in sql:
+                cursor.execute(statement)
