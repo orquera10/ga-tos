@@ -195,12 +195,15 @@
     {% endif %}
 
     {% if puede_editar %}
-    <div class="my-4 d-flex gap-2">
+    <div class="my-4 d-flex gap-2 budget-action-row">
         <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger flex-grow-1 py-2">
             <i class="bi bi-plus-circle"></i> Ga$to
         </a>
         <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success flex-grow-1 py-2">
             <i class="bi bi-plus-circle"></i> Ingreso
+        </a>
+        <a href="{% url 'presupuestos:chat_presupuesto' presupuesto.id %}" class="btn btn-primary flex-grow-1 py-2">
+            <i class="bi bi-chat-dots"></i> Chat
         </a>
     </div>
     {% endif %}
@@ -362,6 +365,47 @@
             </div>
         {% endif %}
     </div>
+    </section>
+
+    <section class="expense-summary-panel" aria-labelledby="expense-summary-title">
+        <div class="expense-summary-header">
+            <div>
+                <p class="section-kicker mb-1">Resumen gráfico</p>
+                <h3 class="transactions-title mb-0" id="expense-summary-title">Gastos por tipo</h3>
+            </div>
+            <div class="expense-summary-total">
+                <span>Total gastado</span>
+                <strong>{{ total_gastos|floatformat:2 }} {{ presupuesto.get_moneda_display }}</strong>
+            </div>
+        </div>
+
+        {% if resumen_gastos_por_tipo %}
+            <div class="expense-summary-chart">
+                {% for item in resumen_gastos_por_tipo %}
+                    <div class="expense-summary-row">
+                        <div class="expense-summary-label">
+                            <div>
+                                <span class="expense-summary-dot" aria-hidden="true"></span>
+                                <strong>{{ item.tipo }}</strong>
+                                <span class="expense-summary-count">{{ item.cantidad }} gasto{{ item.cantidad|pluralize }}</span>
+                            </div>
+                            <span class="expense-summary-amount">{{ item.total|floatformat:2 }} {{ presupuesto.moneda }}</span>
+                        </div>
+                        <div class="expense-summary-track"
+                             role="img"
+                             aria-label="{{ item.tipo }}: {{ item.porcentaje }}% del total de gastos">
+                            <span class="expense-summary-bar" style="width: {{ item.porcentaje }}%"></span>
+                        </div>
+                        <span class="expense-summary-percentage">{{ item.porcentaje }}%</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="expense-summary-empty">
+                <i class="bi bi-bar-chart" aria-hidden="true"></i>
+                <p class="mb-0">El resumen aparecerá cuando registres tu primer gasto.</p>
+            </div>
+        {% endif %}
     </section>
 {% endblock %}
 

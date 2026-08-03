@@ -1,0 +1,41 @@
+{% extends 'presupuestos/base.html' %}
+
+{% block title %}Chat - {{ presupuesto.nombre }}{% endblock %}
+
+{% block content %}
+<div class="chat-shell">
+    <div class="chat-header">
+        <div>
+            <p class="section-kicker mb-1">Chat</p>
+            <h1 class="page-title mb-0">{{ presupuesto.nombre }}</h1>
+        </div>
+        <a href="{% url 'presupuestos:ver_presupuesto' presupuesto.id %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <div class="chat-body">
+        <div class="chat-bubble chat-bubble-system">
+            <strong>Ga$tos</strong>
+            <p class="mb-0">
+                Podes cargar movimientos escribiendo mensajes como
+                <span>gasto 2500 comida empanadas</span> o <span>ingreso 100000 sueldo</span>.
+            </p>
+        </div>
+
+        {% for message in chat_messages %}
+            <div class="chat-bubble {% if message.tipo == 'usuario' %}chat-bubble-user{% else %}chat-bubble-system{% endif %} {% if message.estado == 'error' %}chat-bubble-error{% endif %}">
+                <p class="mb-0">{{ message.texto }}</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <form class="chat-compose" method="post">
+        {% csrf_token %}
+        <input type="text" name="mensaje" class="form-control" placeholder="{% if puede_editar %}Escribi un gasto o ingreso...{% else %}Solo lectura{% endif %}" {% if not puede_editar %}disabled{% endif %} autocomplete="off" required>
+        <button class="btn btn-primary" {% if not puede_editar %}disabled{% endif %}>
+            <i class="bi bi-send"></i>
+        </button>
+    </form>
+</div>
+{% endblock %}

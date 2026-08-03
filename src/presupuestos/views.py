@@ -10,6 +10,9 @@ from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from itertools import groupby
+from decimal import Decimal, InvalidOperation
+from datetime import datetime, time, timedelta
+import re
 from core.auth import asignar_presupuestos_sin_usuario
 from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
 from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm
@@ -70,12 +73,27 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context = super().get_context_data(**kwargs)
         
         # Obtener gastos e ingresos ordenados
-        gastos = list(self.object.gastos.all().order_by('-fecha'))
+        gastos = list(self.object.gastos.select_related('categoria').order_by('-fecha'))
         ingresos = list(self.object.ingresos.all().order_by('-fecha'))
         
         # Calcular totales
         total_gastos = sum(gasto.monto for gasto in gastos)
         total_ingresos = sum(ingreso.monto for ingreso in ingresos)
+
+        gastos_por_tipo = {}
+        for gasto in gastos:
+            tipo = gasto.categoria.nombre if gasto.categoria else 'Sin categoría'
+            if tipo not in gastos_por_tipo:
+                gastos_por_tipo[tipo] = {'tipo': tipo, 'total': Decimal('0'), 'cantidad': 0}
+            gastos_por_tipo[tipo]['total'] += gasto.monto
+            gastos_por_tipo[tipo]['cantidad'] += 1
+
+        resumen_gastos_por_tipo = sorted(
+            gastos_por_tipo.values(),
+            key=lambda item: (-item['total'], item['tipo'].lower()),
+        )
+        for item in resumen_gastos_por_tipo:
+            item['porcentaje'] = round((item['total'] / total_gastos) * 100) if total_gastos else 0
 
         transacciones = ingresos + gastos
         for transaccion in transacciones:
@@ -92,6 +110,7 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context['transacciones_por_dia'] = transacciones_por_dia
         context['total_gastos'] = total_gastos
         context['total_ingresos'] = total_ingresos
+        context['resumen_gastos_por_tipo'] = resumen_gastos_por_tipo
         context['monto_total_con_ingresos'] = self.object.monto_total + total_ingresos
         context['puede_editar'] = self.object.puede_editar(self.request.user)
         context['es_duenio'] = self.object.usuario_id == self.request.user.id
@@ -438,3 +457,173 @@ def quitar_usuario_compartido(request, pk, compartido_id):
     get_object_or_404(PresupuestoCompartido, pk=compartido_id, presupuesto=presupuesto).delete()
     messages.success(request, 'Usuario quitado del presupuesto compartido.')
     return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+
+@login_required
+def chat_presupuesto(request, pk):
+    presupuesto = get_object_or_404(presupuestos_visibles(request.user), pk=pk)
+    puede_editar = presupuesto.puede_editar(request.user)
+    session_key = f'chat_presupuesto_{presupuesto.pk}'
+    chat_messages = request.session.get(session_key, [])
+
+    if request.method == 'POST':
+        if not puede_editar:
+            messages.error(request, 'No tenes permiso para cargar movimientos en este presupuesto.')
+            return redirect('presupuestos:chat_presupuesto', pk=pk)
+
+        texto = request.POST.get('mensaje', '').strip()
+        respuesta = procesar_mensaje_chat_presupuesto(presupuesto, texto)
+        chat_messages.append({'tipo': 'usuario', 'texto': texto})
+        chat_messages.append(respuesta)
+        request.session[session_key] = chat_messages[-20:]
+        request.session.modified = True
+        return redirect('presupuestos:chat_presupuesto', pk=pk)
+
+    return render(request, 'presupuestos/chat_presupuesto.html', {
+        'presupuesto': presupuesto,
+        'puede_editar': puede_editar,
+        'chat_messages': chat_messages,
+    })
+
+
+def procesar_mensaje_chat_presupuesto(presupuesto, texto):
+    texto_limpio = texto.strip()
+    texto_normalizado = texto_limpio.lower()
+
+    if texto_normalizado in ('hola', 'buenas', 'buen dia', 'buenas tardes', 'buenas noches', 'hey'):
+        return {
+            'tipo': 'sistema',
+            'estado': 'ok',
+            'texto': 'Hola. Podes decirme algo como "gaste 2500 en comida empanadas" o "ingreso 100000 sueldo".',
+        }
+
+    if texto_normalizado in ('ayuda', 'help', '?'):
+        return {
+            'tipo': 'sistema',
+            'estado': 'ok',
+            'texto': 'Ejemplos: "gasto 2500 comida empanadas", "gaste 12000 en nafta", "ingreso 100000 sueldo".',
+        }
+
+    tipo_detectado = detectar_tipo_movimiento(texto_normalizado)
+    monto = extraer_monto(texto_limpio)
+    if not tipo_detectado:
+        return {
+            'tipo': 'sistema',
+            'estado': 'error',
+            'texto': 'No se si queres cargar un gasto o un ingreso. Proba con: gasto 2500 comida empanadas.',
+        }
+
+    if monto is None:
+        return {
+            'tipo': 'sistema',
+            'estado': 'error',
+            'texto': 'No pude leer el monto. Ejemplo: gaste 2500 en comida empanadas.',
+        }
+
+    if monto <= 0:
+        return {
+            'tipo': 'sistema',
+            'estado': 'error',
+            'texto': 'El monto tiene que ser mayor a cero.',
+        }
+
+    detalle = limpiar_detalle_chat(texto_limpio, tipo_detectado)
+    categoria_nombre, descripcion = inferir_categoria_y_descripcion(detalle, tipo_detectado)
+    fecha_movimiento = extraer_fecha_chat(texto_normalizado)
+
+    if tipo_detectado == 'gasto':
+        categoria = Categoria.objects.filter(nombre__iexact=categoria_nombre).first()
+        if not categoria:
+            categoria = Categoria.objects.create(nombre=categoria_nombre.capitalize())
+        nombre = descripcion.capitalize() if descripcion else categoria.nombre
+        Gasto.objects.create(
+            presupuesto=presupuesto,
+            categoria=categoria,
+            nombre=nombre,
+            descripcion=descripcion,
+            monto=monto,
+            fecha=fecha_movimiento,
+        )
+        presupuesto.actualizar_monto_restante()
+        return {
+            'tipo': 'sistema',
+            'estado': 'ok',
+            'texto': f'Listo, agregue el gasto "{nombre}" por {monto:.2f}.',
+        }
+
+    nombre = descripcion.capitalize() if descripcion else 'Ingreso'
+    Ingreso.objects.create(
+        presupuesto=presupuesto,
+        nombre=nombre,
+        descripcion=descripcion,
+        monto=monto,
+        fecha=fecha_movimiento,
+    )
+    presupuesto.actualizar_monto_restante()
+    return {
+        'tipo': 'sistema',
+        'estado': 'ok',
+        'texto': f'Listo, agregue el ingreso "{nombre}" por {monto:.2f}.',
+    }
+
+
+def detectar_tipo_movimiento(texto):
+    if re.search(r'\b(ingreso|ingrese|ingresare|cobre|cobro|cobrare|sueldo|deposito|entrada)\b', texto):
+        return 'ingreso'
+    if re.search(r'\b(gasto|gaste|gastare|gastos|egreso|pague|pago|pagare|compre|compra|comprare|salida)\b', texto):
+        return 'gasto'
+    return None
+
+
+def extraer_monto(texto):
+    match = re.search(r'(?<!\w)(?:\$|\+|-)?\s*(\d+(?:[.,]\d{1,2})?)', texto)
+    if not match:
+        return None
+    try:
+        return Decimal(match.group(1).replace('.', '').replace(',', '.'))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def limpiar_detalle_chat(texto, tipo):
+    detalle = re.sub(r'(?<!\w)(?:\$|\+|-)?\s*\d+(?:[.,]\d{1,2})?', ' ', texto, count=1, flags=re.IGNORECASE)
+    palabras = [
+        'gasto', 'gaste', 'gastare', 'gastos', 'egreso', 'pague', 'pago', 'pagare', 'compre', 'compra', 'comprare',
+        'ingreso', 'ingrese', 'ingresare', 'cobre', 'cobro', 'cobrare', 'deposito', 'entrada',
+        'hoy', 'ayer', 'anteayer', 'mañana', 'manana',
+        'en', 'de', 'por', 'para', 'del',
+    ]
+    detalle = re.sub(r'\b(' + '|'.join(palabras) + r')\b', ' ', detalle, flags=re.IGNORECASE)
+    return ' '.join(detalle.split())
+
+
+def inferir_categoria_y_descripcion(detalle, tipo):
+    if tipo == 'ingreso':
+        return 'Ingreso', detalle
+    if not detalle:
+        return 'Varios', ''
+    partes = detalle.split()
+    categoria_nombre = partes[0]
+    descripcion = ' '.join(partes[1:]) or detalle
+    return categoria_nombre, descripcion
+
+
+def extraer_fecha_chat(texto):
+    ahora = timezone.localtime(timezone.now())
+    fecha = ahora.date()
+
+    if re.search(r'\banteayer\b', texto):
+        fecha = fecha - timedelta(days=2)
+    elif re.search(r'\bayer\b', texto):
+        fecha = fecha - timedelta(days=1)
+    elif re.search(r'\b(mañana|manana)\b', texto):
+        fecha = fecha + timedelta(days=1)
+
+    hora_match = re.search(r'\b(?:a las\s*)?(\d{1,2})(?::|\.)(\d{2})\b', texto)
+    if hora_match:
+        hora = int(hora_match.group(1))
+        minuto = int(hora_match.group(2))
+        if 0 <= hora <= 23 and 0 <= minuto <= 59:
+            return datetime.combine(fecha, time(hour=hora, minute=minuto))
+
+    return datetime.combine(fecha, ahora.time().replace(microsecond=0))

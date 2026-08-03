@@ -12,6 +12,7 @@ urlpatterns = [
     path('presupuesto/<int:pk>/eliminar/', views.PresupuestoDeleteView.as_view(), name='eliminar_presupuesto'),
     path('presupuesto/<int:pk>/compartir/', views.compartir_presupuesto, name='compartir_presupuesto'),
     path('presupuesto/<int:pk>/compartir/<int:compartido_id>/quitar/', views.quitar_usuario_compartido, name='quitar_usuario_compartido'),
+    path('presupuesto/<int:pk>/chat/', views.chat_presupuesto, name='chat_presupuesto'),
     path('presupuesto/<int:pk>/', views.PresupuestoDetailView.as_view(), name='ver_presupuesto'),
 
     # URLs de Categoría
