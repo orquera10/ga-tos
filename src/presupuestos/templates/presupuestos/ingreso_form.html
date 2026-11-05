@@ -72,12 +72,28 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
-                            {{ form.descripcion }}
-                            {% if form.descripcion.errors %}
-                                <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
+                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label">
+                                <i class="bi bi-bank"></i> Banco / Billetera destino <small class="text-muted">(Opcional)</small>
+                            </label>
+                            {{ form.cuenta_bancaria_nombre }}
+                            <datalist id="cuentas-list">
+                                {% for c in cuentas_list %}
+                                <option value="{{ c }}">
+                                {% endfor %}
+                            </datalist>
+                            <small class="text-muted d-block mt-1">Ej: Brubank, Mercado Pago, Banco Galicia, Ualá...</small>
+                            {% if form.cuenta_bancaria_nombre.errors %}
+                                <div class="invalid-feedback d-block">{{ form.cuenta_bancaria_nombre.errors.0 }}</div>
                             {% endif %}
                         </div>
+                    </div>
+
+                    <div class="form-section">
+                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}
+                            <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="form-actions">

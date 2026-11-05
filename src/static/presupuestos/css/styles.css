@@ -886,44 +886,48 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 }
 
 .budget-action-row {
-    display: flex;
-    flex-direction: row;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     gap: 0.5rem;
     align-items: center;
     position: sticky;
     top: 58px;
     z-index: 100;
     padding: 0.5rem 0.3rem;
-    background: rgba(18, 18, 18, 0.92);
+    background: rgba(18, 18, 18, 0.95);
     backdrop-filter: blur(8px);
     border-radius: 10px;
 }
 
 .budget-action-row .btn {
     border-radius: 8px;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     gap: 0.35rem;
     font-size: 0.88rem;
     padding: 0.45rem 0.5rem;
     white-space: nowrap;
-    flex: 1;
+    flex: 1 1 0 !important;
+    width: auto !important;
 }
 
 @media (max-width: 576px) {
     .budget-action-row {
-        flex-direction: row;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
         gap: 0.35rem;
-        top: 56px;
+        top: 54px;
         padding: 0.4rem 0.2rem;
         margin-top: 0.5rem !important;
         margin-bottom: 0.5rem !important;
     }
 
     .budget-action-row .btn {
-        padding: 0.42rem 0.3rem;
+        padding: 0.42rem 0.25rem;
         font-size: 0.82rem;
+        flex: 1 1 0 !important;
     }
 }
 

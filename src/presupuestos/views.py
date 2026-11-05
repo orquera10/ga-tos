@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, time, timedelta
 import re
 from core.auth import asignar_presupuestos_sin_usuario
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria
 from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm
 
 
@@ -73,8 +73,8 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context = super().get_context_data(**kwargs)
         
         # Obtener gastos e ingresos ordenados
-        gastos = list(self.object.gastos.select_related('categoria').order_by('-fecha'))
-        ingresos = list(self.object.ingresos.all().order_by('-fecha'))
+        gastos = list(self.object.gastos.select_related('categoria', 'cuenta_bancaria').order_by('-fecha'))
+        ingresos = list(self.object.ingresos.select_related('cuenta_bancaria').order_by('-fecha'))
         
         # Calcular totales
         total_gastos = sum(gasto.monto for gasto in gastos)
@@ -91,6 +91,40 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         gastos_transferencia = sum(g.monto for g in gastos if g.metodo_pago == 'transferencia')
         saldo_transferencia = ingresos_transferencia - gastos_transferencia
         total_sueldo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'sueldo')
+
+        # Desglose de saldos por cuenta bancaria / billetera
+        cuentas_map = {}
+        for i in ingresos:
+            if i.cuenta_bancaria:
+                c_nom = i.cuenta_bancaria.nombre
+                if c_nom not in cuentas_map:
+                    cuentas_map[c_nom] = {'nombre': c_nom, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
+                cuentas_map[c_nom]['ingresos'] += i.monto
+        for g in gastos:
+            if g.cuenta_bancaria:
+                c_nom = g.cuenta_bancaria.nombre
+                if c_nom not in cuentas_map:
+                    cuentas_map[c_nom] = {'nombre': c_nom, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
+                cuentas_map[c_nom]['gastos'] += g.monto
+
+        for c in cuentas_map.values():
+            c['saldo'] = c['ingresos'] - c['gastos']
+        saldos_por_cuenta = sorted(cuentas_map.values(), key=lambda x: -x['saldo'])
+
+        # Desglose de gastos por persona / destinatario
+        personas_map = {}
+        for g in gastos:
+            p_nom = g.persona.strip() if g.persona else 'Sin asignar'
+            if p_nom not in personas_map:
+                personas_map[p_nom] = {'persona': p_nom, 'total': Decimal('0'), 'cantidad': 0}
+            personas_map[p_nom]['total'] += g.monto
+            personas_map[p_nom]['cantidad'] += 1
+
+        resumen_gastos_por_persona = sorted(personas_map.values(), key=lambda x: -x['total'])
+        for item in resumen_gastos_por_persona:
+            item['porcentaje'] = round((item['total'] / total_gastos) * 100) if total_gastos else 0
+
+        personas_list = sorted(list({g.persona.strip() for g in gastos if g.persona and g.persona.strip()}))
 
         gastos_por_tipo = {}
         for gasto in gastos:
@@ -134,6 +168,9 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context['saldo_restante'] = saldo_restante
         context['total_ingresos'] = total_ingresos
         context['resumen_gastos_por_tipo'] = resumen_gastos_por_tipo
+        context['resumen_gastos_por_persona'] = resumen_gastos_por_persona
+        context['saldos_por_cuenta'] = saldos_por_cuenta
+        context['personas_list'] = personas_list
         context['monto_total_con_ingresos'] = monto_total_con_ingresos
         context['puede_editar'] = self.object.puede_editar(self.request.user)
         context['es_duenio'] = self.object.usuario_id == self.request.user.id
@@ -263,6 +300,7 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['initial'] = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        kwargs['user'] = self.request.user
         return kwargs
 
     def form_valid(self, form):
@@ -275,7 +313,7 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
                 form.instance.moneda = presupuesto.moneda
             
             # Guardar el gasto
-            gasto = form.save()
+            gasto = form.save(user=self.request.user)
             
             # Actualizar el monto restante del presupuesto
             presupuesto.actualizar_monto_restante()
@@ -292,6 +330,8 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
+        context['personas_list'] = sorted(list(Gasto.objects.filter(presupuesto__usuario=self.request.user).exclude(persona='').values_list('persona', flat=True).distinct()))
+        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
         return context
 
 class GastoUpdateView(GastoEditableMixin, UpdateView):
@@ -302,15 +342,22 @@ class GastoUpdateView(GastoEditableMixin, UpdateView):
     def get_success_url(self):
         return reverse_lazy('presupuestos:ver_presupuesto', kwargs={'pk': self.object.presupuesto.pk})
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
         context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
+        context['personas_list'] = sorted(list(Gasto.objects.filter(presupuesto__usuario=self.request.user).exclude(persona='').values_list('persona', flat=True).distinct()))
+        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
         return context
 
     def form_valid(self, form):
         # Guardar el gasto con el archivo adjunto
-        gasto = form.save()
+        gasto = form.save(user=self.request.user)
         messages.success(self.request, 'Gasto actualizado exitosamente')
         return super().form_valid(form)
 
@@ -354,17 +401,16 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
     
     def get_success_url(self):
         return reverse_lazy('presupuestos:ver_ingreso', kwargs={'pk': self.object.pk})
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def form_valid(self, form):
-        # Guardar el monto anterior para el cálculo
-        old_monto = self.get_object().monto
-        
-        # Guardar el formulario para obtener el nuevo ingreso
+        # Guardar el ingreso
         response = super().form_valid(form)
-        
-        # Actualizar el monto restante del presupuesto usando el método del modelo
         self.object.presupuesto.actualizar_monto_restante()
-        
         messages.success(self.request, 'Ingreso actualizado correctamente')
         return response
     
@@ -372,6 +418,7 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
         context['editing'] = True
+        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
         return context
 
 
@@ -416,6 +463,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['initial'] = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        kwargs['user'] = self.request.user
         return kwargs
 
     def form_valid(self, form):
@@ -424,7 +472,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
             form.instance.presupuesto = presupuesto
             
             # Guardar el ingreso
-            ingreso = form.save()
+            ingreso = form.save(user=self.request.user)
             
             # Actualizar el monto restante usando el método del modelo
             presupuesto.actualizar_monto_restante()
@@ -441,6 +489,8 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
+        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
+        return context
         return context
 
 

@@ -156,3 +156,36 @@ class ApiEndpointsTestCase(TestCase):
         )
         p_abierto.refresh_from_db()
         self.assertEqual(p_abierto.monto_restante, Decimal('60000.00'))
+
+    def test_gasto_con_persona_y_cuenta_bancaria(self):
+        resp_ing = self.client.post(
+            '/api/ingresos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Cobro DiDi',
+                'monto': 50000.00,
+                'tipo_ingreso': 'transferencia',
+                'cuenta_bancaria': 'Brubank'
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_ing.status_code, 201)
+        self.assertEqual(resp_ing.json()['ingreso']['cuenta_bancaria'], 'Brubank')
+
+        resp_gasto = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Cena',
+                'monto': 15000.00,
+                'metodo_pago': 'transferencia',
+                'persona': 'Victoria',
+                'cuenta_bancaria': 'Brubank'
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_gasto.status_code, 201)
+        self.assertEqual(resp_gasto.json()['gasto']['persona'], 'Victoria')
+        self.assertEqual(resp_gasto.json()['gasto']['cuenta_bancaria'], 'Brubank')

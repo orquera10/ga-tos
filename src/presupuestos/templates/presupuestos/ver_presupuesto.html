@@ -159,6 +159,27 @@
                     </div>
                 </div>
             </div>
+
+            {% if saldos_por_cuenta %}
+            <!-- Cuentas Bancarias y Billeteras Virtuales -->
+            <div class="mt-3 pt-3 border-top border-secondary">
+                <div class="small text-muted mb-2 d-flex align-items-center">
+                    <i class="bi bi-wallet2 text-primary me-1"></i> <strong class="text-light">Cuentas y Billeteras</strong>
+                </div>
+                <div class="row g-2">
+                    {% for c in saldos_por_cuenta %}
+                    <div class="col-6 col-md-4">
+                        <div class="p-2 rounded" style="background: rgba(0, 208, 156, 0.06); border: 1px solid rgba(0, 208, 156, 0.22);">
+                            <div class="small text-muted text-truncate fw-bold">{{ c.nombre }}</div>
+                            <div class="fw-bold {% if c.saldo >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                                ${{ c.saldo|floatformat:2 }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -242,6 +263,21 @@
             <span class="transactions-count">{{ debug_gastos_count|add:debug_ingresos_count }} registros</span>
         </div>
 
+        {% if personas_list %}
+        <!-- Filtro rápido por persona -->
+        <div class="d-flex flex-wrap gap-2 mb-3 px-2 align-items-center">
+            <span class="small text-muted me-1"><i class="bi bi-people"></i> Persona:</span>
+            <button type="button" class="btn btn-sm btn-light active js-filter-persona" data-persona="all">
+                Todos
+            </button>
+            {% for p in personas_list %}
+            <button type="button" class="btn btn-sm btn-outline-info js-filter-persona" data-persona="{{ p|lower }}">
+                {{ p }}
+            </button>
+            {% endfor %}
+        </div>
+        {% endif %}
+
     <div class="transacciones-container">
         {% if transacciones_por_dia %}
             {% for dia in transacciones_por_dia %}
@@ -251,7 +287,7 @@
                     </div>
                     
                     {% for transaccion in dia.list %}
-                    <div class="transaccion-item gasto-item {% if transaccion|model_name == 'gasto' %}transaccion-gasto{% else %}transaccion-ingreso{% endif %}">
+                    <div class="transaccion-item gasto-item {% if transaccion|model_name == 'gasto' %}transaccion-gasto{% else %}transaccion-ingreso{% endif %}" data-persona="{{ transaccion.persona|default:''|lower }}">
                         {% if puede_editar and transaccion|model_name == 'gasto' %}
                         <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="swipe-delete-underlay js-delete-modal" aria-hidden="true" tabindex="-1" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
                             <i class="bi bi-trash-fill"></i>
@@ -278,10 +314,13 @@
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     {{ transaccion.categoria.nombre|default:"Sin categoría" }}
+                                    {% if transaccion.persona %}
+                                        <span class="badge bg-info text-dark ms-1"><i class="bi bi-person"></i> {{ transaccion.persona }}</span>
+                                    {% endif %}
                                     {% if transaccion.metodo_pago == 'efectivo' %}
                                         <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
                                     {% elif transaccion.metodo_pago == 'transferencia' %}
-                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.{% if transaccion.cuenta_bancaria %} ({{ transaccion.cuenta_bancaria.nombre }}){% endif %}</span>
                                     {% elif transaccion.metodo_pago == 'tarjeta' %}
                                         <span class="badge bg-warning text-dark ms-1"><i class="bi bi-credit-card"></i> Tarjeta (Próx. mes)</span>
                                     {% endif %}
@@ -307,6 +346,12 @@
                                     {% elif transaccion.tipo_ingreso == 'efectivo' %}
                                         <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
                                     {% elif transaccion.tipo_ingreso == 'transferencia' %}
+                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                    {% endif %}
+                                    {% if transaccion.cuenta_bancaria %}
+                                        <span class="badge bg-dark border border-secondary text-light ms-1"><i class="bi bi-wallet2"></i> {{ transaccion.cuenta_bancaria.nombre }}</span>
+                                    {% endif %}
+                                </p>
                                         <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
                                     {% endif %}
                                 </p>
@@ -448,6 +493,30 @@
                 <p class="mb-0">El resumen aparecerá cuando registres tu primer gasto.</p>
             </div>
         {% endif %}
+
+        {% if resumen_gastos_por_persona %}
+        <div class="mt-4 pt-3 border-top border-secondary">
+            <h5 class="transactions-title mb-3"><i class="bi bi-people text-info"></i> Gastos por persona</h5>
+            <div class="expense-summary-chart">
+                {% for item in resumen_gastos_por_persona %}
+                    <div class="expense-summary-row">
+                        <div class="expense-summary-label">
+                            <div>
+                                <span class="expense-summary-dot" style="background-color: #00D09C;" aria-hidden="true"></span>
+                                <strong>{{ item.persona }}</strong>
+                                <span class="expense-summary-count">{{ item.cantidad }} gasto{{ item.cantidad|pluralize }}</span>
+                            </div>
+                            <span class="expense-summary-amount">{{ item.total|floatformat:2 }} {{ presupuesto.moneda }}</span>
+                        </div>
+                        <div class="expense-summary-track" role="img" aria-label="{{ item.persona }}: {{ item.porcentaje }}%">
+                            <span class="expense-summary-bar" style="width: {{ item.porcentaje }}%; background: #00D09C;"></span>
+                        </div>
+                        <span class="expense-summary-percentage">{{ item.porcentaje }}%</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </section>
 {% endblock %}
 
@@ -545,6 +614,39 @@
                 }
             });
         });
+
+        // Filtro interactivo por persona / destinatario
+        var filterBtns = document.querySelectorAll('.js-filter-persona');
+        if (filterBtns.length) {
+            filterBtns.forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    filterBtns.forEach(function(b) {
+                        b.classList.remove('active', 'btn-light');
+                        b.classList.add('btn-outline-info');
+                    });
+                    btn.classList.add('active', 'btn-light');
+                    btn.classList.remove('btn-outline-info');
+
+                    var target = btn.getAttribute('data-persona');
+                    document.querySelectorAll('.transaccion-item').forEach(function(item) {
+                        var p = (item.getAttribute('data-persona') || '').trim();
+                        if (target === 'all' || p === target) {
+                            item.style.display = '';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+
+                    // Ocultar días que queden vacíos
+                    document.querySelectorAll('.dia-transacciones').forEach(function(dia) {
+                        var visible = Array.from(dia.querySelectorAll('.transaccion-item')).some(function(it) {
+                            return it.style.display !== 'none';
+                        });
+                        dia.style.display = visible ? '' : 'none';
+                    });
+                });
+            });
+        }
     });
 </script>
 {% endblock %}

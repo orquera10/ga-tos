@@ -18,6 +18,8 @@ class QuickExpenseActivity : AppCompatActivity() {
 
     private lateinit var etMonto: EditText
     private lateinit var etNombre: EditText
+    private lateinit var etPersona: EditText
+    private lateinit var etCuentaBancaria: EditText
     private lateinit var spPresupuesto: Spinner
     private lateinit var spCategoria: Spinner
     private lateinit var spMetodoPago: Spinner
@@ -37,6 +39,8 @@ class QuickExpenseActivity : AppCompatActivity() {
 
         etMonto = findViewById(R.id.etMonto)
         etNombre = findViewById(R.id.etNombre)
+        etPersona = findViewById(R.id.etPersona)
+        etCuentaBancaria = findViewById(R.id.etCuentaBancaria)
         spPresupuesto = findViewById(R.id.spPresupuesto)
         spCategoria = findViewById(R.id.spCategoria)
         spMetodoPago = findViewById(R.id.spMetodoPago)
@@ -130,6 +134,9 @@ class QuickExpenseActivity : AppCompatActivity() {
             else -> "efectivo"
         }
 
+        val persona = etPersona.text.toString().trim()
+        val cuenta = etCuentaBancaria.text.toString().trim()
+
         btnSave.isEnabled = false
         btnSave.text = "Guardando..."
 
@@ -140,7 +147,9 @@ class QuickExpenseActivity : AppCompatActivity() {
                 nombre = nombre,
                 monto = monto,
                 categoryId = categoryId,
-                metodoPago = metodoValue
+                metodoPago = metodoValue,
+                persona = persona,
+                cuentaBancaria = cuenta
             )
 
             withContext(Dispatchers.Main) {

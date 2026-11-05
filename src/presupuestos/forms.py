@@ -111,6 +111,28 @@ class CompartirPresupuestoForm(forms.ModelForm):
 
 class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
     presupuesto_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    persona = forms.CharField(
+        required=False,
+        max_length=60,
+        label='Persona / Tag',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Hija, Victoria, Dario, Personal...',
+            'list': 'personas-list',
+            'autocomplete': 'off'
+        })
+    )
+    cuenta_bancaria_nombre = forms.CharField(
+        required=False,
+        max_length=60,
+        label='Cuenta / Billetera (si es transf.)',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
+            'list': 'cuentas-list',
+            'autocomplete': 'off'
+        })
+    )
     fecha = forms.DateTimeField(
         widget=forms.DateTimeInput(
             attrs={
@@ -126,11 +148,11 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
     class Meta:
         model = Gasto
-        fields = ['nombre', 'monto', 'metodo_pago', 'categoria', 'fecha', 'descripcion', 'presupuesto_pk']
+        fields = ['nombre', 'persona', 'monto', 'metodo_pago', 'cuenta_bancaria_nombre', 'categoria', 'fecha', 'descripcion', 'presupuesto_pk']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Almuerzo, Supermercado...'}),
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
-            'metodo_pago': forms.Select(attrs={'class': 'form-select'}),
+            'metodo_pago': forms.Select(attrs={'class': 'form-select', 'id': 'id_metodo_pago'}),
             'categoria': forms.Select(attrs={'class': 'form-select'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'})
         }
@@ -138,15 +160,42 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'metodo_pago': 'Medio de Pago'
         }
         
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self.instance.fecha:
-            local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+        if self.instance and self.instance.pk:
+            if self.instance.persona:
+                self.initial['persona'] = self.instance.persona
+            if self.instance.cuenta_bancaria:
+                self.initial['cuenta_bancaria_nombre'] = self.instance.cuenta_bancaria.nombre
+            if self.instance.fecha:
+                local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+                self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
         else:
             local_dt = timezone.localtime(timezone.now())
-        self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
-    def save(self, commit=True):
+    def save(self, commit=True, user=None):
+        current_user = user or self.user
+        if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
+            current_user = self.instance.presupuesto.usuario
+
+        cuenta_nom = (self.cleaned_data.get('cuenta_bancaria_nombre') or '').strip()
+        if cuenta_nom and current_user:
+            from .models import CuentaBancaria
+            cuenta, _ = CuentaBancaria.objects.get_or_create(
+                usuario=current_user,
+                nombre__iexact=cuenta_nom,
+                defaults={'nombre': cuenta_nom.title()}
+            )
+            self.instance.cuenta_bancaria = cuenta
+        elif not cuenta_nom:
+            self.instance.cuenta_bancaria = None
+
+        if 'persona' in self.cleaned_data:
+            p = (self.cleaned_data.get('persona') or '').strip()
+            self.instance.persona = p.title() if p else ''
+
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)
@@ -160,6 +209,17 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
 class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
     presupuesto_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    cuenta_bancaria_nombre = forms.CharField(
+        required=False,
+        max_length=60,
+        label='Cuenta / Billetera destino',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
+            'list': 'cuentas-list',
+            'autocomplete': 'off'
+        })
+    )
     fecha = forms.DateTimeField(
         widget=forms.DateTimeInput(
             attrs={
@@ -175,26 +235,47 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
     class Meta:
         model = Ingreso
-        fields = ['nombre', 'monto', 'tipo_ingreso', 'fecha', 'descripcion', 'presupuesto_pk']
+        fields = ['nombre', 'monto', 'tipo_ingreso', 'cuenta_bancaria_nombre', 'fecha', 'descripcion', 'presupuesto_pk']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Sueldo, Cobro de honorarios...'}),
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
-            'tipo_ingreso': forms.Select(attrs={'class': 'form-select'}),
+            'tipo_ingreso': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo_ingreso'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
         }
         labels = {
             'tipo_ingreso': 'Tipo de Ingreso'
         }
         
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        self.user = user
         super().__init__(*args, **kwargs)
-        if self.instance and self.instance.pk and self.instance.fecha:
-            local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+        if self.instance and self.instance.pk:
+            if self.instance.cuenta_bancaria:
+                self.initial['cuenta_bancaria_nombre'] = self.instance.cuenta_bancaria.nombre
+            if self.instance.fecha:
+                local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+                self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
         else:
             local_dt = timezone.localtime(timezone.now())
-        self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
-    def save(self, commit=True):
+    def save(self, commit=True, user=None):
+        current_user = user or self.user
+        if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
+            current_user = self.instance.presupuesto.usuario
+
+        cuenta_nom = (self.cleaned_data.get('cuenta_bancaria_nombre') or '').strip()
+        if cuenta_nom and current_user:
+            from .models import CuentaBancaria
+            cuenta, _ = CuentaBancaria.objects.get_or_create(
+                usuario=current_user,
+                nombre__iexact=cuenta_nom,
+                defaults={'nombre': cuenta_nom.title()}
+            )
+            self.instance.cuenta_bancaria = cuenta
+        elif not cuenta_nom:
+            self.instance.cuenta_bancaria = None
+
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)

@@ -20,6 +20,7 @@ class QuickIncomeActivity : AppCompatActivity() {
     private lateinit var etNombre: EditText
     private lateinit var spPresupuesto: Spinner
     private lateinit var spTipoIngreso: Spinner
+    private lateinit var etCuentaBancaria: EditText
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
 
@@ -37,6 +38,7 @@ class QuickIncomeActivity : AppCompatActivity() {
         etNombre = findViewById(R.id.etNombreIngreso)
         spPresupuesto = findViewById(R.id.spPresupuestoIngreso)
         spTipoIngreso = findViewById(R.id.spTipoIngreso)
+        etCuentaBancaria = findViewById(R.id.etCuentaBancariaIngreso)
         btnSave = findViewById(R.id.btnSaveIngreso)
         btnCancel = findViewById(R.id.btnCancelIngreso)
 
@@ -108,6 +110,8 @@ class QuickIncomeActivity : AppCompatActivity() {
             else -> "transferencia"
         }
 
+        val cuenta = etCuentaBancaria.text.toString().trim()
+
         btnSave.isEnabled = false
         btnSave.text = "Guardando..."
 
@@ -117,7 +121,8 @@ class QuickIncomeActivity : AppCompatActivity() {
                 budgetId = budget.id,
                 nombre = nombre,
                 monto = monto,
-                tipoIngreso = tipoValue
+                tipoIngreso = tipoValue,
+                cuentaBancaria = cuenta
             )
 
             withContext(Dispatchers.Main) {

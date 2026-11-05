@@ -1,148 +1,198 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp"
     android:background="@drawable/bg_dialog">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Nuevo Gasto"
-        android:textColor="@color/primary"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="16dp" />
-
-    <!-- Monto Input (Large & Focused) -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Monto ($)"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-
-    <EditText
-        android:id="@+id/etMonto"
-        android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:inputType="numberDecimal"
-        android:hint="0.00"
-        android:textColor="#FFFFFF"
-        android:textColorHint="@color/text_muted"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:background="@drawable/input_bg"
-        android:paddingHorizontal="12dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp" />
-
-    <!-- Concepto / Nombre Input -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Concepto"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-
-    <EditText
-        android:id="@+id/etNombre"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:inputType="textCapSentences"
-        android:hint="Ej: Almuerzo, Supermercado..."
-        android:textColor="#FFFFFF"
-        android:textColorHint="@color/text_muted"
-        android:textSize="15sp"
-        android:background="@drawable/input_bg"
-        android:paddingHorizontal="12dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp" />
-
-    <!-- Presupuesto Selector -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Presupuesto"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-
-    <Spinner
-        android:id="@+id/spPresupuesto"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@drawable/input_bg"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp" />
-
-    <!-- Categoria Selector -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Categoría"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-
-    <Spinner
-        android:id="@+id/spCategoria"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@drawable/input_bg"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="12dp" />
-
-    <!-- Medio de Pago Selector -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Medio de Pago"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
-
-    <Spinner
-        android:id="@+id/spMetodoPago"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@drawable/input_bg"
-        android:layout_marginTop="4dp"
-        android:layout_marginBottom="20dp" />
-
-    <!-- Action buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp">
+        android:orientation="vertical"
+        android:padding="20dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnCancel"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Cancelar"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nuevo Gasto"
+            android:textColor="@color/primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Monto Input -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Monto ($)"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/etMonto"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:inputType="numberDecimal"
+            android:hint="0.00"
             android:textColor="#FFFFFF"
+            android:textColorHint="@color/text_muted"
+            android:textSize="22sp"
             android:textStyle="bold"
-            app:backgroundTint="@color/danger"
-            app:cornerRadius="8dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:layout_marginEnd="8dp" />
+            android:background="@drawable/input_bg"
+            android:paddingHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSave"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="Guardar"
-            android:textColor="#000000"
-            android:textStyle="bold"
-            app:backgroundTint="@color/primary"
-            app:cornerRadius="8dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp" />
+        <!-- Concepto -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Concepto"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/etNombre"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:inputType="textCapSentences"
+            android:hint="Ej: Almuerzo, Supermercado..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="@color/text_muted"
+            android:textSize="15sp"
+            android:background="@drawable/input_bg"
+            android:paddingHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Persona / Destinatario -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Persona / Tag (Opcional)"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/etPersona"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:inputType="textCapWords"
+            android:hint="Ej: Hija, Victoria, Dario, Personal..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="@color/text_muted"
+            android:textSize="15sp"
+            android:background="@drawable/input_bg"
+            android:paddingHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Presupuesto Selector -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Presupuesto"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <Spinner
+            android:id="@+id/spPresupuesto"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@drawable/input_bg"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Categoria Selector -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Categoría"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <Spinner
+            android:id="@+id/spCategoria"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@drawable/input_bg"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Medio de Pago Selector -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Medio de Pago"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <Spinner
+            android:id="@+id/spMetodoPago"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@drawable/input_bg"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Banco / Billetera -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Banco / Billetera (Si es transferencia)"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <EditText
+            android:id="@+id/etCuentaBancaria"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:inputType="textCapWords"
+            android:hint="Ej: Brubank, Mercado Pago, Ualá..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="@color/text_muted"
+            android:textSize="15sp"
+            android:background="@drawable/input_bg"
+            android:paddingHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Action buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancel"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Cancelar"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                app:backgroundTint="@color/danger"
+                app:cornerRadius="8dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:layout_marginEnd="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="Guardar"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                app:backgroundTint="@color/primary"
+                app:cornerRadius="8dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
-</LinearLayout>
+</ScrollView>

@@ -29,10 +29,39 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre</label>
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre del gasto</label>
                             {{ form.nombre }}
                             {% if form.nombre.errors %}
                                 <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.persona.id_for_label }}" class="form-label">
+                                <i class="bi bi-person"></i> Persona / Destinatario <small class="text-muted">(Opcional)</small>
+                            </label>
+                            {{ form.persona }}
+                            <datalist id="personas-list">
+                                {% for p in personas_list %}
+                                <option value="{{ p }}">
+                                {% endfor %}
+                            </datalist>
+                            <small class="text-muted d-block mt-1">Ej: Hija, Victoria, Dario, Personal...</small>
+                            {% if form.persona.errors %}
+                                <div class="invalid-feedback d-block">{{ form.persona.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 form-section">
+                        <div class="col-md-6">
+                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto ({{ presupuesto.get_moneda_display }})</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.monto }}
+                            </div>
+                            {% if form.monto.errors %}
+                                <div class="invalid-feedback d-block">{{ form.monto.errors.0 }}</div>
                             {% endif %}
                         </div>
 
@@ -52,16 +81,34 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto ({{ presupuesto.get_moneda_display }})</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                {{ form.monto }}
-                            </div>
-                            {% if form.monto.errors %}
-                                <div class="invalid-feedback d-block">{{ form.monto.errors.0 }}</div>
+                            <label for="{{ form.metodo_pago.id_for_label }}" class="form-label">Medio de Pago</label>
+                            {{ form.metodo_pago }}
+                            <small class="text-muted d-block mt-1">
+                                Efectivo y Transferencia descuentan el saldo actual. Tarjeta impactará el próximo mes.
+                            </small>
+                            {% if form.metodo_pago.errors %}
+                                <div class="invalid-feedback d-block">{{ form.metodo_pago.errors.0 }}</div>
                             {% endif %}
                         </div>
 
+                        <div class="col-md-6" id="div-cuenta-bancaria">
+                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label">
+                                <i class="bi bi-bank"></i> Banco / Billetera <small class="text-muted">(Si es transferencia)</small>
+                            </label>
+                            {{ form.cuenta_bancaria_nombre }}
+                            <datalist id="cuentas-list">
+                                {% for c in cuentas_list %}
+                                <option value="{{ c }}">
+                                {% endfor %}
+                            </datalist>
+                            <small class="text-muted d-block mt-1">Ej: Brubank, Mercado Pago, Banco Galicia, Ualá...</small>
+                            {% if form.cuenta_bancaria_nombre.errors %}
+                                <div class="invalid-feedback d-block">{{ form.cuenta_bancaria_nombre.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 form-section">
                         <div class="col-md-6">
                             <label for="{{ form.fecha.id_for_label }}" class="form-label">Fecha y hora</label>
                             <div class="input-group">
@@ -70,19 +117,6 @@
                             </div>
                             {% if form.fecha.errors %}
                                 <div class="invalid-feedback d-block">{{ form.fecha.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="row g-3 form-section">
-                        <div class="col-md-6">
-                            <label for="{{ form.metodo_pago.id_for_label }}" class="form-label">Medio de Pago</label>
-                            {{ form.metodo_pago }}
-                            <small class="text-muted d-block mt-1">
-                                Efectivo y Transferencia descuentan el saldo actual. Tarjeta impactará el próximo mes.
-                            </small>
-                            {% if form.metodo_pago.errors %}
-                                <div class="invalid-feedback d-block">{{ form.metodo_pago.errors.0 }}</div>
                             {% endif %}
                         </div>
 

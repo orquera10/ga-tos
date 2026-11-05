@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
 from django.db.models import Q
 
-from presupuestos.models import Presupuesto, Categoria, Gasto, Ingreso
+from presupuestos.models import Presupuesto, Categoria, Gasto, Ingreso, CuentaBancaria
 from presupuestos.views import presupuestos_editables, presupuestos_visibles
 from .models import ApiToken
 from .auth import api_auth_required, get_user_from_request
@@ -216,10 +216,24 @@ def crear_gasto_api(request):
     if metodo_pago not in ['efectivo', 'transferencia', 'tarjeta']:
         metodo_pago = 'efectivo'
 
+    persona_raw = (data.get('persona') or '').strip()
+    persona = persona_raw.title() if persona_raw else ''
+
+    cuenta_bancaria = None
+    cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    if cuenta_raw:
+        cuenta_bancaria, _ = CuentaBancaria.objects.get_or_create(
+            usuario=request.api_user,
+            nombre__iexact=cuenta_raw,
+            defaults={'nombre': cuenta_raw.title()}
+        )
+
     gasto = Gasto(
         presupuesto=presupuesto,
         categoria=categoria,
         nombre=nombre,
+        persona=persona,
+        cuenta_bancaria=cuenta_bancaria,
         monto=monto,
         metodo_pago=metodo_pago,
         descripcion=descripcion or None,
@@ -236,6 +250,9 @@ def crear_gasto_api(request):
         'gasto': {
             'id': gasto.id,
             'nombre': gasto.nombre,
+            'persona': gasto.persona,
+            'cuenta_bancaria': gasto.cuenta_bancaria.nombre if gasto.cuenta_bancaria else None,
+            'metodo_pago': gasto.metodo_pago,
             'monto': float(gasto.monto),
             'categoria': gasto.categoria.nombre if gasto.categoria else None,
             'fecha': gasto.fecha.strftime('%Y-%m-%d %H:%M'),
@@ -288,11 +305,21 @@ def crear_ingreso_api(request):
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:
         tipo_ingreso = 'transferencia'
 
+    cuenta_bancaria = None
+    cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    if cuenta_raw:
+        cuenta_bancaria, _ = CuentaBancaria.objects.get_or_create(
+            usuario=request.api_user,
+            nombre__iexact=cuenta_raw,
+            defaults={'nombre': cuenta_raw.title()}
+        )
+
     ingreso = Ingreso(
         presupuesto=presupuesto,
         nombre=nombre,
         monto=monto,
         tipo_ingreso=tipo_ingreso,
+        cuenta_bancaria=cuenta_bancaria,
         descripcion=data.get('descripcion') or None
     )
     ingreso.full_clean()
@@ -307,6 +334,8 @@ def crear_ingreso_api(request):
             'id': ingreso.id,
             'nombre': ingreso.nombre,
             'monto': float(ingreso.monto),
+            'tipo_ingreso': ingreso.tipo_ingreso,
+            'cuenta_bancaria': ingreso.cuenta_bancaria.nombre if ingreso.cuenta_bancaria else None,
         },
         'presupuesto': {
             'id': presupuesto.id,

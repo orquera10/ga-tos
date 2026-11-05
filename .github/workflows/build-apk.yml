@@ -62,13 +62,15 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.5.1
-          name: "Ga$tos Android APK v1.5.1"
+          tag_name: v1.6.0
+          name: "Ga$tos Android APK v1.6.0"
           body: |
-            ### App Android de Ga$tos v1.5.1
-            - **Sincronización 100% Automática del Widget**: Al iniciar sesión en la web, el widget se vincula automáticamente sin volver a pedir usuario ni contraseña.
-            - **Diálogos de Gasto e Ingreso corregidos**: Botón Cancelar en rojo, Guardar completo y visible, e incorporación de Medios de Pago y Tipos de Ingreso.
-            - **Soporte completo de flujo financiero**: Efectivo, Banco/Transferencia y Tarjetas de crédito diferidas.
+            ### App Android de Ga$tos v1.6.0
+            - **Etiquetas de Personas / Destinatario**: Asigna a qué persona corresponde el gasto (hija, victoria, personal, etc.) directamente desde el widget y la app.
+            - **Cuentas Bancarias y Billeteras**: Registra a qué banco/billetera (Brubank, Mercado Pago, Ualá, Galicia, etc.) va o de dónde sale cada movimiento, con visualización de saldos por entidad.
+            - **Diálogos de Gasto e Ingreso 100% Optimizados**: Formularios con scroll suave, botón Cancelar en rojo, botón Guardar completo y visible sin recortes.
+            - **Sincronización 100% Automática del Widget**: Al iniciar sesión en la web, el widget se vincula solo sin pedir contraseña.
+            - **Soporte de flujo continuo y tarjetas diferidas**.
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

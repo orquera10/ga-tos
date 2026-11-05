@@ -133,6 +133,21 @@ class PresupuestoCompartido(models.Model):
         return f'{self.presupuesto} compartido con {self.usuario} ({self.permiso})'
 
 
+class CuentaBancaria(models.Model):
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cuentas_bancarias')
+    nombre = models.CharField(max_length=60)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ('usuario', 'nombre')
+        verbose_name = 'Cuenta Bancaria / Billetera'
+        verbose_name_plural = 'Cuentas Bancarias / Billeteras'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+
 class Gasto(models.Model):
     METODOS_PAGO = [
         ('efectivo', 'Efectivo'),
@@ -142,6 +157,8 @@ class Gasto(models.Model):
     presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='gastos')
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, null=True, blank=True)
     nombre = models.CharField(max_length=100)
+    persona = models.CharField(max_length=60, blank=True, default='')
+    cuenta_bancaria = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='gastos')
     descripcion = models.TextField(blank=True, null=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
@@ -179,6 +196,7 @@ class Ingreso(models.Model):
         ('sueldo', 'Sueldo'),
     ]
     presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='ingresos')
+    cuenta_bancaria = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='ingresos')
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, null=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
