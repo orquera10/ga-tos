@@ -101,9 +101,23 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Banco / Billetera destino (Opcional)"
+            android:text="Banco / Billetera destino (Toca para elegir)"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
+
+        <HorizontalScrollView
+            android:id="@+id/hsvCuentaChipsIngreso"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp">
+            <LinearLayout
+                android:id="@+id/llCuentaChipsIngreso"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
         <EditText
             android:id="@+id/etCuentaBancariaIngreso"
@@ -116,7 +130,7 @@
             android:textSize="15sp"
             android:background="@drawable/input_bg"
             android:paddingHorizontal="12dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="2dp"
             android:layout_marginBottom="20dp" />
 
         <!-- Action buttons -->

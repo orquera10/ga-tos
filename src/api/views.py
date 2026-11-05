@@ -128,9 +128,41 @@ def presupuestos_api(request):
             'es_propio': p.usuario_id == request.api_user.id,
         })
 
+    user = request.api_user
+    personas = sorted(list({
+        p.strip()
+        for p in Gasto.objects.filter(presupuesto__usuario=user).exclude(persona='').values_list('persona', flat=True)
+        if p.strip()
+    }))
+    cuentas = list(CuentaBancaria.objects.filter(usuario=user).values_list('nombre', flat=True).order_by('nombre'))
+
     return JsonResponse({
         'success': True,
-        'presupuestos': items
+        'presupuestos': items,
+        'personas': personas,
+        'cuentas': cuentas
+    })
+
+
+@api_auth_required
+@require_http_methods(["GET"])
+def metadata_api(request):
+    """
+    Lista las personas (tags) y cuentas bancarias usadas por el usuario
+    para selección rápida tipo tags/chips en la app y widget.
+    GET /api/metadata/
+    """
+    user = request.api_user
+    personas = sorted(list({
+        p.strip()
+        for p in Gasto.objects.filter(presupuesto__usuario=user).exclude(persona='').values_list('persona', flat=True)
+        if p.strip()
+    }))
+    cuentas = list(CuentaBancaria.objects.filter(usuario=user).values_list('nombre', flat=True).order_by('nombre'))
+    return JsonResponse({
+        'success': True,
+        'personas': personas,
+        'cuentas': cuentas
     })
 
 

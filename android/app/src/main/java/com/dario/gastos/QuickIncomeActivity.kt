@@ -1,12 +1,15 @@
 package com.dario.gastos
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +24,7 @@ class QuickIncomeActivity : AppCompatActivity() {
     private lateinit var spPresupuesto: Spinner
     private lateinit var spTipoIngreso: Spinner
     private lateinit var etCuentaBancaria: EditText
+    private lateinit var llCuentaChipsIngreso: LinearLayout
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
 
@@ -39,6 +43,7 @@ class QuickIncomeActivity : AppCompatActivity() {
         spPresupuesto = findViewById(R.id.spPresupuestoIngreso)
         spTipoIngreso = findViewById(R.id.spTipoIngreso)
         etCuentaBancaria = findViewById(R.id.etCuentaBancariaIngreso)
+        llCuentaChipsIngreso = findViewById(R.id.llCuentaChipsIngreso)
         btnSave = findViewById(R.id.btnSaveIngreso)
         btnCancel = findViewById(R.id.btnCancelIngreso)
 
@@ -60,12 +65,13 @@ class QuickIncomeActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener { saveIncome() }
 
-        loadBudgets()
+        loadBudgetsAndMetadata()
     }
 
-    private fun loadBudgets() {
+    private fun loadBudgetsAndMetadata() {
         CoroutineScope(Dispatchers.IO).launch {
             val bList = ApiClient.getBudgets(this@QuickIncomeActivity)
+            val metadata = ApiClient.getMetadata(this@QuickIncomeActivity)
             withContext(Dispatchers.Main) {
                 budgets = bList
                 if (budgets.isNotEmpty()) {
@@ -78,6 +84,31 @@ class QuickIncomeActivity : AppCompatActivity() {
                     if (idx >= 0) {
                         spPresupuesto.setSelection(idx)
                     }
+                }
+
+                // Renderizar chips de cuentas bancarias
+                llCuentaChipsIngreso.removeAllViews()
+                for (c in metadata.cuentas) {
+                    val chip = TextView(this@QuickIncomeActivity).apply {
+                        text = c
+                        setTextColor(Color.parseColor("#3D8BFD"))
+                        textSize = 13f
+                        setBackgroundResource(R.drawable.chip_bank_bg)
+                        setPadding(28, 14, 28, 14)
+                        val lp = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(0, 0, 16, 0)
+                        }
+                        layoutParams = lp
+                        setOnClickListener {
+                            etCuentaBancaria.setText(c)
+                            etCuentaBancaria.setSelection(c.length)
+                            spTipoIngreso.setSelection(0) // Transferencia
+                        }
+                    }
+                    llCuentaChipsIngreso.addView(chip)
                 }
             }
         }

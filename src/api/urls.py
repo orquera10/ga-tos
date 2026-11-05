@@ -11,6 +11,7 @@ urlpatterns = [
     # Recursos para la App / Widget
     path('presupuestos/', views.presupuestos_api, name='presupuestos'),
     path('categorias/', views.categorias_api, name='categorias'),
+    path('metadata/', views.metadata_api, name='metadata'),
 
     # Acciones de carga rápida
     path('gastos/crear/', views.crear_gasto_api, name='crear_gasto'),

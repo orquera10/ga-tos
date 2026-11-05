@@ -398,43 +398,32 @@
                     {% endfor %}
                     
                     <!-- Total del día -->
-                    <hr class="separador my-0">
-                    <div class="p-2 mb-4 rounded">
-                        <div>
-                            <div class="resumen-dia">
-                                {% with gastos_dia=dia.list|select_model:'gasto' %}
-                                {% if gastos_dia %}
-                                <span class="me-3">
-                                    <p class="text-muted mb-0">Gastos:</p>
-                                    <span class="text-danger fw-bold ms-1">-{{ gastos_dia|sumar_montos|floatformat:2 }}</span>
-                                </span>
-                                {% endif %}
-                                {% endwith %}
-                                
-                                {% with ingresos_dia=dia.list|select_model:'ingreso' %}
-                                {% if ingresos_dia %}
-                                <span class="me-3">
-                                    <p class="text-muted mb-0">Ingresos:</p>
-                                    <span class="text-success fw-bold ms-1">+{{ ingresos_dia|sumar_montos|floatformat:2 }}</span>
-                                </span>
-                                {% endif %}
-                                {% endwith %}
-                                
-                                <span>
-                                <p class="text-muted mb-0">Total del día:</p>
-                                {% with ingresos_dia=dia.list|select_model:'ingreso' %}
-                                {% with gastos_dia=dia.list|select_model:'gasto' %}
-                                {% with total_ingresos=ingresos_dia|sumar_montos total_gastos=gastos_dia|sumar_montos %}
-                                {% with saldo_dia=total_ingresos|sub:total_gastos %}
-                                <span class="fw-bold ms-2 {% if saldo_dia > 0 %}text-success{% elif saldo_dia < 0 %}text-danger{% endif %}">
-                                    {% if saldo_dia > 0 %}+{% endif %}{{ saldo_dia|floatformat:2 }}
-                                </span>
-                                {% endwith %}
-                                {% endwith %}
-                                {% endwith %}
-                                {% endwith %}
-                                </span>
+                    <div class="resumen-dia-box mx-2 my-2 p-2 px-3 rounded">
+                        <div class="row align-items-center g-2 text-center">
+                            {% with gastos_dia=dia.list|select_model:'gasto' ingresos_dia=dia.list|select_model:'ingreso' %}
+                            {% with total_gastos=gastos_dia|sumar_montos total_ingresos=ingresos_dia|sumar_montos %}
+                            {% with saldo_dia=total_ingresos|sub:total_gastos %}
+                            <div class="col-4">
+                                <div class="text-muted small">Gastos:</div>
+                                <div class="fw-bold text-danger text-truncate">
+                                    {% if gastos_dia %}-{{ total_gastos|floatformat:2 }}{% else %}-0,00{% endif %}
+                                </div>
                             </div>
+                            <div class="col-4">
+                                <div class="text-muted small">Ingresos:</div>
+                                <div class="fw-bold text-success text-truncate">
+                                    {% if ingresos_dia %}+{{ total_ingresos|floatformat:2 }}{% else %}+0,00{% endif %}
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted small">Total del día:</div>
+                                <div class="fw-bold {% if saldo_dia > 0 %}text-success{% elif saldo_dia < 0 %}text-danger{% else %}text-muted{% endif %} text-truncate">
+                                    {% if saldo_dia > 0 %}+{% endif %}{{ saldo_dia|floatformat:2 }}
+                                </div>
+                            </div>
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
                         </div>
                     </div>
                 </div>
@@ -491,9 +480,11 @@
         {% endif %}
 
         {% if resumen_gastos_por_persona %}
-        <div class="mt-4 pt-3 border-top border-secondary">
-            <h5 class="transactions-title mb-3"><i class="bi bi-people text-info"></i> Gastos por persona</h5>
-            <div class="expense-summary-chart">
+        <div class="mt-4 pt-4 border-top border-secondary px-3 px-md-4 pb-3">
+            <h5 class="transactions-title mb-3 d-flex align-items-center gap-2">
+                <i class="bi bi-people text-info"></i> Gastos por persona
+            </h5>
+            <div class="expense-summary-chart p-0">
                 {% for item in resumen_gastos_por_persona %}
                     <div class="expense-summary-row">
                         <div class="expense-summary-label">

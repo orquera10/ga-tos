@@ -31,12 +31,16 @@ def progress_bar_color(porcentaje):
     """
     Devuelve la clase de color de Bootstrap según el porcentaje de gasto.
     """
-    if porcentaje < 50:
+    try:
+        val = float(porcentaje)
+        if val < 50:
+            return 'success'
+        elif val < 75:
+            return 'warning'
+        else:
+            return 'danger'
+    except (ValueError, TypeError):
         return 'success'
-    elif porcentaje < 75:
-        return 'warning'
-    else:
-        return 'danger'
 
 @register.filter
 def sub(value, arg):

@@ -1,12 +1,16 @@
 package com.dario.gastos
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +29,8 @@ class QuickExpenseActivity : AppCompatActivity() {
     private lateinit var spMetodoPago: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
+    private lateinit var llPersonaChips: LinearLayout
+    private lateinit var llCuentaChips: LinearLayout
 
     private var budgets: List<ApiClient.Budget> = emptyList()
     private var categories: List<ApiClient.Category> = emptyList()
@@ -46,6 +52,8 @@ class QuickExpenseActivity : AppCompatActivity() {
         spMetodoPago = findViewById(R.id.spMetodoPago)
         btnSave = findViewById(R.id.btnSave)
         btnCancel = findViewById(R.id.btnCancel)
+        llPersonaChips = findViewById(R.id.llPersonaChips)
+        llCuentaChips = findViewById(R.id.llCuentaChips)
 
         val metodos = listOf("Efectivo", "Transferencia", "Tarjeta (Próx. mes)")
         spMetodoPago.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, metodos)
@@ -66,13 +74,14 @@ class QuickExpenseActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener { saveExpense() }
 
-        loadSpinners()
+        loadSpinnersAndMetadata()
     }
 
-    private fun loadSpinners() {
+    private fun loadSpinnersAndMetadata() {
         CoroutineScope(Dispatchers.IO).launch {
             val bList = ApiClient.getBudgets(this@QuickExpenseActivity)
             val cList = ApiClient.getCategories(this@QuickExpenseActivity)
+            val metadata = ApiClient.getMetadata(this@QuickExpenseActivity)
 
             withContext(Dispatchers.Main) {
                 budgets = bList
@@ -83,7 +92,6 @@ class QuickExpenseActivity : AppCompatActivity() {
                     val bAdapter = ArrayAdapter(this@QuickExpenseActivity, android.R.layout.simple_spinner_dropdown_item, bNames)
                     spPresupuesto.adapter = bAdapter
 
-                    // Seleccionar el último presupuesto usado si existe
                     val lastBudgetId = Prefs.getLastBudgetId(this@QuickExpenseActivity)
                     val idx = budgets.indexOfFirst { it.id == lastBudgetId }
                     if (idx >= 0) {
@@ -95,6 +103,55 @@ class QuickExpenseActivity : AppCompatActivity() {
                 cNames.addAll(categories.map { it.nombre })
                 val cAdapter = ArrayAdapter(this@QuickExpenseActivity, android.R.layout.simple_spinner_dropdown_item, cNames)
                 spCategoria.adapter = cAdapter
+
+                // Renderizar chips de personas (tags guardados)
+                llPersonaChips.removeAllViews()
+                for (p in metadata.personas) {
+                    val chip = TextView(this@QuickExpenseActivity).apply {
+                        text = p
+                        setTextColor(Color.parseColor("#00D09C"))
+                        textSize = 13f
+                        setBackgroundResource(R.drawable.chip_tag_bg)
+                        setPadding(28, 14, 28, 14)
+                        val lp = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(0, 0, 16, 0)
+                        }
+                        layoutParams = lp
+                        setOnClickListener {
+                            etPersona.setText(p)
+                            etPersona.setSelection(p.length)
+                        }
+                    }
+                    llPersonaChips.addView(chip)
+                }
+
+                // Renderizar chips de cuentas bancarias
+                llCuentaChips.removeAllViews()
+                for (c in metadata.cuentas) {
+                    val chip = TextView(this@QuickExpenseActivity).apply {
+                        text = c
+                        setTextColor(Color.parseColor("#3D8BFD"))
+                        textSize = 13f
+                        setBackgroundResource(R.drawable.chip_bank_bg)
+                        setPadding(28, 14, 28, 14)
+                        val lp = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply {
+                            setMargins(0, 0, 16, 0)
+                        }
+                        layoutParams = lp
+                        setOnClickListener {
+                            etCuentaBancaria.setText(c)
+                            etCuentaBancaria.setSelection(c.length)
+                            spMetodoPago.setSelection(1) // Transferencia
+                        }
+                    }
+                    llCuentaChips.addView(chip)
+                }
             }
         }
     }

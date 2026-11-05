@@ -27,6 +27,11 @@ object ApiClient {
         val nombre: String
     )
 
+    data class Metadata(
+        val personas: List<String>,
+        val cuentas: List<String>
+    )
+
     data class WidgetSummary(
         val budget: Budget?,
         val message: String?
@@ -166,6 +171,23 @@ object ApiClient {
             list
         } catch (e: Exception) {
             emptyList()
+        }
+    }
+
+    suspend fun getMetadata(context: Context): Metadata {
+        val (code, response) = makeRequest(context, "/api/metadata/", "GET")
+        if (code != 200) return Metadata(emptyList(), emptyList())
+        return try {
+            val json = JSONObject(response)
+            val pArr = json.optJSONArray("personas") ?: JSONArray()
+            val cArr = json.optJSONArray("cuentas") ?: JSONArray()
+            val pList = mutableListOf<String>()
+            for (i in 0 until pArr.length()) pList.add(pArr.getString(i))
+            val cList = mutableListOf<String>()
+            for (i in 0 until cArr.length()) cList.add(cArr.getString(i))
+            Metadata(pList, cList)
+        } catch (e: Exception) {
+            Metadata(emptyList(), emptyList())
         }
     }
 

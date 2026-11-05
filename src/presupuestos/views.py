@@ -92,8 +92,26 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         saldo_transferencia = ingresos_transferencia - gastos_transferencia
         total_sueldo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'sueldo')
 
+        owner = self.object.usuario
+        user_cuentas = list(CuentaBancaria.objects.filter(usuario=owner).order_by('nombre'))
+
+        # Auto-vincular movimientos previos cuyo concepto coincida con el nombre de una cuenta
+        for c in user_cuentas:
+            c_low = c.nombre.lower()
+            for i in ingresos:
+                if not i.cuenta_bancaria and c_low in i.nombre.lower():
+                    i.cuenta_bancaria = c
+                    i.save(update_fields=['cuenta_bancaria'])
+            for g in gastos:
+                if not g.cuenta_bancaria and c_low in g.nombre.lower():
+                    g.cuenta_bancaria = c
+                    g.save(update_fields=['cuenta_bancaria'])
+
         # Desglose de saldos por cuenta bancaria / billetera
-        cuentas_map = {}
+        cuentas_map = {
+            c.nombre: {'nombre': c.nombre, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
+            for c in user_cuentas
+        }
         for i in ingresos:
             if i.cuenta_bancaria:
                 c_nom = i.cuenta_bancaria.nombre
@@ -124,7 +142,15 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         for item in resumen_gastos_por_persona:
             item['porcentaje'] = round((item['total'] / total_gastos) * 100) if total_gastos else 0
 
+        # Personas en este presupuesto y todas las personas del usuario
         personas_list = sorted(list({g.persona.strip() for g in gastos if g.persona and g.persona.strip()}))
+        todas_las_personas = sorted(list({
+            p.strip()
+            for p in Gasto.objects.filter(presupuesto__usuario=owner).exclude(persona='').values_list('persona', flat=True)
+            if p.strip()
+        }))
+        if not personas_list:
+            personas_list = todas_las_personas
 
         gastos_por_tipo = {}
         for gasto in gastos:
@@ -171,6 +197,7 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context['resumen_gastos_por_persona'] = resumen_gastos_por_persona
         context['saldos_por_cuenta'] = saldos_por_cuenta
         context['personas_list'] = personas_list
+        context['todas_las_personas'] = todas_las_personas
         context['monto_total_con_ingresos'] = monto_total_con_ingresos
         context['puede_editar'] = self.object.puede_editar(self.request.user)
         context['es_duenio'] = self.object.usuario_id == self.request.user.id

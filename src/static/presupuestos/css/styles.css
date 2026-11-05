@@ -1896,11 +1896,13 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     background: rgba(255, 255, 255, 0.035);
 }
 
+.transactions-panel .resumen-dia-box,
 .transactions-panel .resumen-dia {
-    background: rgba(0, 0, 0, 0.18);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 8px;
-    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    box-sizing: border-box;
 }
 
 .expense-summary-panel {
