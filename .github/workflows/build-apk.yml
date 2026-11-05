@@ -37,21 +37,15 @@ jobs:
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon > build.log 2>&1 || touch FAILED
-
-      - name: Publicar Log si falla
-        if: always()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: debug-log
-          name: "Debug Log"
-          files: android/build.log
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verificar si falló la compilación
-        run: |
+          cd ..
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git checkout -B debug-build-log
+          git add -f android/build.log
+          git commit -m "debug: full build log" || true
+          git push -f origin debug-build-log || true
           if [ -f android/FAILED ]; then
-            echo "La compilación falló. Revisa el log subido al release debug-log."
+            echo "La compilación falló. El log completo fue pusheado a la rama debug-build-log."
             exit 1
           fi
 
