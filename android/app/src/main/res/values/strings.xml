@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Ga$tos</string>
+    <string name="widget_name">Ga$tos Widget</string>
+    <string name="btn_nuevo_gasto">+ Gasto</string>
+    <string name="btn_nuevo_ingreso">+ Ingreso</string>
+    <string name="btn_guardar">Guardar</string>
+    <string name="btn_cancelar">Cancelar</string>
+    <string name="title_quick_expense">Registrar Gasto</string>
+    <string name="title_quick_income">Registrar Ingreso</string>
+    <string name="hint_monto">0.00</string>
+    <string name="hint_concepto">¿En qué gastaste? (ej: Almuerzo)</string>
+    <string name="hint_ingreso">Concepto (ej: Cobro sueldo)</string>
+    <string name="label_presupuesto">Presupuesto:</string>
+    <string name="label_categoria">Categoría:</string>
+    <string name="link_widget_title">Vincular Widget con tu Cuenta</string>
+    <string name="link_widget_desc">Ingresa tu usuario y contraseña de https://gastos.dario10.pw para conectar el Widget de escritorio.</string>
+</resources>
