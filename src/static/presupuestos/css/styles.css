@@ -2103,3 +2103,91 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
         top: 0.45rem;
     }
 }
+
+/* Chips táctiles en scroll horizontal (Tags / Personas y Bancos) */
+.chips-scroll-container {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 208, 156, 0.3) transparent;
+    padding: 3px 2px 7px 2px;
+    margin-bottom: 0.45rem;
+    gap: 8px;
+    scroll-behavior: smooth;
+}
+
+.chips-scroll-container::-webkit-scrollbar {
+    height: 4px;
+}
+
+.chips-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chips-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 208, 156, 0.25);
+    border-radius: 4px;
+}
+
+.chip-item {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 5px 13px;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    line-height: 1.25;
+}
+
+.chip-persona {
+    background: rgba(0, 208, 156, 0.12);
+    color: #00d09c;
+    border-color: rgba(0, 208, 156, 0.35);
+}
+
+.chip-persona:hover,
+.chip-persona:focus-visible {
+    background: rgba(0, 208, 156, 0.24);
+    color: #26ffcb;
+    border-color: #00d09c;
+    transform: translateY(-1px);
+}
+
+.chip-persona.active {
+    background: #00d09c !important;
+    color: #0b0f14 !important;
+    font-weight: 700 !important;
+    border-color: #00d09c !important;
+    box-shadow: 0 0 12px rgba(0, 208, 156, 0.45);
+}
+
+.chip-bank {
+    background: rgba(61, 139, 253, 0.12);
+    color: #3d8bfd;
+    border-color: rgba(61, 139, 253, 0.35);
+}
+
+.chip-bank:hover,
+.chip-bank:focus-visible {
+    background: rgba(61, 139, 253, 0.24);
+    color: #6ea8fe;
+    border-color: #3d8bfd;
+    transform: translateY(-1px);
+}
+
+.chip-bank.active {
+    background: #3d8bfd !important;
+    color: #0b0f14 !important;
+    font-weight: 700 !important;
+    border-color: #3d8bfd !important;
+    box-shadow: 0 0 12px rgba(61, 139, 253, 0.45);
+}

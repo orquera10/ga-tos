@@ -27,6 +27,38 @@ def presupuestos_editables(user):
     asignar_presupuestos_sin_usuario()
     return Presupuesto.objects.filter(Q(usuario=user) | Q(compartidos__usuario=user, compartidos__permiso='editar')).distinct()
 
+
+def get_user_recent_personas(user):
+    """Retorna los tags/personas únicos ordenados por los últimos usados (más recientes primero)."""
+    raw = (
+        Gasto.objects.filter(presupuesto__usuario=user)
+        .exclude(persona__isnull=True)
+        .exclude(persona='')
+        .order_by('-fecha', '-id')
+        .values_list('persona', flat=True)
+    )
+    result = []
+    for p in raw:
+        clean = p.strip()
+        if clean and clean not in result:
+            result.append(clean)
+    return result
+
+
+def get_user_recent_cuentas(user):
+    """Retorna las cuentas bancarias únicas ordenadas por últimas usadas o registradas."""
+    raw = (
+        CuentaBancaria.objects.filter(usuario=user)
+        .order_by('-id')
+        .values_list('nombre', flat=True)
+    )
+    result = []
+    for c in raw:
+        clean = c.strip()
+        if clean and clean not in result:
+            result.append(clean)
+    return result
+
 class PresupuestoUsuarioMixin(LoginRequiredMixin):
     def get_queryset(self):
         return presupuestos_visibles(self.request.user)
@@ -357,8 +389,8 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
-        context['personas_list'] = sorted(list(Gasto.objects.filter(presupuesto__usuario=self.request.user).exclude(persona='').values_list('persona', flat=True).distinct()))
-        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
+        context['personas_list'] = get_user_recent_personas(self.request.user)
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
         return context
 
 class GastoUpdateView(GastoEditableMixin, UpdateView):
@@ -378,8 +410,8 @@ class GastoUpdateView(GastoEditableMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
         context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
-        context['personas_list'] = sorted(list(Gasto.objects.filter(presupuesto__usuario=self.request.user).exclude(persona='').values_list('persona', flat=True).distinct()))
-        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
+        context['personas_list'] = get_user_recent_personas(self.request.user)
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
         return context
 
     def form_valid(self, form):
@@ -445,7 +477,7 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
         context['editing'] = True
-        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
         return context
 
 
@@ -516,8 +548,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
-        context['cuentas_list'] = sorted(list(CuentaBancaria.objects.filter(usuario=self.request.user).values_list('nombre', flat=True).distinct()))
-        return context
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
         return context
 
 

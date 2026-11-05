@@ -122,7 +122,6 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Ej: Hija, Victoria, Dario, Personal...',
-            'list': 'personas-list',
             'autocomplete': 'off'
         })
     )
@@ -133,7 +132,6 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
-            'list': 'cuentas-list',
             'autocomplete': 'off'
         })
     )
@@ -220,7 +218,6 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
-            'list': 'cuentas-list',
             'autocomplete': 'off'
         })
     )

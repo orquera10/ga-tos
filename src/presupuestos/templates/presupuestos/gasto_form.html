@@ -37,16 +37,24 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.persona.id_for_label }}" class="form-label">
-                                <i class="bi bi-person"></i> Persona / Destinatario <small class="text-muted">(Opcional)</small>
+                            <label for="{{ form.persona.id_for_label }}" class="form-label d-flex justify-content-between align-items-center mb-1">
+                                <span><i class="bi bi-tag"></i> Persona / Tag <small class="text-muted">(Opcional)</small></span>
+                                {% if personas_list %}<small class="text-muted" style="font-size: 0.75rem;">Últimos usados</small>{% endif %}
                             </label>
-                            {{ form.persona }}
-                            <datalist id="personas-list">
+
+                            {% if personas_list %}
+                            <!-- Línea horizontal deslizable de últimos tags usados -->
+                            <div class="chips-scroll-container">
                                 {% for p in personas_list %}
-                                <option value="{{ p }}">
+                                <button type="button" class="chip-item chip-persona js-chip-persona" data-val="{{ p }}" title="Seleccionar {{ p }}">
+                                    <i class="bi bi-tag-fill me-1"></i>{{ p }}
+                                </button>
                                 {% endfor %}
-                            </datalist>
-                            <small class="text-muted d-block mt-1">Ej: Hija, Victoria, Dario, Personal...</small>
+                            </div>
+                            {% endif %}
+
+                            {{ form.persona }}
+                            <small class="text-muted d-block mt-1">Toca un tag o escribe uno nuevo para guardarlo.</small>
                             {% if form.persona.errors %}
                                 <div class="invalid-feedback d-block">{{ form.persona.errors.0 }}</div>
                             {% endif %}
@@ -92,16 +100,24 @@
                         </div>
 
                         <div class="col-md-6" id="div-cuenta-bancaria">
-                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label">
-                                <i class="bi bi-bank"></i> Banco / Billetera <small class="text-muted">(Si es transferencia)</small>
+                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label d-flex justify-content-between align-items-center mb-1">
+                                <span><i class="bi bi-bank"></i> Banco / Billetera <small class="text-muted">(Si es transferencia)</small></span>
+                                {% if cuentas_list %}<small class="text-muted" style="font-size: 0.75rem;">Cuentas</small>{% endif %}
                             </label>
-                            {{ form.cuenta_bancaria_nombre }}
-                            <datalist id="cuentas-list">
+
+                            {% if cuentas_list %}
+                            <!-- Línea horizontal deslizable de cuentas bancarias -->
+                            <div class="chips-scroll-container">
                                 {% for c in cuentas_list %}
-                                <option value="{{ c }}">
+                                <button type="button" class="chip-item chip-bank js-chip-cuenta" data-val="{{ c }}" title="Seleccionar {{ c }}">
+                                    <i class="bi bi-bank me-1"></i>{{ c }}
+                                </button>
                                 {% endfor %}
-                            </datalist>
-                            <small class="text-muted d-block mt-1">Ej: Brubank, Mercado Pago, Banco Galicia, Ualá...</small>
+                            </div>
+                            {% endif %}
+
+                            {{ form.cuenta_bancaria_nombre }}
+                            <small class="text-muted d-block mt-1">Toca un banco o escribe uno nuevo.</small>
                             {% if form.cuenta_bancaria_nombre.errors %}
                                 <div class="invalid-feedback d-block">{{ form.cuenta_bancaria_nombre.errors.0 }}</div>
                             {% endif %}
@@ -142,4 +158,82 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Manejo de chips de persona/tags
+    const personaInput = document.getElementById('{{ form.persona.id_for_label }}');
+    const personaChips = document.querySelectorAll('.js-chip-persona');
+
+    function syncPersonaActive() {
+        if (!personaInput) return;
+        const currentVal = (personaInput.value || '').trim().toLowerCase();
+        personaChips.forEach(chip => {
+            const chipVal = (chip.dataset.val || '').trim().toLowerCase();
+            if (chipVal && chipVal === currentVal) {
+                chip.classList.add('active');
+            } else {
+                chip.classList.remove('active');
+            }
+        });
+    }
+
+    if (personaInput && personaChips.length > 0) {
+        syncPersonaActive();
+        personaChips.forEach(chip => {
+            chip.addEventListener('click', function (e) {
+                e.preventDefault();
+                const val = this.dataset.val || '';
+                if ((personaInput.value || '').trim().toLowerCase() === val.trim().toLowerCase()) {
+                    personaInput.value = '';
+                } else {
+                    personaInput.value = val;
+                }
+                syncPersonaActive();
+            });
+        });
+        personaInput.addEventListener('input', syncPersonaActive);
+    }
+
+    // Manejo de chips de cuenta bancaria
+    const cuentaInput = document.getElementById('{{ form.cuenta_bancaria_nombre.id_for_label }}');
+    const metodoSelect = document.getElementById('id_metodo_pago');
+    const cuentaChips = document.querySelectorAll('.js-chip-cuenta');
+
+    function syncCuentaActive() {
+        if (!cuentaInput) return;
+        const currentVal = (cuentaInput.value || '').trim().toLowerCase();
+        cuentaChips.forEach(chip => {
+            const chipVal = (chip.dataset.val || '').trim().toLowerCase();
+            if (chipVal && chipVal === currentVal) {
+                chip.classList.add('active');
+            } else {
+                chip.classList.remove('active');
+            }
+        });
+    }
+
+    if (cuentaInput && cuentaChips.length > 0) {
+        syncCuentaActive();
+        cuentaChips.forEach(chip => {
+            chip.addEventListener('click', function (e) {
+                e.preventDefault();
+                const val = this.dataset.val || '';
+                if ((cuentaInput.value || '').trim().toLowerCase() === val.trim().toLowerCase()) {
+                    cuentaInput.value = '';
+                } else {
+                    cuentaInput.value = val;
+                    if (metodoSelect) {
+                        metodoSelect.value = 'transferencia';
+                    }
+                }
+                syncCuentaActive();
+            });
+        });
+        cuentaInput.addEventListener('input', syncCuentaActive);
+    }
+});
+</script>
 {% endblock %}

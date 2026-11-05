@@ -10,7 +10,12 @@ from django.utils.dateparse import parse_datetime, parse_date
 from django.db.models import Q
 
 from presupuestos.models import Presupuesto, Categoria, Gasto, Ingreso, CuentaBancaria
-from presupuestos.views import presupuestos_editables, presupuestos_visibles
+from presupuestos.views import (
+    presupuestos_editables,
+    presupuestos_visibles,
+    get_user_recent_personas,
+    get_user_recent_cuentas,
+)
 from .models import ApiToken
 from .auth import api_auth_required, get_user_from_request
 
@@ -149,16 +154,12 @@ def presupuestos_api(request):
 def metadata_api(request):
     """
     Lista las personas (tags) y cuentas bancarias usadas por el usuario
-    para selección rápida tipo tags/chips en la app y widget.
+    ordenadas por los últimos usados para selección rápida tipo tags/chips en la app y widget.
     GET /api/metadata/
     """
     user = request.api_user
-    personas = sorted(list({
-        p.strip()
-        for p in Gasto.objects.filter(presupuesto__usuario=user).exclude(persona='').values_list('persona', flat=True)
-        if p.strip()
-    }))
-    cuentas = list(CuentaBancaria.objects.filter(usuario=user).values_list('nombre', flat=True).order_by('nombre'))
+    personas = get_user_recent_personas(user)
+    cuentas = get_user_recent_cuentas(user)
     return JsonResponse({
         'success': True,
         'personas': personas,
