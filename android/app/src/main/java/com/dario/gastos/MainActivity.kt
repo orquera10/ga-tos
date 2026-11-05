@@ -15,6 +15,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
@@ -23,6 +24,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -71,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         biometricOverlay = findViewById(R.id.biometricOverlay)
         btnUnlockBiometric = findViewById(R.id.btnUnlockBiometric)
 
-        btnUnlockBiometric.setOnClickListener { promptBiometric() }
+        btnUnlockBiometric.setOnClickListener { checkBiometricSecurity() }
 
         updateButtonsStatus()
         btnLinkWidget.setOnClickListener {
@@ -191,43 +193,40 @@ class MainActivity : AppCompatActivity() {
         biometricOverlay.visibility = View.GONE
     }
 
+    @RequiresApi(Build.VERSION_CODES.P)
     private fun promptBiometric() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            cancellationSignal?.cancel()
-            cancellationSignal = CancellationSignal()
+        cancellationSignal?.cancel()
+        cancellationSignal = CancellationSignal()
 
-            try {
-                val prompt = BiometricPrompt.Builder(this)
-                    .setTitle("Desbloquear Ga\$tos")
-                    .setSubtitle("Usa tu huella dactilar para ingresar")
-                    .setNegativeButton("Cancelar", mainExecutor) { _, _ -> }
-                    .build()
+        val executor = ContextCompat.getMainExecutor(this)
+        try {
+            val prompt = BiometricPrompt.Builder(this)
+                .setTitle("Desbloquear Ga\$tos")
+                .setSubtitle("Usa tu huella dactilar para ingresar")
+                .setNegativeButton("Cancelar", executor, DialogInterface.OnClickListener { _, _ -> })
+                .build()
 
-                prompt.authenticate(
-                    cancellationSignal!!,
-                    mainExecutor,
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
-                            super.onAuthenticationSucceeded(result)
-                            isUnlocked = true
-                            biometricOverlay.visibility = View.GONE
-                        }
-
-                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-                            super.onAuthenticationError(errorCode, errString)
-                        }
-
-                        override fun onAuthenticationFailed() {
-                            super.onAuthenticationFailed()
-                            Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
-                        }
+            prompt.authenticate(
+                cancellationSignal!!,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                        super.onAuthenticationSucceeded(result)
+                        isUnlocked = true
+                        biometricOverlay.visibility = View.GONE
                     }
-                )
-            } catch (e: Exception) {
-                isUnlocked = true
-                biometricOverlay.visibility = View.GONE
-            }
-        } else {
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                        super.onAuthenticationError(errorCode, errString)
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+        } catch (e: Exception) {
             isUnlocked = true
             biometricOverlay.visibility = View.GONE
         }
