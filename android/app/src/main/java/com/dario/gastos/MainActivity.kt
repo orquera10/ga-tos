@@ -15,13 +15,15 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.content.pm.PackageManager
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
+import android.os.CancellationSignal
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.CoroutineScope
@@ -173,48 +175,62 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkBiometricSecurity() {
-        val biometricManager = BiometricManager.from(this)
-        val canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
+    private var cancellationSignal: CancellationSignal? = null
 
-        if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
-            biometricOverlay.visibility = View.VISIBLE
-            promptBiometric()
-        } else {
-            // Dispositivo sin hardware o sin huella configurada: acceso directo
-            isUnlocked = true
-            biometricOverlay.visibility = View.GONE
+    private fun checkBiometricSecurity() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val hasFingerprint = packageManager.hasSystemFeature(PackageManager.FEATURE_FINGERPRINT)
+            if (hasFingerprint) {
+                biometricOverlay.visibility = View.VISIBLE
+                promptBiometric()
+                return
+            }
         }
+        // Dispositivo sin hardware o version anterior a Android 9: acceso directo
+        isUnlocked = true
+        biometricOverlay.visibility = View.GONE
     }
 
     private fun promptBiometric() {
-        val executor = ContextCompat.getMainExecutor(this)
-        val biometricPrompt = BiometricPrompt(this, executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    isUnlocked = true
-                    biometricOverlay.visibility = View.GONE
-                }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            cancellationSignal?.cancel()
+            cancellationSignal = CancellationSignal()
 
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                }
+            try {
+                val prompt = BiometricPrompt.Builder(this)
+                    .setTitle("Desbloquear Ga\$tos")
+                    .setSubtitle("Usa tu huella dactilar para ingresar")
+                    .setNegativeButton("Cancelar", mainExecutor) { _, _ -> }
+                    .build()
 
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
-                }
+                prompt.authenticate(
+                    cancellationSignal!!,
+                    mainExecutor,
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                            super.onAuthenticationSucceeded(result)
+                            isUnlocked = true
+                            biometricOverlay.visibility = View.GONE
+                        }
+
+                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                            super.onAuthenticationError(errorCode, errString)
+                        }
+
+                        override fun onAuthenticationFailed() {
+                            super.onAuthenticationFailed()
+                            Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                isUnlocked = true
+                biometricOverlay.visibility = View.GONE
             }
-        )
-
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Desbloquear Ga\$tos")
-            .setSubtitle("Usa tu huella dactilar para ingresar")
-            .setNegativeButtonText("Cancelar")
-            .build()
-
-        biometricPrompt.authenticate(promptInfo)
+        } else {
+            isUnlocked = true
+            biometricOverlay.visibility = View.GONE
+        }
     }
 
     private fun updateButtonsStatus() {
