@@ -25,12 +25,24 @@
                         </div>
                     {% endif %}
 
-                    <div class="form-section">
-                        <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre</label>
-                        {{ form.nombre }}
-                        {% if form.nombre.errors %}
-                            <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
-                        {% endif %}
+                    <div class="row g-3 form-section">
+                        <div class="col-md-6">
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre</label>
+                            {{ form.nombre }}
+                            {% if form.nombre.errors %}
+                                <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.tipo.id_for_label }}" class="form-label">Tipo de Presupuesto</label>
+                            {{ form.tipo }}
+                            <small class="text-muted d-block mt-1" id="tipoHelp">
+                                Fijo (con cupo inicial) o Abierto (flujo continuo sin monto inicial).
+                            </small>
+                            {% if form.tipo.errors %}
+                                <div class="invalid-feedback d-block">{{ form.tipo.errors.0 }}</div>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -64,9 +76,9 @@
                         </div>
                     </div>
 
-                    <div class="row form-section">
+                    <div class="row form-section" id="montoSection">
                         <div class="col-md-8">
-                            <label for="{{ form.monto_total.id_for_label }}" class="form-label">Monto total</label>
+                            <label for="{{ form.monto_total.id_for_label }}" class="form-label" id="montoLabel">Monto total inicial</label>
                             <div class="input-group">
                                 {{ form.monto_total }}
                                 <span class="input-group-text moneda-select-wrap">
@@ -79,6 +91,7 @@
                                     </select>
                                 </span>
                             </div>
+                            <small class="text-muted d-block mt-1" id="montoHelpText"></small>
                             {% if form.monto_total.errors %}
                                 <div class="invalid-feedback d-block">{{ form.monto_total.errors.0 }}</div>
                             {% endif %}
@@ -98,4 +111,30 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoSelect = document.getElementById('id_tipo');
+    const montoLabel = document.getElementById('montoLabel');
+    const montoInput = document.getElementById('id_monto_total');
+    const montoHelp = document.getElementById('montoHelpText');
+
+    function updateTipoView() {
+        if (!tipoSelect) return;
+        if (tipoSelect.value === 'abierto') {
+            montoLabel.textContent = 'Monto inicial (Opcional)';
+            montoHelp.textContent = 'En presupuesto abierto puedes dejarlo en 0 e ir sumando ingresos y gastos.';
+            if (!montoInput.value) montoInput.value = '0';
+        } else {
+            montoLabel.textContent = 'Monto total inicial';
+            montoHelp.textContent = 'Cupo límite total asignado a este presupuesto.';
+        }
+    }
+
+    if (tipoSelect) {
+        tipoSelect.addEventListener('change', updateTipoView);
+        updateTipoView();
+    }
+});
+</script>
 {% endblock %}

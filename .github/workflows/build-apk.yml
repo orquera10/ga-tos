@@ -48,12 +48,13 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.3.0
-          name: "Ga$tos Android APK v1.3.0"
+          tag_name: v1.4.0
+          name: "Ga$tos Android APK v1.4.0"
           body: |
-            ### App Android de Ga$tos v1.3.0
-            - **Botones de diálogos corregidos**: Botón 'Cancelar' en rojo brillante y 'Guardar' con texto limpio sin cortes de línea.
-            - **Consistencia en todos los diálogos**: Aplicado a nuevo gasto, nuevo ingreso, selector de presupuesto y vincular cuenta.
+            ### App Android de Ga$tos v1.4.0
+            - **Medio de pago en Gasto**: Selector de Efectivo, Transferencia o Tarjeta (impacto diferido).
+            - **Tipo de ingreso**: Selector de Transferencia, Efectivo o Sueldo mensual.
+            - **Compatibilidad con presupuestos abiertos (flujo continuo)**.
             - Descarga **app-debug.apk** para actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

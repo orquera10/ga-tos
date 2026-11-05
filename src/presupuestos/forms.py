@@ -12,9 +12,8 @@ class CapitalizeFieldsMixin:
         for field_name, field in self.fields.items():
             if isinstance(field, (forms.CharField, forms.TextInput, forms.Textarea)):
                 if field_name in cleaned_data and cleaned_data[field_name]:
-                    # Capitaliza solo la primera letra de toda la cadena
                     value = str(cleaned_data[field_name])
-                    if value:  # Asegurarse de que el valor no esté vacío
+                    if value:
                         cleaned_data[field_name] = value[0].upper() + value[1:].lower()
         return cleaned_data
 
@@ -35,14 +34,19 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
         input_formats=['%Y-%m-%d'],
         initial=timezone.now().date()
     )
+    monto_total = forms.DecimalField(
+        required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'})
+    )
     
     class Meta:
         model = Presupuesto
-        fields = ['nombre', 'descripcion', 'fecha_inicio', 'fecha_fin', 'monto_total', 'moneda']
+        fields = ['nombre', 'tipo', 'monto_total', 'moneda', 'fecha_inicio', 'fecha_fin', 'descripcion']
         widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Gastos de Mayo, Vacaciones...'}),
+            'tipo': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo'}),
+            'moneda': forms.Select(attrs={'class': 'form-select'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'monto_total': forms.NumberInput(attrs={'class': 'form-control'})
         }
 
     def __init__(self, *args, **kwargs):
@@ -50,6 +54,17 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
         if self.instance and self.instance.pk:
             self.initial['fecha_inicio'] = self.instance.fecha_inicio
             self.initial['fecha_fin'] = self.instance.fecha_fin
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get('tipo')
+        monto_total = cleaned_data.get('monto_total')
+        if tipo == 'abierto':
+            cleaned_data['monto_total'] = monto_total or 0
+        else:
+            if monto_total is None or monto_total <= 0:
+                self.add_error('monto_total', 'Debes ingresar un monto inicial positivo para presupuestos de monto fijo.')
+        return cleaned_data
 
 class CategoriaForm(CapitalizeFieldsMixin, forms.ModelForm):
     class Meta:
@@ -101,7 +116,7 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             attrs={
                 'type': 'datetime-local',
                 'class': 'form-control',
-                'step': '1'  # Permite segundos
+                'step': '1'
             },
             format='%Y-%m-%dT%H:%M:%S'
         ),
@@ -111,26 +126,27 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
     class Meta:
         model = Gasto
-        fields = ['nombre', 'categoria', 'monto', 'fecha', 'descripcion', 'presupuesto_pk']
+        fields = ['nombre', 'monto', 'metodo_pago', 'categoria', 'fecha', 'descripcion', 'presupuesto_pk']
         widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Almuerzo, Supermercado...'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
+            'metodo_pago': forms.Select(attrs={'class': 'form-select'}),
             'categoria': forms.Select(attrs={'class': 'form-select'}),
-            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'})
+        }
+        labels = {
+            'metodo_pago': 'Medio de Pago'
         }
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Mostrar la fecha existente al editar, o la fecha actual al crear.
         if self.instance and self.instance.pk and self.instance.fecha:
-            # Asegurarse de que la fecha esté en la zona horaria local para mostrarla correctamente
             local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
         else:
             local_dt = timezone.localtime(timezone.now())
         self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True):
-        # Usar siempre la fecha enviada por el formulario.
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)
@@ -149,7 +165,7 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             attrs={
                 'type': 'datetime-local',
                 'class': 'form-control',
-                'step': '1'  # Permite segundos
+                'step': '1'
             },
             format='%Y-%m-%dT%H:%M:%S'
         ),
@@ -159,26 +175,26 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
     class Meta:
         model = Ingreso
-        fields = ['nombre', 'monto', 'fecha', 'descripcion', 'presupuesto_pk']
+        fields = ['nombre', 'monto', 'tipo_ingreso', 'fecha', 'descripcion', 'presupuesto_pk']
         widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Sueldo, Cobro de honorarios...'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
+            'tipo_ingreso': forms.Select(attrs={'class': 'form-select'}),
             'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
-            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
-            'nombre': forms.TextInput(attrs={'class': 'form-control'})
+        }
+        labels = {
+            'tipo_ingreso': 'Tipo de Ingreso'
         }
         
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Solo mostrar el campo de fecha si estamos editando un ingreso existente
         if self.instance and self.instance.pk and self.instance.fecha:
-            # Asegurarse de que la fecha esté en la zona horaria local para mostrarla correctamente
             local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
         else:
             local_dt = timezone.localtime(timezone.now())
         self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True):
-        # Para nuevos ingresos, la fecha ya se establece en el modelo
-        # Para ediciones, usar la fecha del formulario sin conversión de zona horaria
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
         return super().save(commit)
@@ -188,5 +204,3 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         if monto is not None and monto <= 0:
             raise forms.ValidationError('El monto debe ser mayor a cero')
         return monto
-
-

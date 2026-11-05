@@ -106,3 +106,53 @@ class ApiEndpointsTestCase(TestCase):
         self.assertIsNotNone(data['presupuesto'])
         self.assertEqual(len(data['ultimos_gastos']), 1)
         self.assertEqual(data['ultimos_gastos'][0]['nombre'], 'Café')
+
+    def test_gasto_tarjeta_no_descuenta_saldo(self):
+        payload = {
+            'presupuesto_id': self.presupuesto.id,
+            'nombre': 'Zapatillas cuotas',
+            'monto': 3000.00,
+            'metodo_pago': 'tarjeta'
+        }
+        resp = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps(payload),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertEqual(data['presupuesto']['monto_restante'], 10000.00)
+
+        resp_resumen = self.client.get(
+            f'/api/widget/resumen/?presupuesto_id={self.presupuesto.id}',
+            **self.auth_headers
+        )
+        res_data = resp_resumen.json()
+        self.assertEqual(res_data['presupuesto']['total_tarjeta'], 3000.00)
+
+    def test_presupuesto_abierto(self):
+        p_abierto = Presupuesto.objects.create(
+            usuario=self.user,
+            nombre='Flujo Continuo',
+            tipo='abierto',
+            monto_total=Decimal('0.00'),
+            monto_restante=Decimal('0.00'),
+            fecha_inicio=timezone.localdate(),
+            fecha_fin=timezone.localdate() + timezone.timedelta(days=30),
+            moneda='ARS'
+        )
+        self.client.post(
+            '/api/ingresos/crear/',
+            data=json.dumps({'presupuesto_id': p_abierto.id, 'nombre': 'Sueldo Mayo', 'monto': 80000.00, 'tipo_ingreso': 'sueldo'}),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({'presupuesto_id': p_abierto.id, 'nombre': 'Supermercado', 'monto': 20000.00, 'metodo_pago': 'efectivo'}),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        p_abierto.refresh_from_db()
+        self.assertEqual(p_abierto.monto_restante, Decimal('60000.00'))

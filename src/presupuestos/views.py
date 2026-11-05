@@ -78,7 +78,19 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         
         # Calcular totales
         total_gastos = sum(gasto.monto for gasto in gastos)
+        total_gastos_computables = sum(gasto.monto for gasto in gastos if gasto.metodo_pago != 'tarjeta')
+        total_tarjeta = sum(gasto.monto for gasto in gastos if gasto.metodo_pago == 'tarjeta')
         total_ingresos = sum(ingreso.monto for ingreso in ingresos)
+
+        # Desglose de saldos por medio de pago
+        ingresos_efectivo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'efectivo')
+        gastos_efectivo = sum(g.monto for g in gastos if g.metodo_pago == 'efectivo')
+        saldo_efectivo = ingresos_efectivo - gastos_efectivo
+
+        ingresos_transferencia = sum(i.monto for i in ingresos if i.tipo_ingreso in ['transferencia', 'sueldo'])
+        gastos_transferencia = sum(g.monto for g in gastos if g.metodo_pago == 'transferencia')
+        saldo_transferencia = ingresos_transferencia - gastos_transferencia
+        total_sueldo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'sueldo')
 
         gastos_por_tipo = {}
         for gasto in gastos:
@@ -104,14 +116,25 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
             for fecha, items in groupby(transacciones, key=lambda transaccion: transaccion.fecha_local.date())
         ]
         
+        monto_total_con_ingresos = (
+            total_ingresos if self.object.tipo == 'abierto' else (self.object.monto_total + total_ingresos)
+        )
+        saldo_restante = monto_total_con_ingresos - total_gastos_computables
+
         # Agregar al contexto
         context['gastos'] = gastos
         context['ingresos'] = ingresos
         context['transacciones_por_dia'] = transacciones_por_dia
         context['total_gastos'] = total_gastos
+        context['total_gastos_computables'] = total_gastos_computables
+        context['total_tarjeta'] = total_tarjeta
+        context['saldo_efectivo'] = saldo_efectivo
+        context['saldo_transferencia'] = saldo_transferencia
+        context['total_sueldo'] = total_sueldo
+        context['saldo_restante'] = saldo_restante
         context['total_ingresos'] = total_ingresos
         context['resumen_gastos_por_tipo'] = resumen_gastos_por_tipo
-        context['monto_total_con_ingresos'] = self.object.monto_total + total_ingresos
+        context['monto_total_con_ingresos'] = monto_total_con_ingresos
         context['puede_editar'] = self.object.puede_editar(self.request.user)
         context['es_duenio'] = self.object.usuario_id == self.request.user.id
         context['compartir_form'] = CompartirPresupuestoForm(presupuesto=self.object)

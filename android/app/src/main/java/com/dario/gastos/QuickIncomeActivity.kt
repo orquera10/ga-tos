@@ -19,6 +19,7 @@ class QuickIncomeActivity : AppCompatActivity() {
     private lateinit var etMonto: EditText
     private lateinit var etNombre: EditText
     private lateinit var spPresupuesto: Spinner
+    private lateinit var spTipoIngreso: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
 
@@ -35,8 +36,12 @@ class QuickIncomeActivity : AppCompatActivity() {
         etMonto = findViewById(R.id.etMontoIngreso)
         etNombre = findViewById(R.id.etNombreIngreso)
         spPresupuesto = findViewById(R.id.spPresupuestoIngreso)
+        spTipoIngreso = findViewById(R.id.spTipoIngreso)
         btnSave = findViewById(R.id.btnSaveIngreso)
         btnCancel = findViewById(R.id.btnCancelIngreso)
+
+        val tipos = listOf("Transferencia", "Efectivo", "Sueldo")
+        spTipoIngreso.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, tipos)
 
         btnCancel.setOnClickListener { finish() }
 
@@ -97,6 +102,12 @@ class QuickIncomeActivity : AppCompatActivity() {
         }
         val budget = budgets[selectedBudgetIdx]
 
+        val tipoValue = when (spTipoIngreso.selectedItemPosition) {
+            1 -> "efectivo"
+            2 -> "sueldo"
+            else -> "transferencia"
+        }
+
         btnSave.isEnabled = false
         btnSave.text = "Guardando..."
 
@@ -105,7 +116,8 @@ class QuickIncomeActivity : AppCompatActivity() {
                 context = this@QuickIncomeActivity,
                 budgetId = budget.id,
                 nombre = nombre,
-                monto = monto
+                monto = monto,
+                tipoIngreso = tipoValue
             )
 
             withContext(Dispatchers.Main) {

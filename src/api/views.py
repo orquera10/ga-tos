@@ -212,12 +212,16 @@ def crear_gasto_api(request):
         fecha = parse_datetime(fecha_raw) or parse_date(fecha_raw)
 
     descripcion = (data.get('descripcion') or '').strip()
+    metodo_pago = (data.get('metodo_pago') or 'efectivo').lower().strip()
+    if metodo_pago not in ['efectivo', 'transferencia', 'tarjeta']:
+        metodo_pago = 'efectivo'
 
     gasto = Gasto(
         presupuesto=presupuesto,
         categoria=categoria,
         nombre=nombre,
         monto=monto,
+        metodo_pago=metodo_pago,
         descripcion=descripcion or None,
         fecha=fecha or timezone.localtime(timezone.now())
     )
@@ -280,10 +284,15 @@ def crear_ingreso_api(request):
     if not presupuesto:
         return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
 
+    tipo_ingreso = (data.get('tipo_ingreso') or 'transferencia').lower().strip()
+    if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:
+        tipo_ingreso = 'transferencia'
+
     ingreso = Ingreso(
         presupuesto=presupuesto,
         nombre=nombre,
         monto=monto,
+        tipo_ingreso=tipo_ingreso,
         descripcion=data.get('descripcion') or None
     )
     ingreso.full_clean()
@@ -345,10 +354,14 @@ def widget_resumen_api(request):
         'presupuesto': {
             'id': presupuesto.id,
             'nombre': presupuesto.nombre,
+            'tipo': presupuesto.tipo,
             'moneda': presupuesto.moneda,
             'moneda_display': presupuesto.get_moneda_display(),
             'monto_restante': float(presupuesto.monto_restante),
-            'disponible': float(presupuesto.monto_total + presupuesto.total_ingresos),
+            'disponible': float(presupuesto.monto_total_con_ingresos()),
+            'saldo_efectivo': float(presupuesto.saldo_efectivo),
+            'saldo_transferencia': float(presupuesto.saldo_transferencia),
+            'total_tarjeta': float(presupuesto.total_tarjeta),
             'porcentaje_gastado': round(float(presupuesto.porcentaje_gastado()), 1),
             'gastos_count': presupuesto.gastos.count(),
         },

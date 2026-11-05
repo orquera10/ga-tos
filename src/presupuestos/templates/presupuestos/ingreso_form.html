@@ -59,12 +59,25 @@
                         </div>
                     </div>
 
-                    <div class="form-section">
-                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
-                        {{ form.descripcion }}
-                        {% if form.descripcion.errors %}
-                            <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
-                        {% endif %}
+                    <div class="row g-3 form-section">
+                        <div class="col-md-6">
+                            <label for="{{ form.tipo_ingreso.id_for_label }}" class="form-label">Tipo / Medio de Ingreso</label>
+                            {{ form.tipo_ingreso }}
+                            <small class="text-muted d-block mt-1">
+                                Elige si es Sueldo mensual, Transferencia o Efectivo.
+                            </small>
+                            {% if form.tipo_ingreso.errors %}
+                                <div class="invalid-feedback d-block">{{ form.tipo_ingreso.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
+                            {{ form.descripcion }}
+                            {% if form.descripcion.errors %}
+                                <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="form-actions">

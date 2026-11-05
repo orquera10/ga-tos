@@ -21,7 +21,12 @@
                         <div class="card-body">
                             <div class="presupuesto-card-header">
                                 <div class="presupuesto-title-group">
-                                    <h5 class="card-title mb-1" title="{{ presupuesto.nombre }}">{{ presupuesto.nombre }}</h5>
+                                    <h5 class="card-title mb-1" title="{{ presupuesto.nombre }}">
+                                        {{ presupuesto.nombre }}
+                                        {% if presupuesto.tipo == 'abierto' %}
+                                            <span class="badge bg-info text-dark" style="font-size: 0.68rem; vertical-align: middle;">Flujo Abierto</span>
+                                        {% endif %}
+                                    </h5>
                                     <p class="card-subtitle mb-0 text-muted">
                                         <i class="bi bi-calendar-range me-1"></i>
                                         {{ presupuesto.fecha_inicio|date:"d/m/Y" }} - {{ presupuesto.fecha_fin|date:"d/m/Y" }}
@@ -42,7 +47,7 @@
                                 <div class="metric-grid mb-3">
                                     <div class="metric-box">
                                         <span class="metric-label">Disponible</span>
-                                        <strong class="text-primary">{{ presupuesto.monto_total|add:presupuesto.total_ingresos|floatformat:2 }}</strong>
+                                        <strong class="text-primary">{{ presupuesto.monto_total_con_ingresos|floatformat:2 }}</strong>
                                     </div>
                                     <div class="metric-box">
                                         <span class="metric-label">Restante</span>

@@ -20,6 +20,7 @@ class QuickExpenseActivity : AppCompatActivity() {
     private lateinit var etNombre: EditText
     private lateinit var spPresupuesto: Spinner
     private lateinit var spCategoria: Spinner
+    private lateinit var spMetodoPago: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
 
@@ -38,8 +39,12 @@ class QuickExpenseActivity : AppCompatActivity() {
         etNombre = findViewById(R.id.etNombre)
         spPresupuesto = findViewById(R.id.spPresupuesto)
         spCategoria = findViewById(R.id.spCategoria)
+        spMetodoPago = findViewById(R.id.spMetodoPago)
         btnSave = findViewById(R.id.btnSave)
         btnCancel = findViewById(R.id.btnCancel)
+
+        val metodos = listOf("Efectivo", "Transferencia", "Tarjeta (Próx. mes)")
+        spMetodoPago.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, metodos)
 
         btnCancel.setOnClickListener { finish() }
 
@@ -119,6 +124,12 @@ class QuickExpenseActivity : AppCompatActivity() {
             categoryId = categories[selectedCatIdx - 1].id
         }
 
+        val metodoValue = when (spMetodoPago.selectedItemPosition) {
+            1 -> "transferencia"
+            2 -> "tarjeta"
+            else -> "efectivo"
+        }
+
         btnSave.isEnabled = false
         btnSave.text = "Guardando..."
 
@@ -128,7 +139,8 @@ class QuickExpenseActivity : AppCompatActivity() {
                 budgetId = budget.id,
                 nombre = nombre,
                 monto = monto,
-                categoryId = categoryId
+                categoryId = categoryId,
+                metodoPago = metodoValue
             )
 
             withContext(Dispatchers.Main) {

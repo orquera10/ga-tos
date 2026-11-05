@@ -174,12 +174,14 @@ object ApiClient {
         nombre: String,
         monto: Double,
         categoryId: Int? = null,
+        metodoPago: String = "efectivo",
         desc: String = ""
     ): Pair<Boolean, String> {
         val payload = JSONObject().apply {
             put("presupuesto_id", budgetId)
             put("nombre", nombre)
             put("monto", monto)
+            put("metodo_pago", metodoPago)
             if (categoryId != null && categoryId > 0) put("categoria_id", categoryId)
             if (desc.isNotEmpty()) put("descripcion", desc)
         }
@@ -201,12 +203,14 @@ object ApiClient {
         budgetId: Int,
         nombre: String,
         monto: Double,
+        tipoIngreso: String = "transferencia",
         desc: String = ""
     ): Pair<Boolean, String> {
         val payload = JSONObject().apply {
             put("presupuesto_id", budgetId)
             put("nombre", nombre)
             put("monto", monto)
+            put("tipo_ingreso", tipoIngreso)
             if (desc.isNotEmpty()) put("descripcion", desc)
         }
         val (code, response) = makeRequest(context, "/api/ingresos/crear/", "POST", payload)

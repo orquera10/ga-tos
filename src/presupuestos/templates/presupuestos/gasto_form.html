@@ -74,12 +74,25 @@
                         </div>
                     </div>
 
-                    <div class="form-section">
-                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
-                        {{ form.descripcion }}
-                        {% if form.descripcion.errors %}
-                            <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
-                        {% endif %}
+                    <div class="row g-3 form-section">
+                        <div class="col-md-6">
+                            <label for="{{ form.metodo_pago.id_for_label }}" class="form-label">Medio de Pago</label>
+                            {{ form.metodo_pago }}
+                            <small class="text-muted d-block mt-1">
+                                Efectivo y Transferencia descuentan el saldo actual. Tarjeta impactará el próximo mes.
+                            </small>
+                            {% if form.metodo_pago.errors %}
+                                <div class="invalid-feedback d-block">{{ form.metodo_pago.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
+                            {{ form.descripcion }}
+                            {% if form.descripcion.errors %}
+                                <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="form-actions">

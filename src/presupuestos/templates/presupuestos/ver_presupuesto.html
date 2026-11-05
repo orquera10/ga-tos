@@ -124,13 +124,38 @@
             <div class="row mt-3">
                 <div class="col-12">
                     <div class="text-center">
-                        <div class="text-muted small">Saldo Restante</div>
-                        {% with saldo_restante=monto_total_con_ingresos|sub:total_gastos %}
-                        {% widthratio saldo_restante presupuesto.monto_total 100 as porcentaje_restante %}
-                        <h3 class="mb-0 {% if porcentaje_restante|add:0 > 50 %}text-success{% elif porcentaje_restante|add:0 > 25 %}text-warning{% else %}text-danger{% endif %}">
+                        <div class="text-muted small">Saldo Restante Real</div>
+                        <h3 class="mb-0 {% if saldo_restante > 0 %}text-success{% elif saldo_restante == 0 %}text-warning{% else %}text-danger{% endif %}">
                             {{ saldo_restante|floatformat:2 }} {{ presupuesto.get_moneda_display }}
                         </h3>
-                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desglose rápido por medio de pago -->
+            <div class="row g-2 mt-3 pt-3 border-top border-secondary">
+                <div class="col-4">
+                    <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                        <div class="small text-muted mb-1"><i class="bi bi-cash text-success"></i> Efectivo</div>
+                        <h6 class="mb-0 fw-bold {% if saldo_efectivo >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {{ saldo_efectivo|floatformat:2 }}
+                        </h6>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                        <div class="small text-muted mb-1"><i class="bi bi-bank text-primary"></i> Banco/Transf.</div>
+                        <h6 class="mb-0 fw-bold {% if saldo_transferencia >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                            {{ saldo_transferencia|floatformat:2 }}
+                        </h6>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="p-2 rounded text-center" style="background: rgba(255, 183, 77, 0.08); border: 1px solid rgba(255, 183, 77, 0.25);" title="Gastos con tarjeta que se pagarán el mes siguiente">
+                        <div class="small text-warning mb-1"><i class="bi bi-credit-card"></i> Tarjeta próx.</div>
+                        <h6 class="mb-0 fw-bold text-warning">
+                            -{{ total_tarjeta|floatformat:2 }}
+                        </h6>
                     </div>
                 </div>
             </div>
@@ -253,6 +278,13 @@
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     {{ transaccion.categoria.nombre|default:"Sin categoría" }}
+                                    {% if transaccion.metodo_pago == 'efectivo' %}
+                                        <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
+                                    {% elif transaccion.metodo_pago == 'transferencia' %}
+                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                    {% elif transaccion.metodo_pago == 'tarjeta' %}
+                                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-credit-card"></i> Tarjeta (Próx. mes)</span>
+                                    {% endif %}
                                 </p>
                                 {% if transaccion.descripcion %}
                                 <p class="transaccion-descripcion gasto-descripcion small text-muted mb-0">
@@ -270,6 +302,13 @@
                                 <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     Ingreso
+                                    {% if transaccion.tipo_ingreso == 'sueldo' %}
+                                        <span class="badge bg-success ms-1"><i class="bi bi-briefcase"></i> Sueldo</span>
+                                    {% elif transaccion.tipo_ingreso == 'efectivo' %}
+                                        <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
+                                    {% elif transaccion.tipo_ingreso == 'transferencia' %}
+                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                    {% endif %}
                                 </p>
                                 {% if transaccion.descripcion %}
                                 <p class="transaccion-descripcion gasto-descripcion small text-muted mb-0">
@@ -284,9 +323,12 @@
                         <div class="transaccion-meta">
                             <div class="transaccion-monto text-end gasto-monto">
                                 {% if transaccion|model_name == 'gasto' %}
-                                <div class="text-danger fw-bold">
+                                <div class="{% if transaccion.metodo_pago == 'tarjeta' %}text-warning{% else %}text-danger{% endif %} fw-bold">
                                     -{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}
                                 </div>
+                                {% if transaccion.metodo_pago == 'tarjeta' %}
+                                <div class="small text-warning" style="font-size: 0.7rem;">Diferido</div>
+                                {% endif %}
                                 {% else %}
                                 <div class="text-success fw-bold">
                                     +{{ transaccion.monto|floatformat:2 }}
