@@ -885,16 +885,110 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     outline-offset: 3px;
 }
 
+/* Cards de desglose de saldos */
+.saldos-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    text-align: center;
+    padding: 0.65rem 0.35rem;
+    border-radius: 12px;
+    min-height: 74px;
+    box-sizing: border-box;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.saldos-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    font-size: 0.74rem;
+    font-weight: 600;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.saldos-card-header i {
+    font-size: 0.92rem;
+}
+
+.saldos-card-monto {
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-top: 0.3rem;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saldos-card-efectivo {
+    background: linear-gradient(145deg, rgba(0, 208, 156, 0.08), rgba(0, 208, 156, 0.02));
+    border: 1px solid rgba(0, 208, 156, 0.28);
+}
+.saldos-card-efectivo .saldos-card-header {
+    color: #a8dfcd;
+}
+.saldos-card-efectivo .saldos-card-header i {
+    color: var(--tx-primary, #00d09c);
+}
+
+.saldos-card-banco {
+    background: linear-gradient(145deg, rgba(13, 110, 253, 0.09), rgba(13, 110, 253, 0.02));
+    border: 1px solid rgba(13, 110, 253, 0.28);
+}
+.saldos-card-banco .saldos-card-header {
+    color: #b3d4fc;
+}
+.saldos-card-banco .saldos-card-header i {
+    color: #4da3ff;
+}
+
+.saldos-card-tarjeta {
+    background: linear-gradient(145deg, rgba(255, 183, 77, 0.1), rgba(255, 183, 77, 0.03));
+    border: 1px solid rgba(255, 183, 77, 0.32);
+}
+.saldos-card-tarjeta .saldos-card-header {
+    color: #ffe0b2;
+}
+.saldos-card-tarjeta .saldos-card-header i {
+    color: #ffb74d;
+}
+
+@media (max-width: 576px) {
+    .saldos-card {
+        padding: 0.5rem 0.2rem;
+        min-height: 68px;
+    }
+    .saldos-card-header {
+        font-size: 0.68rem;
+        gap: 0.18rem;
+    }
+    .saldos-card-header i {
+        font-size: 0.8rem;
+    }
+    .saldos-card-monto {
+        font-size: 0.86rem;
+        margin-top: 0.2rem;
+    }
+}
+
 .budget-action-row {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    gap: 0.5rem;
+    gap: 0.6rem;
     align-items: center;
     position: sticky;
     top: 58px;
     z-index: 100;
-    padding: 0.5rem 0.3rem;
+    padding: 0.5rem 0.35rem;
     background: rgba(18, 18, 18, 0.95);
     backdrop-filter: blur(8px);
     border-radius: 10px;
@@ -905,9 +999,10 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    gap: 0.35rem;
-    font-size: 0.88rem;
-    padding: 0.45rem 0.5rem;
+    gap: 0.45rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0.55rem 0.5rem;
     white-space: nowrap;
     flex: 1 1 0 !important;
     width: auto !important;
@@ -915,18 +1010,16 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 @media (max-width: 576px) {
     .budget-action-row {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 0.35rem;
+        gap: 0.45rem;
         top: 54px;
-        padding: 0.4rem 0.2rem;
+        padding: 0.4rem 0.25rem;
         margin-top: 0.5rem !important;
         margin-bottom: 0.5rem !important;
     }
 
     .budget-action-row .btn {
-        padding: 0.42rem 0.25rem;
-        font-size: 0.82rem;
+        padding: 0.5rem 0.35rem;
+        font-size: 0.88rem;
         flex: 1 1 0 !important;
     }
 }
@@ -1509,9 +1602,18 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: 1rem 1.1rem;
+    padding: 0.9rem 1.1rem;
     background: rgba(0, 0, 0, 0.22);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.share-panel-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.share-panel-header[aria-expanded="true"] #shareChevron {
+    transform: rotate(180deg);
 }
 
 .share-panel-icon {

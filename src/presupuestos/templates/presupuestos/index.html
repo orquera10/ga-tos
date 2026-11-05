@@ -72,12 +72,6 @@
                                     <span><i class="bi bi-receipt me-1"></i>{{ presupuesto.gastos.count }} gastos</span>
                                     <span>{{ presupuesto.porcentaje_gastado|floatformat:"0" }}% usado</span>
                                 </div>
-
-                                <div class="presupuesto-actions">
-                                    <a href="{% url 'presupuestos:chat_presupuesto' presupuesto.id %}" class="btn btn-primary presupuesto-chat-btn">
-                                        <i class="bi bi-chat-dots"></i> Chat
-                                    </a>
-                                </div>
                             </div>
                         </div>
                     </div>

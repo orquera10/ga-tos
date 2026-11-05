@@ -133,29 +133,38 @@
             </div>
 
             <!-- Desglose rápido por medio de pago -->
-            <div class="row g-2 mt-3 pt-3 border-top border-secondary">
+            <div class="row g-2 mt-3 pt-3 border-top border-secondary align-items-stretch">
                 <div class="col-4">
-                    <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
-                        <div class="small text-muted mb-1"><i class="bi bi-cash text-success"></i> Efectivo</div>
-                        <h6 class="mb-0 fw-bold {% if saldo_efectivo >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    <div class="saldos-card saldos-card-efectivo h-100">
+                        <div class="saldos-card-header">
+                            <i class="bi bi-cash-stack"></i>
+                            <span>Efectivo</span>
+                        </div>
+                        <div class="saldos-card-monto {% if saldo_efectivo >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {{ saldo_efectivo|floatformat:2 }}
-                        </h6>
+                        </div>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="p-2 rounded text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
-                        <div class="small text-muted mb-1"><i class="bi bi-bank text-primary"></i> Banco/Transf.</div>
-                        <h6 class="mb-0 fw-bold {% if saldo_transferencia >= 0 %}text-primary{% else %}text-danger{% endif %}">
+                    <div class="saldos-card saldos-card-banco h-100">
+                        <div class="saldos-card-header">
+                            <i class="bi bi-bank"></i>
+                            <span>Banco / Transf.</span>
+                        </div>
+                        <div class="saldos-card-monto {% if saldo_transferencia >= 0 %}text-primary{% else %}text-danger{% endif %}">
                             {{ saldo_transferencia|floatformat:2 }}
-                        </h6>
+                        </div>
                     </div>
                 </div>
                 <div class="col-4">
-                    <div class="p-2 rounded text-center" style="background: rgba(255, 183, 77, 0.08); border: 1px solid rgba(255, 183, 77, 0.25);" title="Gastos con tarjeta que se pagarán el mes siguiente">
-                        <div class="small text-warning mb-1"><i class="bi bi-credit-card"></i> Tarjeta próx.</div>
-                        <h6 class="mb-0 fw-bold text-warning">
+                    <div class="saldos-card saldos-card-tarjeta h-100" title="Gastos con tarjeta que se pagarán el mes siguiente">
+                        <div class="saldos-card-header">
+                            <i class="bi bi-credit-card"></i>
+                            <span>Tarjeta próx.</span>
+                        </div>
+                        <div class="saldos-card-monto text-warning">
                             -{{ total_tarjeta|floatformat:2 }}
-                        </h6>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -185,58 +194,76 @@
 
     {% if es_duenio %}
     <section class="share-panel mb-4">
-        <div class="share-panel-header">
+        <div class="share-panel-header cursor-pointer"
+             data-bs-toggle="collapse"
+             data-bs-target="#collapseCompartir"
+             aria-expanded="false"
+             aria-controls="collapseCompartir"
+             style="cursor: pointer; user-select: none;">
             <div>
                 <p class="section-kicker mb-1">Compartir</p>
-                <h3 class="transactions-title mb-0">Usuarios con acceso</h3>
+                <h3 class="transactions-title mb-0 d-flex align-items-center gap-2">
+                    Usuarios con acceso
+                    {% if usuarios_compartidos %}
+                    <span class="badge bg-secondary rounded-pill" style="font-size: 0.72rem;">{{ usuarios_compartidos|length }}</span>
+                    {% endif %}
+                </h3>
             </div>
-            <span class="share-panel-icon">
-                <i class="bi bi-people"></i>
-            </span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="share-panel-icon">
+                    <i class="bi bi-people"></i>
+                </span>
+                <i class="bi bi-chevron-down text-muted" id="shareChevron" style="transition: transform 0.25s ease; font-size: 1.1rem;"></i>
+            </div>
         </div>
-        <form method="post" action="{% url 'presupuestos:compartir_presupuesto' presupuesto.id %}" class="share-form">
-            {% csrf_token %}
-            <div class="share-field share-field-main">
-                <label for="{{ compartir_form.usuario.id_for_label }}" class="form-label">Usuario o email</label>
-                <div class="share-input-wrap">
-                    <i class="bi bi-person-plus"></i>
-                    {{ compartir_form.usuario }}
-                </div>
-            </div>
-            <div class="share-field">
-                <label for="{{ compartir_form.permiso.id_for_label }}" class="form-label">Permiso</label>
-                {{ compartir_form.permiso }}
-            </div>
-            <button type="submit" class="btn btn-primary share-submit">
-                <i class="bi bi-share"></i> Compartir
-            </button>
-        </form>
-        {% if usuarios_compartidos %}
-            <div class="shared-users-list">
-                {% for compartido in usuarios_compartidos %}
-                    <div class="shared-user-item">
-                        <div class="shared-user-main">
-                            <span class="shared-user-avatar">{{ compartido.usuario.username|first|upper }}</span>
-                            <div>
-                                <strong>{{ compartido.usuario.username }}</strong>
-                                <span class="text-muted">{{ compartido.usuario.email }}</span>
-                            </div>
-                        </div>
-                        <div class="shared-user-actions">
-                            <span class="shared-permission {% if compartido.permiso == 'editar' %}shared-permission-edit{% else %}shared-permission-read{% endif %}">
-                                {{ compartido.get_permiso_display }}
-                            </span>
-                            <form method="post" action="{% url 'presupuestos:quitar_usuario_compartido' presupuesto.id compartido.id %}">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger shared-remove" title="Quitar">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </form>
+
+        <div class="collapse" id="collapseCompartir">
+            <div class="pt-3 border-top border-secondary mt-3">
+                <form method="post" action="{% url 'presupuestos:compartir_presupuesto' presupuesto.id %}" class="share-form">
+                    {% csrf_token %}
+                    <div class="share-field share-field-main">
+                        <label for="{{ compartir_form.usuario.id_for_label }}" class="form-label">Usuario o email</label>
+                        <div class="share-input-wrap">
+                            <i class="bi bi-person-plus"></i>
+                            {{ compartir_form.usuario }}
                         </div>
                     </div>
-                {% endfor %}
+                    <div class="share-field">
+                        <label for="{{ compartir_form.permiso.id_for_label }}" class="form-label">Permiso</label>
+                        {{ compartir_form.permiso }}
+                    </div>
+                    <button type="submit" class="btn btn-primary share-submit">
+                        <i class="bi bi-share"></i> Compartir
+                    </button>
+                </form>
+                {% if usuarios_compartidos %}
+                    <div class="shared-users-list mt-3">
+                        {% for compartido in usuarios_compartidos %}
+                            <div class="shared-user-item">
+                                <div class="shared-user-main">
+                                    <span class="shared-user-avatar">{{ compartido.usuario.username|first|upper }}</span>
+                                    <div>
+                                        <strong>{{ compartido.usuario.username }}</strong>
+                                        <span class="text-muted">{{ compartido.usuario.email }}</span>
+                                    </div>
+                                </div>
+                                <div class="shared-user-actions">
+                                    <span class="shared-permission {% if compartido.permiso == 'editar' %}shared-permission-edit{% else %}shared-permission-read{% endif %}">
+                                        {{ compartido.get_permiso_display }}
+                                    </span>
+                                    <form method="post" action="{% url 'presupuestos:quitar_usuario_compartido' presupuesto.id compartido.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger shared-remove" title="Quitar">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
-        {% endif %}
+        </div>
     </section>
     {% endif %}
 
@@ -247,9 +274,6 @@
         </a>
         <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success">
             <i class="bi bi-plus-circle"></i> Ingreso
-        </a>
-        <a href="{% url 'presupuestos:chat_presupuesto' presupuesto.id %}" class="btn btn-primary">
-            <i class="bi bi-chat-dots"></i> Chat
         </a>
     </div>
     {% endif %}
