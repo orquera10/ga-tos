@@ -376,9 +376,6 @@
                                         <span class="badge bg-dark border border-secondary text-light ms-1"><i class="bi bi-wallet2"></i> {{ transaccion.cuenta_bancaria.nombre }}</span>
                                     {% endif %}
                                 </p>
-                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
-                                    {% endif %}
-                                </p>
                                 {% if transaccion.descripcion %}
                                 <p class="transaccion-descripcion gasto-descripcion small text-muted mb-0">
                                     {{ transaccion.descripcion|truncatechars:60 }}
