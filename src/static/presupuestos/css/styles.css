@@ -890,6 +890,13 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     flex-direction: row;
     gap: 0.5rem;
     align-items: center;
+    position: sticky;
+    top: 58px;
+    z-index: 100;
+    padding: 0.5rem 0.3rem;
+    background: rgba(18, 18, 18, 0.92);
+    backdrop-filter: blur(8px);
+    border-radius: 10px;
 }
 
 .budget-action-row .btn {
@@ -908,12 +915,14 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     .budget-action-row {
         flex-direction: row;
         gap: 0.35rem;
-        margin-top: 0.75rem !important;
-        margin-bottom: 0.75rem !important;
+        top: 56px;
+        padding: 0.4rem 0.2rem;
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
     }
 
     .budget-action-row .btn {
-        padding: 0.4rem 0.3rem;
+        padding: 0.42rem 0.3rem;
         font-size: 0.82rem;
     }
 }

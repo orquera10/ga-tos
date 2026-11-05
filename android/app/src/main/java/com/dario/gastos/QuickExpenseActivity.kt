@@ -138,7 +138,7 @@ class QuickExpenseActivity : AppCompatActivity() {
                     finish()
                 } else {
                     btnSave.isEnabled = true
-                    btnSave.text = "Guardar Gasto"
+                    btnSave.text = "Guardar"
                     Toast.makeText(this@QuickExpenseActivity, "Error: $msg", Toast.LENGTH_LONG).show()
                 }
             }

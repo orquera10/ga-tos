@@ -115,7 +115,7 @@ class QuickIncomeActivity : AppCompatActivity() {
                     finish()
                 } else {
                     btnSave.isEnabled = true
-                    btnSave.text = "Guardar Ingreso"
+                    btnSave.text = "Guardar"
                     Toast.makeText(this@QuickIncomeActivity, "Error: $msg", Toast.LENGTH_LONG).show()
                 }
             }
