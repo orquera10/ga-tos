@@ -175,14 +175,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkBiometricSecurity() {
         val biometricManager = BiometricManager.from(this)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
-        val canAuth = biometricManager.canAuthenticate(authenticators)
+        val canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
 
         if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
             biometricOverlay.visibility = View.VISIBLE
             promptBiometric()
         } else {
-            // Dispositivo sin hardware o sin huella/PIN configurado: acceso directo
+            // Dispositivo sin hardware o sin huella configurada: acceso directo
             isUnlocked = true
             biometricOverlay.visibility = View.GONE
         }
@@ -200,7 +199,6 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    // Se mantiene el overlay para permitir reintentar con el botón
                 }
 
                 override fun onAuthenticationFailed() {
@@ -212,8 +210,8 @@ class MainActivity : AppCompatActivity() {
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Desbloquear Ga$tos")
-            .setSubtitle("Usa tu huella dactilar o PIN para acceder")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .setSubtitle("Usa tu huella dactilar para ingresar")
+            .setNegativeButtonText("Cancelar")
             .build()
 
         biometricPrompt.authenticate(promptInfo)
