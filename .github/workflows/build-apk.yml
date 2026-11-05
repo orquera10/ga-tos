@@ -52,7 +52,7 @@ jobs:
           name: "Ga$tos Android APK v1.1.0"
           body: |
             ### App Android de Ga$tos con Widget v1.1.0
-            - Selector de presupuesto para el Widget (toca el nombre del presupuesto en el widget o desde la app para elegir cuál mostrar).
+            - Selector de presupuesto para el Widget (toca el nombre del presupuesto en el widget o el botón "Presupuesto" en la app para elegir cuál mostrar).
             - Descarga **app-debug.apk** para actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

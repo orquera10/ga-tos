@@ -11,7 +11,8 @@
         android:layout_height="50dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="14dp"
+        android:paddingLeft="14dp"
+        android:paddingRight="14dp"
         android:background="#181818">
 
         <TextView
@@ -31,7 +32,8 @@
             android:textSize="11sp"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_secondary"
-            android:paddingHorizontal="10dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
             android:layout_marginEnd="6dp" />
 
         <Button
@@ -42,7 +44,8 @@
             android:textSize="11sp"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_secondary"
-            android:paddingHorizontal="10dp" />
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp" />
 
     </LinearLayout>
 

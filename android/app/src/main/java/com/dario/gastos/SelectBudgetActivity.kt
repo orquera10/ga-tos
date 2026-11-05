@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class SelectBudgetActivity : AppCompatActivity() {
 
@@ -47,7 +48,10 @@ class SelectBudgetActivity : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 budgets = list
                 if (budgets.isNotEmpty()) {
-                    val names = budgets.map { "${it.nombre} (${it.moneda}) - Restante: $ ${String.format("%.2f", it.montoRestante)}" }
+                    val names = budgets.map {
+                        val restanteFormatted = String.format(Locale.getDefault(), "%.2f", it.montoRestante)
+                        "${it.nombre} (${it.moneda}) - Restante: $ $restanteFormatted"
+                    }
                     val adapter = ArrayAdapter(this@SelectBudgetActivity, android.R.layout.simple_spinner_dropdown_item, names)
                     spBudgetList.adapter = adapter
 
