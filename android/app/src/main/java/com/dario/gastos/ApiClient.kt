@@ -89,7 +89,8 @@ object ApiClient {
             val json = JSONObject(response)
             if (code == 200 && json.optBoolean("success")) {
                 val token = json.getString("token")
-                Prefs.setToken(context, token)
+                val username = json.optString("username", userOrEmail)
+                Prefs.saveToken(context, token, username)
                 Pair(true, "Vinculado correctamente")
             } else {
                 Pair(false, json.optString("error", "Error al iniciar sesión ($code)"))

@@ -13,6 +13,7 @@ object Prefs {
     private const val KEY_LAST_REMAINING = "last_remaining"
     private const val KEY_LAST_AVAILABLE = "last_available"
     private const val KEY_LAST_PERCENT = "last_percent"
+    private const val KEY_USERNAME = "username"
 
     const val DEFAULT_BASE_URL = "https://gastos.dario10.pw"
 
@@ -26,6 +27,22 @@ object Prefs {
 
     fun setToken(context: Context, token: String?) {
         get(context).edit().putString(KEY_TOKEN, token).apply()
+    }
+
+    fun saveToken(context: Context, token: String?, username: String? = null) {
+        val editor = get(context).edit().putString(KEY_TOKEN, token)
+        if (!username.isNullOrEmpty()) {
+            editor.putString(KEY_USERNAME, username)
+        }
+        editor.apply()
+    }
+
+    fun getUsername(context: Context): String {
+        return get(context).getString(KEY_USERNAME, "") ?: ""
+    }
+
+    fun setUsername(context: Context, username: String) {
+        get(context).edit().putString(KEY_USERNAME, username).apply()
     }
 
     fun getBaseUrl(context: Context): String {
