@@ -2,9 +2,11 @@ package com.dario.gastos
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.View
 import android.view.Window
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -28,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var btnLinkWidget: Button
+    private lateinit var btnSelectBudget: Button
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,9 +40,13 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         swipeRefresh = findViewById(R.id.swipeRefresh)
         btnLinkWidget = findViewById(R.id.btnLinkWidget)
+        btnSelectBudget = findViewById(R.id.btnSelectBudget)
 
-        updateLinkButtonStatus()
+        updateButtonsStatus()
         btnLinkWidget.setOnClickListener { showLinkDialog() }
+        btnSelectBudget.setOnClickListener {
+            startActivity(Intent(this, SelectBudgetActivity::class.java))
+        }
 
         // Setup SwipeRefresh
         swipeRefresh.setColorSchemeColors(Color.parseColor("#00D09C"))
@@ -70,7 +77,6 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 swipeRefresh.isRefreshing = false
                 cookieManager.flush()
-                // Al cargar la página principal, refrescar datos del widget si ya está vinculado
                 if (!Prefs.getToken(this@MainActivity).isNullOrEmpty()) {
                     GastosWidgetProvider.notifyUpdate(this@MainActivity)
                 }
@@ -85,11 +91,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Load Main URL
         val targetUrl = Prefs.getBaseUrl(this)
         webView.loadUrl(targetUrl)
 
-        // Handle Back Navigation inside WebView
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (webView.canGoBack()) {
@@ -102,14 +106,21 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun updateLinkButtonStatus() {
+    override fun onResume() {
+        super.onResume()
+        updateButtonsStatus()
+    }
+
+    private fun updateButtonsStatus() {
         val token = Prefs.getToken(this)
         if (!token.isNullOrEmpty()) {
-            btnLinkWidget.text = "✓ Widget Conectado"
+            btnLinkWidget.text = "✓ Conectado"
             btnLinkWidget.setTextColor(Color.parseColor("#00E676"))
+            btnSelectBudget.visibility = View.VISIBLE
         } else {
-            btnLinkWidget.text = "Vincular Widget"
+            btnLinkWidget.text = "Vincular"
             btnLinkWidget.setTextColor(Color.parseColor("#FFFFFF"))
+            btnSelectBudget.visibility = View.GONE
         }
     }
 
@@ -143,7 +154,7 @@ class MainActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     if (ok) {
                         Toast.makeText(this@MainActivity, "✓ $msg", Toast.LENGTH_SHORT).show()
-                        updateLinkButtonStatus()
+                        updateButtonsStatus()
                         GastosWidgetProvider.notifyUpdate(this@MainActivity)
                         dialog.dismiss()
                     } else {

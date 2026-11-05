@@ -48,11 +48,12 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "Ga$tos Android APK v1.0.0"
+          tag_name: v1.1.0
+          name: "Ga$tos Android APK v1.1.0"
           body: |
-            ### App Android de Ga$tos con Widget
-            Toca el archivo **app-debug.apk** de abajo para descargarlo directamente a tu celular.
+            ### App Android de Ga$tos con Widget v1.1.0
+            - Selector de presupuesto para el Widget (toca el nombre del presupuesto en el widget o desde la app para elegir cuál mostrar).
+            - Descarga **app-debug.apk** para actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,6 +7,7 @@ object Prefs {
     private const val PREF_NAME = "gastos_prefs"
     private const val KEY_TOKEN = "api_token"
     private const val KEY_BASE_URL = "base_url"
+    private const val KEY_SELECTED_BUDGET_ID = "selected_budget_id"
     private const val KEY_LAST_BUDGET_ID = "last_budget_id"
     private const val KEY_LAST_BUDGET_NAME = "last_budget_name"
     private const val KEY_LAST_REMAINING = "last_remaining"
@@ -29,6 +30,14 @@ object Prefs {
 
     fun getBaseUrl(context: Context): String {
         return get(context).getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+    }
+
+    fun getSelectedBudgetId(context: Context): Int {
+        return get(context).getInt(KEY_SELECTED_BUDGET_ID, -1)
+    }
+
+    fun setSelectedBudgetId(context: Context, id: Int) {
+        get(context).edit().putInt(KEY_SELECTED_BUDGET_ID, id).apply()
     }
 
     fun saveWidgetData(context: Context, id: Int, name: String, remaining: Double, available: Double, percent: Double) {
@@ -58,6 +67,8 @@ object Prefs {
     }
 
     fun getLastBudgetId(context: Context): Int {
+        val selected = getSelectedBudgetId(context)
+        if (selected > 0) return selected
         return get(context).getInt(KEY_LAST_BUDGET_ID, -1)
     }
 }

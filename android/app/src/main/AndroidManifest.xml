@@ -25,6 +25,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Diálogo para cambiar el presupuesto que se muestra en el Widget -->
+        <activity
+            android:name=".SelectBudgetActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Gastos.Dialog"
+            android:excludeFromRecents="true" />
+
         <!-- Diálogo flotante rápido para cargar gasto desde el Widget -->
         <activity
             android:name=".QuickExpenseActivity"

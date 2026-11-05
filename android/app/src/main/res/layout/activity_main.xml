@@ -11,7 +11,7 @@
         android:layout_height="50dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="14dp"
         android:background="#181818">
 
         <TextView
@@ -24,14 +24,25 @@
             android:textStyle="bold" />
 
         <Button
+            android:id="@+id/btnSelectBudget"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Presupuesto"
+            android:textSize="11sp"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/btn_secondary"
+            android:paddingHorizontal="10dp"
+            android:layout_marginEnd="6dp" />
+
+        <Button
             android:id="@+id/btnLinkWidget"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="Vincular Widget"
-            android:textSize="12sp"
+            android:text="Vincular"
+            android:textSize="11sp"
             android:textColor="#FFFFFF"
             android:background="@drawable/btn_secondary"
-            android:paddingHorizontal="12dp" />
+            android:paddingHorizontal="10dp" />
 
     </LinearLayout>
 

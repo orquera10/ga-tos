@@ -55,7 +55,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 val available = Prefs.getLastAvailable(context)
                 val percent = Prefs.getLastPercent(context)
 
-                views.setTextViewText(R.id.widgetBudgetName, budgetName)
+                views.setTextViewText(R.id.widgetBudgetName, "$budgetName ▾")
                 views.setTextViewText(
                     R.id.widgetTxtRestante,
                     String.format(Locale.getDefault(), "$ %.2f", remaining)
@@ -70,7 +70,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 views.setProgressBar(R.id.widgetProgressBar, 100, percent.coerceIn(0, 100), false)
             }
 
-            // Click on widget body -> Open MainActivity
+            // Click en el cuerpo del widget -> Abrir MainActivity
             val mainIntent = Intent(context, MainActivity::class.java)
             val mainPending = PendingIntent.getActivity(
                 context, 0, mainIntent,
@@ -78,7 +78,15 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetContainer, mainPending)
 
-            // Click + Gasto -> Open QuickExpenseActivity
+            // Click en el nombre del presupuesto -> Abrir diálogo para cambiar de presupuesto
+            val selectIntent = Intent(context, SelectBudgetActivity::class.java)
+            val selectPending = PendingIntent.getActivity(
+                context, 4, selectIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widgetBudgetName, selectPending)
+
+            // Click + Gasto -> Abrir QuickExpenseActivity
             val expenseIntent = Intent(context, QuickExpenseActivity::class.java)
             val expensePending = PendingIntent.getActivity(
                 context, 1, expenseIntent,
@@ -86,7 +94,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetBtnAddExpense, expensePending)
 
-            // Click + Ingreso -> Open QuickIncomeActivity
+            // Click + Ingreso -> Abrir QuickIncomeActivity
             val incomeIntent = Intent(context, QuickIncomeActivity::class.java)
             val incomePending = PendingIntent.getActivity(
                 context, 2, incomeIntent,
@@ -94,7 +102,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetBtnAddIncome, incomePending)
 
-            // Click ↻ -> Trigger refresh broadcast
+            // Click ↻ -> Refrescar datos
             val refreshIntent = Intent(context, GastosWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH_WIDGET
             }
@@ -120,7 +128,10 @@ class GastosWidgetProvider : AppWidgetProvider() {
             }
 
             CoroutineScope(Dispatchers.IO).launch {
-                val summary = ApiClient.getWidgetSummary(context)
+                val selectedId = Prefs.getSelectedBudgetId(context)
+                val budgetIdParam = if (selectedId > 0) selectedId else null
+                val summary = ApiClient.getWidgetSummary(context, budgetIdParam)
+
                 if (summary?.budget != null) {
                     val b = summary.budget
                     Prefs.saveWidgetData(
