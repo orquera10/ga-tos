@@ -36,17 +36,24 @@ jobs:
           cd android
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --no-daemon > build.log 2>&1 || {
-            echo "## Detalle del Error de Compilación" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -n 150 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat build.log | tail -n 150
+          ./gradlew assembleDebug --stacktrace --no-daemon > build.log 2>&1 || touch FAILED
+
+      - name: Publicar Log si falla
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: debug-log
+          name: "Debug Log"
+          files: android/build.log
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verificar si falló la compilación
+        run: |
+          if [ -f android/FAILED ]; then
+            echo "La compilación falló. Revisa el log subido al release debug-log."
             exit 1
-          }
-          cat build.log | tail -n 50
-          echo "=== Verificando APK generado ==="
-          ls -la app/build/outputs/apk/debug/
+          fi
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4
