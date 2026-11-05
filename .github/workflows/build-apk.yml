@@ -48,12 +48,14 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.1.0
-          name: "Ga$tos Android APK v1.1.0"
+          tag_name: v1.2.0
+          name: "Ga$tos Android APK v1.2.0"
           body: |
-            ### App Android de Ga$tos con Widget v1.1.0
-            - Selector de presupuesto para el Widget (toca el nombre del presupuesto en el widget o el botón "Presupuesto" en la app para elegir cuál mostrar).
-            - Descarga **app-debug.apk** para actualizar.
+            ### App Android de Ga$tos con Widget v1.2.0
+            - **Widget compacto de 1 sola línea**: Se adapta a una fila de tu pantalla de inicio con presupuesto, saldo restante, + Gasto, + Ingreso y refresco rápido.
+            - **Ventanas flotantes independientes**: Al presionar "+ Gasto" o "+ Ingreso" desde el widget, el diálogo flotante se abre sobre la pantalla actual sin traer la aplicación completa al frente.
+            - **Diseño del diálogo mejorado**: Ancho más cómodo y botones 50/50 balanceados sin cortes ni solapamientos.
+            - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

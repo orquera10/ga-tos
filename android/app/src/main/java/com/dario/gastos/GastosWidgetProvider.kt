@@ -44,16 +44,12 @@ class GastosWidgetProvider : AppWidgetProvider() {
 
             val token = Prefs.getToken(context)
             if (token.isNullOrEmpty()) {
-                views.setTextViewText(R.id.widgetBudgetName, "Toca para vincular")
-                views.setTextViewText(R.id.widgetTxtRestante, "Sin vincular")
+                views.setTextViewText(R.id.widgetBudgetName, "Sin vincular")
+                views.setTextViewText(R.id.widgetTxtRestante, "Toca aquí")
                 views.setTextColor(R.id.widgetTxtRestante, Color.parseColor("#FFB74D"))
-                views.setTextViewText(R.id.widgetTxtDisponible, "-")
-                views.setProgressBar(R.id.widgetProgressBar, 100, 0, false)
             } else {
                 val budgetName = Prefs.getLastBudgetName(context)
                 val remaining = Prefs.getLastRemaining(context)
-                val available = Prefs.getLastAvailable(context)
-                val percent = Prefs.getLastPercent(context)
 
                 views.setTextViewText(R.id.widgetBudgetName, "$budgetName ▾")
                 views.setTextViewText(
@@ -62,40 +58,44 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 )
                 val remainingColor = if (remaining < 0) Color.parseColor("#FF5252") else Color.parseColor("#00E676")
                 views.setTextColor(R.id.widgetTxtRestante, remainingColor)
-
-                views.setTextViewText(
-                    R.id.widgetTxtDisponible,
-                    String.format(Locale.getDefault(), "$ %.2f", available)
-                )
-                views.setProgressBar(R.id.widgetProgressBar, 100, percent.coerceIn(0, 100), false)
             }
 
             // Click en el cuerpo del widget -> Abrir MainActivity
-            val mainIntent = Intent(context, MainActivity::class.java)
+            val mainIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val mainPending = PendingIntent.getActivity(
                 context, 0, mainIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widgetContainer, mainPending)
 
-            // Click en el nombre del presupuesto -> Abrir diálogo para cambiar de presupuesto
-            val selectIntent = Intent(context, SelectBudgetActivity::class.java)
+            // Click en el nombre o saldo del presupuesto -> Abrir diálogo para cambiar de presupuesto
+            val selectIntent = Intent(context, SelectBudgetActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val selectPending = PendingIntent.getActivity(
                 context, 4, selectIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(R.id.widgetBudgetInfo, selectPending)
             views.setOnClickPendingIntent(R.id.widgetBudgetName, selectPending)
+            views.setOnClickPendingIntent(R.id.widgetTxtRestante, selectPending)
 
-            // Click + Gasto -> Abrir QuickExpenseActivity
-            val expenseIntent = Intent(context, QuickExpenseActivity::class.java)
+            // Click + Gasto -> Abrir QuickExpenseActivity independiente
+            val expenseIntent = Intent(context, QuickExpenseActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val expensePending = PendingIntent.getActivity(
                 context, 1, expenseIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widgetBtnAddExpense, expensePending)
 
-            // Click + Ingreso -> Abrir QuickIncomeActivity
-            val incomeIntent = Intent(context, QuickIncomeActivity::class.java)
+            // Click + Ingreso -> Abrir QuickIncomeActivity independiente
+            val incomeIntent = Intent(context, QuickIncomeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val incomePending = PendingIntent.getActivity(
                 context, 2, incomeIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

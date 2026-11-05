@@ -34,33 +34,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="end">
+        android:layout_marginTop="8dp">
 
         <Button
             android:id="@+id/btnCancelSelect"
-            android:layout_width="wrap_content"
-            android:layout_height="42dp"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
             android:text="Cancelar"
             android:textColor="@color/text_secondary"
             android:background="@drawable/btn_secondary"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingLeft="16dp"
-            android:paddingRight="16dp"
             android:layout_marginEnd="8dp" />
 
         <Button
             android:id="@+id/btnApplySelect"
-            android:layout_width="wrap_content"
-            android:layout_height="42dp"
-            android:text="Aplicar al Widget"
+            android:layout_width="0dp"
+            android:layout_height="46dp"
+            android:layout_weight="1"
+            android:text="Aplicar"
             android:textColor="#000000"
             android:textStyle="bold"
-            android:background="@drawable/btn_primary"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp" />
+            android:background="@drawable/btn_primary" />
 
     </LinearLayout>
 

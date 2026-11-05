@@ -28,6 +28,10 @@ class QuickIncomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_income)
 
+        val dm = resources.displayMetrics
+        val dialogWidth = (dm.widthPixels * 0.92).toInt()
+        window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+
         etMonto = findViewById(R.id.etMontoIngreso)
         etNombre = findViewById(R.id.etNombreIngreso)
         spPresupuesto = findViewById(R.id.spPresupuestoIngreso)

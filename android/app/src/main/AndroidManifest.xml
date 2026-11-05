@@ -30,6 +30,8 @@
             android:name=".SelectBudgetActivity"
             android:exported="false"
             android:theme="@style/Theme.Gastos.Dialog"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
             android:excludeFromRecents="true" />
 
         <!-- Diálogo flotante rápido para cargar gasto desde el Widget -->
@@ -37,6 +39,9 @@
             android:name=".QuickExpenseActivity"
             android:exported="false"
             android:theme="@style/Theme.Gastos.Dialog"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:windowSoftInputMode="stateVisible|adjustResize"
             android:excludeFromRecents="true" />
 
         <!-- Diálogo flotante rápido para cargar ingreso desde el Widget -->
@@ -44,6 +49,9 @@
             android:name=".QuickIncomeActivity"
             android:exported="false"
             android:theme="@style/Theme.Gastos.Dialog"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:windowSoftInputMode="stateVisible|adjustResize"
             android:excludeFromRecents="true" />
 
         <!-- Receptor del Widget de escritorio -->

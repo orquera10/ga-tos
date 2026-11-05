@@ -195,14 +195,14 @@
     {% endif %}
 
     {% if puede_editar %}
-    <div class="my-4 d-flex gap-2 budget-action-row">
-        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger flex-grow-1 py-2">
+    <div class="my-3 budget-action-row">
+        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
             <i class="bi bi-plus-circle"></i> Ga$to
         </a>
-        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success flex-grow-1 py-2">
+        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success">
             <i class="bi bi-plus-circle"></i> Ingreso
         </a>
-        <a href="{% url 'presupuestos:chat_presupuesto' presupuesto.id %}" class="btn btn-primary flex-grow-1 py-2">
+        <a href="{% url 'presupuestos:chat_presupuesto' presupuesto.id %}" class="btn btn-primary">
             <i class="bi bi-chat-dots"></i> Chat
         </a>
     </div>

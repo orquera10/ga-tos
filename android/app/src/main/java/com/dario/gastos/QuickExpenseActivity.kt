@@ -30,6 +30,10 @@ class QuickExpenseActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_expense)
 
+        val dm = resources.displayMetrics
+        val dialogWidth = (dm.widthPixels * 0.92).toInt()
+        window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+
         etMonto = findViewById(R.id.etMonto)
         etNombre = findViewById(R.id.etNombre)
         spPresupuesto = findViewById(R.id.spPresupuesto)

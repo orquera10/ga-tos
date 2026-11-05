@@ -23,6 +23,10 @@ class SelectBudgetActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_select_budget)
 
+        val dm = resources.displayMetrics
+        val dialogWidth = (dm.widthPixels * 0.92).toInt()
+        window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+
         spBudgetList = findViewById(R.id.spBudgetList)
         btnApply = findViewById(R.id.btnApplySelect)
         btnCancel = findViewById(R.id.btnCancelSelect)
