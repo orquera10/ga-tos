@@ -57,6 +57,10 @@ object Prefs {
         get(context).edit().putInt(KEY_SELECTED_BUDGET_ID, id).apply()
     }
 
+    fun saveLastBudgetId(context: Context, id: Int) {
+        setSelectedBudgetId(context, id)
+    }
+
     fun saveWidgetData(context: Context, id: Int, name: String, remaining: Double, available: Double, percent: Double) {
         get(context).edit()
             .putInt(KEY_LAST_BUDGET_ID, id)
