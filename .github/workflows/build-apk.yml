@@ -10,6 +10,9 @@ on:
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compilar APK
@@ -41,3 +44,15 @@ jobs:
           name: Gastos-App-Debug
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      - name: Publicar Release directo con el APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "Ga$tos Android APK v1.0.0"
+          body: |
+            ### App Android de Ga$tos con Widget
+            Toca el archivo **app-debug.apk** de abajo para descargarlo directamente a tu celular.
+          files: android/app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
