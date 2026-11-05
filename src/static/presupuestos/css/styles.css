@@ -1167,21 +1167,34 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 .form-control,
 .form-select {
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    min-height: 46px;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.95rem;
+}
+
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%2300d09c' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-size: 18px 14px !important;
+    padding-right: 2.4rem !important;
+    cursor: pointer;
 }
 
 .card .form-control,
 .card .form-select,
 .form-shell .form-control,
 .form-shell .form-select {
-    background-color: #f7f7f7;
+    background-color: #ffffff;
     color: #111;
 }
 
 .input-group-text {
-    border-color: rgba(255, 255, 255, 0.16);
-    border-radius: 8px;
+    border-color: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    min-height: 46px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--tx-primary);
 }
 
 .moneda-select-wrap {
@@ -1191,7 +1204,15 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 .moneda-select {
     border: 0;
-    min-width: 160px;
+    min-width: 140px;
+}
+
+@media (max-width: 576px) {
+    .moneda-select {
+        min-width: 110px;
+        font-size: 0.85rem;
+        padding-left: 0.5rem;
+    }
 }
 
 .form-actions {
@@ -1588,6 +1609,19 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     margin-top: 1.5rem;
 }
 
+.budget-main-card {
+    background: var(--bg-secondary) !important;
+    border: 1px solid rgba(160, 255, 233, 0.14) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+.budget-hero-box {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .share-panel {
     background: linear-gradient(145deg, rgba(55, 55, 55, 0.96), rgba(27, 27, 27, 0.96));
     border: 1px solid rgba(160, 255, 233, 0.14);
@@ -1610,6 +1644,33 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 
 .share-panel-header:hover {
     background: rgba(255, 255, 255, 0.05);
+}
+
+.share-collapse-toggle-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(0, 208, 156, 0.14);
+    border: 1px solid rgba(0, 208, 156, 0.35);
+    color: var(--tx-primary, #00d09c);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    font-weight: 800;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+}
+
+.share-panel-header:hover .share-collapse-toggle-btn {
+    background: rgba(0, 208, 156, 0.28);
+    border-color: rgba(0, 208, 156, 0.6);
+    transform: scale(1.06);
+}
+
+.share-panel-header[aria-expanded="true"] .share-collapse-toggle-btn {
+    background: var(--tx-primary, #00d09c);
+    color: #000;
 }
 
 .share-panel-header[aria-expanded="true"] #shareChevron {

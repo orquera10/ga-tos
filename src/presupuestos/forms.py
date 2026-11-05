@@ -70,6 +70,10 @@ class CategoriaForm(CapitalizeFieldsMixin, forms.ModelForm):
     class Meta:
         model = Categoria
         fields = ['nombre', 'descripcion']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Alimentación, Ocio, Servicios...'}),
+            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Descripción opcional...'}),
+        }
 
 
 class CompartirPresupuestoForm(forms.ModelForm):
