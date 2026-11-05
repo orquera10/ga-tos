@@ -1,0 +1,2 @@
+-keep class androidx.biometric.** { *; }
+-dontwarn androidx.biometric.**
