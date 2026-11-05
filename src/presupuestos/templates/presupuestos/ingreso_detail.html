@@ -19,16 +19,42 @@
 
     <div class="detail-grid">
         <div class="detail-item">
-            <span class="detail-label">Tipo</span>
-            <strong>Ingreso</strong>
+            <span class="detail-label">Medio de Ingreso</span>
+            {% if ingreso.tipo_ingreso == 'efectivo' %}
+                <span class="badge bg-secondary" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-cash me-1"></i>Efectivo
+                </span>
+            {% elif ingreso.tipo_ingreso == 'sueldo' %}
+                <span class="badge bg-success" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-briefcase me-1"></i>Sueldo
+                </span>
+            {% else %}
+                <span class="badge bg-primary" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-bank me-1"></i>Transferencia
+                </span>
+            {% endif %}
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Banco / Billetera</span>
+            {% if ingreso.cuenta_bancaria %}
+                <span class="badge" style="background: rgba(61, 139, 253, 0.15); color: #3d8bfd; border: 1px solid rgba(61, 139, 253, 0.4); font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-bank me-1"></i>{{ ingreso.cuenta_bancaria.nombre }}
+                </span>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
         </div>
         <div class="detail-item">
             <span class="detail-label">Presupuesto</span>
             <strong>{{ ingreso.presupuesto.nombre }}</strong>
         </div>
+        <div class="detail-item">
+            <span class="detail-label">Fecha y hora</span>
+            <strong>{{ ingreso.fecha|date:"d/m/Y H:i" }}</strong>
+        </div>
         <div class="detail-item detail-item-wide">
-            <span class="detail-label">Descripcion</span>
-            <strong>{{ ingreso.descripcion|default:"Sin descripcion" }}</strong>
+            <span class="detail-label">Descripción</span>
+            <strong>{{ ingreso.descripcion|default:"Sin descripción" }}</strong>
         </div>
     </div>
 

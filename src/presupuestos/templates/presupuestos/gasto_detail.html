@@ -19,16 +19,56 @@
 
     <div class="detail-grid">
         <div class="detail-item">
-            <span class="detail-label">Categoria</span>
-            <strong>{{ gasto.categoria.nombre|default:"Sin categoria" }}</strong>
+            <span class="detail-label">Persona / Tag</span>
+            {% if gasto.persona %}
+                <span class="badge" style="background: rgba(0, 208, 156, 0.15); color: #00d09c; border: 1px solid rgba(0, 208, 156, 0.4); font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-tag-fill me-1"></i>{{ gasto.persona }}
+                </span>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Medio de Pago</span>
+            {% if gasto.metodo_pago == 'efectivo' %}
+                <span class="badge bg-secondary" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-cash me-1"></i>Efectivo
+                </span>
+            {% elif gasto.metodo_pago == 'tarjeta' %}
+                <span class="badge bg-warning text-dark" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-credit-card me-1"></i>Tarjeta (Próx. mes)
+                </span>
+            {% else %}
+                <span class="badge bg-primary" style="font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-bank me-1"></i>Transferencia
+                </span>
+            {% endif %}
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Banco / Billetera</span>
+            {% if gasto.cuenta_bancaria %}
+                <span class="badge" style="background: rgba(61, 139, 253, 0.15); color: #3d8bfd; border: 1px solid rgba(61, 139, 253, 0.4); font-size: 0.88rem; padding: 5px 10px;">
+                    <i class="bi bi-bank me-1"></i>{{ gasto.cuenta_bancaria.nombre }}
+                </span>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </div>
+        <div class="detail-item">
+            <span class="detail-label">Categoría</span>
+            <strong>{{ gasto.categoria.nombre|default:"Sin categoría" }}</strong>
         </div>
         <div class="detail-item">
             <span class="detail-label">Presupuesto</span>
             <strong>{{ presupuesto.nombre }}</strong>
         </div>
+        <div class="detail-item">
+            <span class="detail-label">Fecha y hora</span>
+            <strong>{{ gasto.fecha|date:"d/m/Y H:i" }}</strong>
+        </div>
         <div class="detail-item detail-item-wide">
-            <span class="detail-label">Descripcion</span>
-            <strong>{{ gasto.descripcion|default:"Sin descripcion" }}</strong>
+            <span class="detail-label">Descripción</span>
+            <strong>{{ gasto.descripcion|default:"Sin descripción" }}</strong>
         </div>
     </div>
 

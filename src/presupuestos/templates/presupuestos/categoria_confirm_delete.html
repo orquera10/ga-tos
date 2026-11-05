@@ -4,37 +4,45 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0">
-                    <i class="bi bi-exclamation-triangle"></i> Confirmar Eliminación
-                </h4>
+    <div class="col-lg-6">
+        <div class="form-shell">
+            <div class="form-heading">
+                <span class="form-icon form-icon-danger"><i class="bi bi-trash"></i></span>
+                <div>
+                    <p class="section-kicker mb-1">Confirmar eliminación</p>
+                    <h4 class="mb-0">{{ object.nombre }}</h4>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="alert alert-warning">
-                    <h5 class="alert-heading">¿Eliminar la categoría "{{ object.nombre }}"?</h5>
-                    <hr>
-                    <div class="mb-2">
-                        <strong>Descripción:</strong>
-                        <p class="mb-0">{% if object.descripcion %}{{ object.descripcion }}{% else %}<span class="text-muted">Sin descripción</span>{% endif %}</p>
+
+            <div class="form-panel">
+                {% if object.gastos_count > 0 %}
+                    <div class="alert alert-danger bg-opacity-10 border-danger mb-4">
+                        <i class="bi bi-exclamation-circle me-1"></i> No se puede eliminar una categoría que tiene <strong>{{ object.gastos_count }}</strong> gastos asociados.
                     </div>
-                    <div class="mb-0">
-                        <strong>Gastos asociados:</strong>
-                        <span class="badge {% if object.gastos_count > 0 %}bg-danger{% else %}bg-secondary{% endif %} rounded-pill">
-                            {{ object.gastos_count }}
-                        </span>
-                        {% if object.gastos_count > 0 %}
-                            <div class="alert alert-danger mt-2 mb-0">
-                                <i class="bi bi-exclamation-circle"></i> No se puede eliminar una categoría que tiene gastos asociados.
-                            </div>
-                        {% endif %}
+                {% else %}
+                    <div class="alert alert-warning bg-opacity-10 border-warning mb-4">
+                        ¿Estás seguro de que deseas eliminar esta categoría?
+                    </div>
+                {% endif %}
+
+                <div class="detail-grid mb-4">
+                    <div class="detail-item">
+                        <span class="detail-label">Nombre</span>
+                        <strong>{{ object.nombre }}</strong>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Gastos asociados</span>
+                        <strong class="{% if object.gastos_count > 0 %}text-danger{% else %}text-muted{% endif %}">{{ object.gastos_count }}</strong>
+                    </div>
+                    <div class="detail-item detail-item-wide">
+                        <span class="detail-label">Descripción</span>
+                        <strong>{{ object.descripcion|default:"Sin descripción" }}</strong>
                     </div>
                 </div>
 
                 <form method="post">
                     {% csrf_token %}
-                    <div class="d-flex justify-content-between">
+                    <div class="form-actions">
                         <a href="{% url 'presupuestos:listar_categorias' %}" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left"></i> Cancelar
                         </a>

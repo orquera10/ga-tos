@@ -450,6 +450,7 @@ class IngresoDetailView(IngresoUsuarioMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
+        context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
         return context
 
 
@@ -508,6 +509,7 @@ class IngresoDeleteView(IngresoEditableMixin, DeleteView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['presupuesto'] = self.object.presupuesto
+        context['puede_editar'] = self.object.presupuesto.puede_editar(self.request.user)
         return context
 
 
