@@ -209,7 +209,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Desbloquear Ga$tos")
+            .setTitle("Desbloquear Ga\$tos")
             .setSubtitle("Usa tu huella dactilar para ingresar")
             .setNegativeButtonText("Cancelar")
             .build()

@@ -36,7 +36,7 @@ jobs:
           cd android
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4
