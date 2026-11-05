@@ -1,2 +1,1 @@
--keep class androidx.biometric.** { *; }
--dontwarn androidx.biometric.**
+# Reglas proguard por defecto
