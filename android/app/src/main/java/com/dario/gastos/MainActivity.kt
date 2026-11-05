@@ -20,9 +20,6 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
-import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,10 +32,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var btnLinkWidget: Button
     private lateinit var btnSelectBudget: Button
-    private lateinit var biometricOverlay: View
-    private lateinit var btnUnlockBiometric: Button
-
-    private var isUnlocked = false
 
     inner class AndroidBridge {
         @JavascriptInterface
@@ -66,10 +59,6 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = findViewById(R.id.swipeRefresh)
         btnLinkWidget = findViewById(R.id.btnLinkWidget)
         btnSelectBudget = findViewById(R.id.btnSelectBudget)
-        biometricOverlay = findViewById(R.id.biometricOverlay)
-        btnUnlockBiometric = findViewById(R.id.btnUnlockBiometric)
-
-        btnUnlockBiometric.setOnClickListener { checkBiometricSecurity() }
 
         updateButtonsStatus()
         btnLinkWidget.setOnClickListener {
@@ -161,59 +150,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
-
-        checkBiometricSecurity()
     }
 
     override fun onResume() {
         super.onResume()
         updateButtonsStatus()
-        if (!isUnlocked) {
-            checkBiometricSecurity()
-        }
-    }
-
-    private fun checkBiometricSecurity() {
-        val biometricManager = BiometricManager.from(this)
-        val canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
-
-        if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
-            biometricOverlay.visibility = View.VISIBLE
-            promptBiometric()
-        } else {
-            isUnlocked = true
-            biometricOverlay.visibility = View.GONE
-        }
-    }
-
-    private fun promptBiometric() {
-        val executor = ContextCompat.getMainExecutor(this)
-        val biometricPrompt = BiometricPrompt(this, executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    isUnlocked = true
-                    biometricOverlay.visibility = View.GONE
-                }
-
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                }
-
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Desbloquear Ga\$tos")
-            .setSubtitle("Usa tu huella dactilar para ingresar")
-            .setNegativeButtonText("Cancelar")
-            .build()
-
-        biometricPrompt.authenticate(promptInfo)
     }
 
     private fun updateButtonsStatus() {

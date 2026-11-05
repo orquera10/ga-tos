@@ -54,9 +54,9 @@ jobs:
           name: "Ga$tos Android APK v1.5.1"
           body: |
             ### App Android de Ga$tos v1.5.1
-            - **Desbloqueo Biométrico (Huella digital / PIN)**: Protección biométrica al abrir la aplicación.
-            - **Sincronización 100% Automática del Widget**: Al iniciar sesión en la web, el widget se vincula solo sin pedir contraseña adicional.
-            - **Botones y diálogos corregidos**: Diálogos con botón cancelar en rojo, guardar del tamaño completo y selector de medio de pago/tipo de ingreso.
+            - **Sincronización 100% Automática del Widget**: Al iniciar sesión en la web, el widget se vincula automáticamente sin volver a pedir usuario ni contraseña.
+            - **Diálogos de Gasto e Ingreso corregidos**: Botón Cancelar en rojo, Guardar completo y visible, e incorporación de Medios de Pago y Tipos de Ingreso.
+            - **Soporte completo de flujo financiero**: Efectivo, Banco/Transferencia y Tarjetas de crédito diferidas.
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:
