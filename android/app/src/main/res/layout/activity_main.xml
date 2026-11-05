@@ -85,7 +85,7 @@
             android:id="@+id/ivFingerprintIcon"
             android:layout_width="80dp"
             android:layout_height="80dp"
-            android:src="@drawable/ic_fingerprint"
+            android:src="@drawable/ic_app_icon"
             android:layout_marginBottom="20dp" />
 
         <TextView
