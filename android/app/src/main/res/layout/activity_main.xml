@@ -1,64 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/background_dark">
 
-    <!-- Top mini bar -->
-    <LinearLayout
+    <WebView
+        android:id="@+id/webView"
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingLeft="14dp"
-        android:paddingRight="14dp"
-        android:background="#181818">
+        android:layout_height="match_parent" />
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Ga$tos"
-            android:textColor="@color/primary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/btnSelectBudget"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="Presupuesto"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_secondary"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:layout_marginEnd="6dp" />
-
-        <Button
-            android:id="@+id/btnLinkWidget"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="Vincular"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_secondary"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp" />
-
-    </LinearLayout>
-
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <WebView
-            android:id="@+id/webView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-</LinearLayout>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
