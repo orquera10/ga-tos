@@ -48,14 +48,13 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.0
-          name: "Ga$tos Android APK v1.4.0"
+          tag_name: v1.5.0
+          name: "Ga$tos Android APK v1.5.0"
           body: |
-            ### App Android de Ga$tos v1.4.0
-            - **Medio de pago en Gasto**: Selector de Efectivo, Transferencia o Tarjeta (impacto diferido).
-            - **Tipo de ingreso**: Selector de Transferencia, Efectivo o Sueldo mensual.
-            - **Compatibilidad con presupuestos abiertos (flujo continuo)**.
-            - Descarga **app-debug.apk** para actualizar.
+            ### App Android de Ga$tos v1.5.0
+            - **Desbloqueo Biométrico (Huella digital / PIN)**: Protección biométrica al abrir la aplicación.
+            - **Sincronización 100% Automática del Widget**: Al iniciar sesión en la web, el widget se vincula solo sin pedir contraseña adicional.
+            - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

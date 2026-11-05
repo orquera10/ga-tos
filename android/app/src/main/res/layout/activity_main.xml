@@ -1,64 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/background_dark">
 
-    <!-- Top mini bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingLeft="14dp"
-        android:paddingRight="14dp"
-        android:background="#181818">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Ga$tos"
-            android:textColor="@color/primary"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+        <!-- Top mini bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:background="#181818">
 
-        <Button
-            android:id="@+id/btnSelectBudget"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="Presupuesto"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_secondary"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:layout_marginEnd="6dp" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Ga$tos"
+                android:textColor="@color/primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/btnLinkWidget"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:text="Vincular"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
-            android:background="@drawable/btn_secondary"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp" />
+            <Button
+                android:id="@+id/btnSelectBudget"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Presupuesto"
+                android:textSize="11sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_secondary"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnLinkWidget"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Vincular"
+                android:textSize="11sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/btn_secondary"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp" />
+
+        </LinearLayout>
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <WebView
+                android:id="@+id/webView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     </LinearLayout>
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
+    <!-- Overlay de Bloqueo Biométrico -->
+    <LinearLayout
+        android:id="@+id/biometricOverlay"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:background="@color/background_dark"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
 
-        <WebView
-            android:id="@+id/webView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+        <ImageView
+            android:id="@+id/ivFingerprintIcon"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_fingerprint"
+            android:layout_marginBottom="20dp" />
 
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ga$tos Protegido"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
 
-</LinearLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Autentícate con tu huella digital o PIN para ingresar"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:layout_marginBottom="28dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnlockBiometric"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="Desbloquear"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            app:backgroundTint="@color/primary"
+            app:cornerRadius="8dp" />
+
+    </LinearLayout>
+
+</FrameLayout>

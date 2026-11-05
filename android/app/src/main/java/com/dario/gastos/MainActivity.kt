@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.Window
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -19,6 +20,9 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +35,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var btnLinkWidget: Button
     private lateinit var btnSelectBudget: Button
+    private lateinit var biometricOverlay: View
+    private lateinit var btnUnlockBiometric: Button
+
+    private var isUnlocked = false
+
+    inner class AndroidBridge {
+        @JavascriptInterface
+        fun onTokenReceived(token: String, username: String) {
+            runOnUiThread {
+                if (token.isNotEmpty()) {
+                    val current = Prefs.getToken(this@MainActivity)
+                    if (current != token) {
+                        Prefs.saveToken(this@MainActivity, token, username)
+                        updateButtonsStatus()
+                        GastosWidgetProvider.notifyUpdate(this@MainActivity)
+                        Toast.makeText(this@MainActivity, "✓ Widget sincronizado automáticamente", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,9 +66,21 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = findViewById(R.id.swipeRefresh)
         btnLinkWidget = findViewById(R.id.btnLinkWidget)
         btnSelectBudget = findViewById(R.id.btnSelectBudget)
+        biometricOverlay = findViewById(R.id.biometricOverlay)
+        btnUnlockBiometric = findViewById(R.id.btnUnlockBiometric)
+
+        btnUnlockBiometric.setOnClickListener { promptBiometric() }
 
         updateButtonsStatus()
-        btnLinkWidget.setOnClickListener { showLinkDialog() }
+        btnLinkWidget.setOnClickListener {
+            val token = Prefs.getToken(this)
+            if (!token.isNullOrEmpty()) {
+                val user = Prefs.getUsername(this)
+                Toast.makeText(this, "El widget ya está sincronizado con @$user", Toast.LENGTH_SHORT).show()
+            } else {
+                showLinkDialog()
+            }
+        }
         btnSelectBudget.setOnClickListener {
             startActivity(Intent(this, SelectBudgetActivity::class.java))
         }
@@ -68,6 +105,8 @@ class MainActivity : AppCompatActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
+        webView.addJavascriptInterface(AndroidBridge(), "AndroidBridge")
+
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 return false
@@ -77,6 +116,24 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 swipeRefresh.isRefreshing = false
                 cookieManager.flush()
+
+                // Intentar sincronización automática del token para el Widget con la sesión activa
+                val jsAutoSync = """
+                    (function() {
+                        try {
+                            fetch('/api/auth/token/', { credentials: 'include' })
+                                .then(function(r) { return r.json(); })
+                                .then(function(d) {
+                                    if (d && d.success && d.token && window.AndroidBridge) {
+                                        window.AndroidBridge.onTokenReceived(d.token, d.username || '');
+                                    }
+                                })
+                                .catch(function(e) {});
+                        } catch(err) {}
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(jsAutoSync, null)
+
                 if (!Prefs.getToken(this@MainActivity).isNullOrEmpty()) {
                     GastosWidgetProvider.notifyUpdate(this@MainActivity)
                 }
@@ -104,17 +161,68 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+
+        checkBiometricSecurity()
     }
 
     override fun onResume() {
         super.onResume()
         updateButtonsStatus()
+        if (!isUnlocked) {
+            checkBiometricSecurity()
+        }
+    }
+
+    private fun checkBiometricSecurity() {
+        val biometricManager = BiometricManager.from(this)
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        val canAuth = biometricManager.canAuthenticate(authenticators)
+
+        if (canAuth == BiometricManager.BIOMETRIC_SUCCESS) {
+            biometricOverlay.visibility = View.VISIBLE
+            promptBiometric()
+        } else {
+            // Dispositivo sin hardware o sin huella/PIN configurado: acceso directo
+            isUnlocked = true
+            biometricOverlay.visibility = View.GONE
+        }
+    }
+
+    private fun promptBiometric() {
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    isUnlocked = true
+                    biometricOverlay.visibility = View.GONE
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    // Se mantiene el overlay para permitir reintentar con el botón
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(this@MainActivity, "Huella no reconocida", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Desbloquear Ga$tos")
+            .setSubtitle("Usa tu huella dactilar o PIN para acceder")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
     }
 
     private fun updateButtonsStatus() {
         val token = Prefs.getToken(this)
         if (!token.isNullOrEmpty()) {
-            btnLinkWidget.text = "✓ Conectado"
+            btnLinkWidget.text = "✓ Widget Conectado"
             btnLinkWidget.setTextColor(Color.parseColor("#00E676"))
             btnSelectBudget.visibility = View.VISIBLE
         } else {
