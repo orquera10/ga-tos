@@ -212,8 +212,6 @@ def crear_gasto_api(request):
 
     if not presupuesto_id:
         return JsonResponse({'success': False, 'error': 'Falta el presupuesto_id'}, status=400)
-    if not nombre:
-        return JsonResponse({'success': False, 'error': 'El nombre del gasto es obligatorio'}, status=400)
     if monto_raw is None:
         return JsonResponse({'success': False, 'error': 'El monto es obligatorio'}, status=400)
 
@@ -231,6 +229,14 @@ def crear_gasto_api(request):
             'success': False,
             'error': 'Presupuesto no encontrado o no tienes permiso para cargar gastos en él'
         }, status=404)
+
+    # Si no se especificó nombre, asignar nombre automático secuencial
+    if not nombre:
+        count_rapidos = Gasto.objects.filter(
+            presupuesto=presupuesto,
+            nombre__icontains='gasto rápido'
+        ).count()
+        nombre = f"⚡ Gasto rápido {count_rapidos + 1:02d}"
 
     # Categoría opcional
     categoria = None
@@ -320,7 +326,7 @@ def crear_ingreso_api(request):
     nombre = (data.get('nombre') or '').strip()
     monto_raw = data.get('monto')
 
-    if not presupuesto_id or not nombre or monto_raw is None:
+    if not presupuesto_id or monto_raw is None:
         return JsonResponse({'success': False, 'error': 'Faltan campos obligatorios'}, status=400)
 
     try:
@@ -333,6 +339,14 @@ def crear_ingreso_api(request):
     presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id).first()
     if not presupuesto:
         return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    # Si no se especificó nombre, asignar nombre automático secuencial
+    if not nombre:
+        count_rapidos = Ingreso.objects.filter(
+            presupuesto=presupuesto,
+            nombre__icontains='ingreso rápido'
+        ).count()
+        nombre = f"⚡ Ingreso rápido {count_rapidos + 1:02d}"
 
     tipo_ingreso = (data.get('tipo_ingreso') or 'transferencia').lower().strip()
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:

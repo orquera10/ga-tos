@@ -310,7 +310,14 @@
                                 <i class="bi bi-credit-card"></i>
                             </span>
                             <div class="transaccion-info">
-                                <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
+                                <h6 class="transaccion-nombre gasto-nombre mb-1 d-flex align-items-center flex-wrap gap-1">
+                                    <span>{{ transaccion.nombre }}</span>
+                                    {% if "rápido" in transaccion.nombre|lower or "⚡" in transaccion.nombre %}
+                                    <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.68rem; padding: 2px 6px; box-shadow: 0 0 6px rgba(255, 193, 7, 0.45);">
+                                        <i class="bi bi-pencil-fill me-1"></i>Completar
+                                    </span>
+                                    {% endif %}
+                                </h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     {{ transaccion.categoria.nombre|default:"Sin categoría" }}
                                     {% if transaccion.persona %}
@@ -339,7 +346,14 @@
                                 <i class="bi bi-cash-coin"></i>
                             </span>
                             <div class="transaccion-info">
-                                <h6 class="transaccion-nombre gasto-nombre mb-1">{{ transaccion.nombre }}</h6>
+                                <h6 class="transaccion-nombre gasto-nombre mb-1 d-flex align-items-center flex-wrap gap-1">
+                                    <span>{{ transaccion.nombre }}</span>
+                                    {% if "rápido" in transaccion.nombre|lower or "⚡" in transaccion.nombre %}
+                                    <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.68rem; padding: 2px 6px; box-shadow: 0 0 6px rgba(255, 193, 7, 0.45);">
+                                        <i class="bi bi-pencil-fill me-1"></i>Completar
+                                    </span>
+                                    {% endif %}
+                                </h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     Ingreso
                                     {% if transaccion.tipo_ingreso == 'sueldo' %}

@@ -1,16 +1,12 @@
 package com.dario.gastos
 
 import android.content.Context
-import android.graphics.Color
 import android.os.Bundle
-import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.Spinner
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
@@ -22,41 +18,25 @@ class QuickExpenseActivity : AppCompatActivity() {
 
     private lateinit var etMonto: EditText
     private lateinit var etNombre: EditText
-    private lateinit var etPersona: EditText
-    private lateinit var etCuentaBancaria: EditText
     private lateinit var spPresupuesto: Spinner
-    private lateinit var spCategoria: Spinner
-    private lateinit var spMetodoPago: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
-    private lateinit var llPersonaChips: LinearLayout
-    private lateinit var llCuentaChips: LinearLayout
 
     private var budgets: List<ApiClient.Budget> = emptyList()
-    private var categories: List<ApiClient.Category> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_expense)
 
         val dm = resources.displayMetrics
-        val dialogWidth = (dm.widthPixels * 0.92).toInt()
+        val dialogWidth = (dm.widthPixels * 0.90).toInt()
         window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
 
         etMonto = findViewById(R.id.etMonto)
         etNombre = findViewById(R.id.etNombre)
-        etPersona = findViewById(R.id.etPersona)
-        etCuentaBancaria = findViewById(R.id.etCuentaBancaria)
         spPresupuesto = findViewById(R.id.spPresupuesto)
-        spCategoria = findViewById(R.id.spCategoria)
-        spMetodoPago = findViewById(R.id.spMetodoPago)
         btnSave = findViewById(R.id.btnSave)
         btnCancel = findViewById(R.id.btnCancel)
-        llPersonaChips = findViewById(R.id.llPersonaChips)
-        llCuentaChips = findViewById(R.id.llCuentaChips)
-
-        val metodos = listOf("Efectivo", "Transferencia", "Tarjeta (Próx. mes)")
-        spMetodoPago.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, metodos)
 
         btnCancel.setOnClickListener { finish() }
 
@@ -67,26 +47,21 @@ class QuickExpenseActivity : AppCompatActivity() {
             return
         }
 
-        // Auto focus monto and show soft keyboard
+        // Auto focus monto y abrir teclado numérico directamente
         etMonto.requestFocus()
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(etMonto, InputMethodManager.SHOW_IMPLICIT)
 
         btnSave.setOnClickListener { saveExpense() }
 
-        loadSpinnersAndMetadata()
+        loadBudgets()
     }
 
-    private fun loadSpinnersAndMetadata() {
+    private fun loadBudgets() {
         CoroutineScope(Dispatchers.IO).launch {
             val bList = ApiClient.getBudgets(this@QuickExpenseActivity)
-            val cList = ApiClient.getCategories(this@QuickExpenseActivity)
-            val metadata = ApiClient.getMetadata(this@QuickExpenseActivity)
-
             withContext(Dispatchers.Main) {
                 budgets = bList
-                categories = cList
-
                 if (budgets.isNotEmpty()) {
                     val bNames = budgets.map { "${it.nombre} (${it.moneda})" }
                     val bAdapter = ArrayAdapter(this@QuickExpenseActivity, android.R.layout.simple_spinner_dropdown_item, bNames)
@@ -97,60 +72,6 @@ class QuickExpenseActivity : AppCompatActivity() {
                     if (idx >= 0) {
                         spPresupuesto.setSelection(idx)
                     }
-                }
-
-                val cNames = mutableListOf("Sin categoría")
-                cNames.addAll(categories.map { it.nombre })
-                val cAdapter = ArrayAdapter(this@QuickExpenseActivity, android.R.layout.simple_spinner_dropdown_item, cNames)
-                spCategoria.adapter = cAdapter
-
-                // Renderizar chips de personas (tags guardados)
-                llPersonaChips.removeAllViews()
-                for (p in metadata.personas) {
-                    val chip = TextView(this@QuickExpenseActivity).apply {
-                        text = p
-                        setTextColor(Color.parseColor("#00D09C"))
-                        textSize = 13f
-                        setBackgroundResource(R.drawable.chip_tag_bg)
-                        setPadding(28, 14, 28, 14)
-                        val lp = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            setMargins(0, 0, 16, 0)
-                        }
-                        layoutParams = lp
-                        setOnClickListener {
-                            etPersona.setText(p)
-                            etPersona.setSelection(p.length)
-                        }
-                    }
-                    llPersonaChips.addView(chip)
-                }
-
-                // Renderizar chips de cuentas bancarias
-                llCuentaChips.removeAllViews()
-                for (c in metadata.cuentas) {
-                    val chip = TextView(this@QuickExpenseActivity).apply {
-                        text = c
-                        setTextColor(Color.parseColor("#3D8BFD"))
-                        textSize = 13f
-                        setBackgroundResource(R.drawable.chip_bank_bg)
-                        setPadding(28, 14, 28, 14)
-                        val lp = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        ).apply {
-                            setMargins(0, 0, 16, 0)
-                        }
-                        layoutParams = lp
-                        setOnClickListener {
-                            etCuentaBancaria.setText(c)
-                            etCuentaBancaria.setSelection(c.length)
-                            spMetodoPago.setSelection(1) // Transferencia
-                        }
-                    }
-                    llCuentaChips.addView(chip)
                 }
             }
         }
@@ -165,34 +86,16 @@ class QuickExpenseActivity : AppCompatActivity() {
             return
         }
 
-        val nombre = etNombre.text.toString().trim()
-        if (nombre.isEmpty()) {
-            Toast.makeText(this, "Ingresa en qué gastaste", Toast.LENGTH_SHORT).show()
-            etNombre.requestFocus()
-            return
-        }
-
         val selectedBudgetIdx = spPresupuesto.selectedItemPosition
         if (selectedBudgetIdx < 0 || selectedBudgetIdx >= budgets.size) {
             Toast.makeText(this, "Selecciona un presupuesto", Toast.LENGTH_SHORT).show()
             return
         }
         val budget = budgets[selectedBudgetIdx]
+        Prefs.saveLastBudgetId(this, budget.id)
 
-        var categoryId: Int? = null
-        val selectedCatIdx = spCategoria.selectedItemPosition
-        if (selectedCatIdx > 0 && selectedCatIdx - 1 < categories.size) {
-            categoryId = categories[selectedCatIdx - 1].id
-        }
-
-        val metodoValue = when (spMetodoPago.selectedItemPosition) {
-            1 -> "transferencia"
-            2 -> "tarjeta"
-            else -> "efectivo"
-        }
-
-        val persona = etPersona.text.toString().trim()
-        val cuenta = etCuentaBancaria.text.toString().trim()
+        // Nombre opcional: si está vacío, el servidor asignará "⚡ Gasto rápido 01" automáticamente
+        val nombre = etNombre.text.toString().trim()
 
         btnSave.isEnabled = false
         btnSave.text = "Guardando..."
@@ -202,11 +105,7 @@ class QuickExpenseActivity : AppCompatActivity() {
                 context = this@QuickExpenseActivity,
                 budgetId = budget.id,
                 nombre = nombre,
-                monto = monto,
-                categoryId = categoryId,
-                metodoPago = metodoValue,
-                persona = persona,
-                cuentaBancaria = cuenta
+                monto = monto
             )
 
             withContext(Dispatchers.Main) {

@@ -4,6 +4,20 @@
 
 {% block content %}
 <div class="detail-shell">
+    {% if "rápido" in gasto.nombre|lower or "⚡" in gasto.nombre %}
+    <div class="alert alert-warning d-flex align-items-center justify-content-between p-2 px-3 mb-3 rounded" style="background: rgba(255, 193, 7, 0.12); border: 1px solid rgba(255, 193, 7, 0.4); color: #ffc107;">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-lightning-charge-fill fs-5"></i>
+            <small class="fw-semibold">Cargado de forma rápida — Pendiente de completar</small>
+        </div>
+        {% if puede_editar %}
+        <a href="{% url 'presupuestos:editar_gasto' gasto.id %}" class="btn btn-sm btn-warning fw-bold">
+            <i class="bi bi-pencil me-1"></i>Completar ahora
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="detail-hero">
         <div>
             <p class="section-kicker mb-1">Gasto</p>
