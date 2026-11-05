@@ -36,7 +36,8 @@ jobs:
           cd android
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon > build.log 2>&1 || (cat build.log && exit 1)
+          cat build.log | tail -n 50
           echo "=== Verificando APK generado ==="
           ls -la app/build/outputs/apk/debug/
 
