@@ -34,6 +34,7 @@ urlpatterns = [
     ),
     path('', include('presupuestos.urls')),
     path('calculadoras/', include('calculadoras.urls')),
+    path('api/', include('api.urls')),
 ]
 
 # Configuración para servir archivos estáticos y medios en desarrollo

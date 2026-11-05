@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'core',
     'presupuestos',
     'calculadoras',
+    'api',
 ]
 
 MIDDLEWARE = [
