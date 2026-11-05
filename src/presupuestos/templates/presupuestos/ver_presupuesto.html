@@ -263,15 +263,15 @@
         </div>
 
         {% if personas_list %}
-        <!-- Filtro rápido por persona -->
-        <div class="d-flex flex-wrap gap-2 mb-3 px-2 align-items-center">
-            <span class="small text-muted me-1"><i class="bi bi-people"></i> Persona:</span>
-            <button type="button" class="btn btn-sm btn-light active js-filter-persona" data-persona="all">
+        <!-- Filtro rápido por tags -->
+        <div class="tags-filter-bar mb-3 px-1">
+            <span class="tags-filter-label"><i class="bi bi-tags-fill me-1"></i> Tags:</span>
+            <button type="button" class="filter-chip active js-filter-persona" data-persona="all">
                 Todos
             </button>
             {% for p in personas_list %}
-            <button type="button" class="btn btn-sm btn-outline-info js-filter-persona" data-persona="{{ p|lower }}">
-                {{ p }}
+            <button type="button" class="filter-chip js-filter-persona" data-persona="{{ p|lower }}">
+                <i class="bi bi-tag me-1"></i>{{ p }}
             </button>
             {% endfor %}
         </div>
@@ -314,7 +314,9 @@
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     {{ transaccion.categoria.nombre|default:"Sin categoría" }}
                                     {% if transaccion.persona %}
-                                        <span class="badge bg-info text-dark ms-1"><i class="bi bi-person"></i> {{ transaccion.persona }}</span>
+                                        <span class="badge ms-1" style="background: rgba(0, 208, 156, 0.16); color: #00d09c; border: 1px solid rgba(0, 208, 156, 0.35); font-weight: 500;">
+                                            <i class="bi bi-tag-fill me-1" style="font-size: 0.72rem;"></i>{{ transaccion.persona }}
+                                        </span>
                                     {% endif %}
                                     {% if transaccion.metodo_pago == 'efectivo' %}
                                         <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
@@ -482,7 +484,7 @@
         {% if resumen_gastos_por_persona %}
         <div class="mt-4 pt-4 border-top border-secondary px-3 px-md-4 pb-3">
             <h5 class="transactions-title mb-3 d-flex align-items-center gap-2">
-                <i class="bi bi-people text-info"></i> Gastos por persona
+                <i class="bi bi-tags text-info"></i> Gastos por tag
             </h5>
             <div class="expense-summary-chart p-0">
                 {% for item in resumen_gastos_por_persona %}
@@ -602,17 +604,15 @@
             });
         });
 
-        // Filtro interactivo por persona / destinatario
+        // Filtro interactivo por tags
         var filterBtns = document.querySelectorAll('.js-filter-persona');
         if (filterBtns.length) {
             filterBtns.forEach(function(btn) {
                 btn.addEventListener('click', function() {
                     filterBtns.forEach(function(b) {
-                        b.classList.remove('active', 'btn-light');
-                        b.classList.add('btn-outline-info');
+                        b.classList.remove('active');
                     });
-                    btn.classList.add('active', 'btn-light');
-                    btn.classList.remove('btn-outline-info');
+                    btn.classList.add('active');
 
                     var target = btn.getAttribute('data-persona');
                     document.querySelectorAll('.transaccion-item').forEach(function(item) {
