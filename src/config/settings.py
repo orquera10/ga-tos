@@ -67,7 +67,7 @@ ALLOWED_HOSTS = env_list('DJANGO_ALLOWED_HOSTS', default=['*'])
 
 CSRF_TRUSTED_ORIGINS = env_list(
     'DJANGO_CSRF_TRUSTED_ORIGINS',
-    default=['https://gastos.darioapp.online']
+    default=['https://gastos.dario10.pw', 'https://gastos.darioapp.online']
 )
 # O si prefieres ser más específico, puedes usar:
 # ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.16', '192.168.5.96', '192.168.101.18']
