@@ -29,7 +29,7 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre del gasto</label>
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label">Nombre</label>
                             {{ form.nombre }}
                             {% if form.nombre.errors %}
                                 <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
@@ -37,16 +37,15 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.persona.id_for_label }}" class="form-label d-flex justify-content-between align-items-center mb-1">
-                                <span><i class="bi bi-tag"></i> Persona / Tag <small class="text-muted">(Opcional)</small></span>
-                                {% if personas_list %}<small class="text-muted" style="font-size: 0.75rem;">Últimos usados</small>{% endif %}
+                            <label for="{{ form.persona.id_for_label }}" class="form-label mb-1">
+                                <i class="bi bi-tag"></i> Persona / Tag
                             </label>
 
                             {% if personas_list %}
-                            <!-- Línea horizontal deslizable de últimos tags usados -->
+                            <!-- Línea horizontal deslizable de tags -->
                             <div class="chips-scroll-container">
                                 {% for p in personas_list %}
-                                <button type="button" class="chip-item chip-persona js-chip-persona" data-val="{{ p }}" title="Seleccionar {{ p }}">
+                                <button type="button" class="chip-item chip-persona js-chip-persona" data-val="{{ p }}" title="{{ p }}">
                                     <i class="bi bi-tag-fill me-1"></i>{{ p }}
                                 </button>
                                 {% endfor %}
@@ -54,7 +53,6 @@
                             {% endif %}
 
                             {{ form.persona }}
-                            <small class="text-muted d-block mt-1">Toca un tag o escribe uno nuevo para guardarlo.</small>
                             {% if form.persona.errors %}
                                 <div class="invalid-feedback d-block">{{ form.persona.errors.0 }}</div>
                             {% endif %}
@@ -63,7 +61,7 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto ({{ presupuesto.get_moneda_display }})</label>
+                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 {{ form.monto }}
@@ -74,7 +72,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.categoria.id_for_label }}" class="form-label d-block">Categoria</label>
+                            <label for="{{ form.categoria.id_for_label }}" class="form-label d-block">Categoría</label>
                             <div class="input-group">
                                 {{ form.categoria }}
                                 <a href="{% url 'presupuestos:crear_categoria' %}?next=presupuestos:crear_gasto&presupuesto_pk={{ presupuesto.pk }}" class="btn btn-outline-primary" type="button">
@@ -91,25 +89,21 @@
                         <div class="col-md-6">
                             <label for="{{ form.metodo_pago.id_for_label }}" class="form-label">Medio de Pago</label>
                             {{ form.metodo_pago }}
-                            <small class="text-muted d-block mt-1">
-                                Efectivo y Transferencia descuentan el saldo actual. Tarjeta impactará el próximo mes.
-                            </small>
                             {% if form.metodo_pago.errors %}
                                 <div class="invalid-feedback d-block">{{ form.metodo_pago.errors.0 }}</div>
                             {% endif %}
                         </div>
 
                         <div class="col-md-6" id="div-cuenta-bancaria">
-                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label d-flex justify-content-between align-items-center mb-1">
-                                <span><i class="bi bi-bank"></i> Banco / Billetera <small class="text-muted">(Si es transferencia)</small></span>
-                                {% if cuentas_list %}<small class="text-muted" style="font-size: 0.75rem;">Cuentas</small>{% endif %}
+                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-1">
+                                <i class="bi bi-bank"></i> Banco / Billetera
                             </label>
 
                             {% if cuentas_list %}
-                            <!-- Línea horizontal deslizable de cuentas bancarias -->
+                            <!-- Línea horizontal deslizable de cuentas -->
                             <div class="chips-scroll-container">
                                 {% for c in cuentas_list %}
-                                <button type="button" class="chip-item chip-bank js-chip-cuenta" data-val="{{ c }}" title="Seleccionar {{ c }}">
+                                <button type="button" class="chip-item chip-bank js-chip-cuenta" data-val="{{ c }}" title="{{ c }}">
                                     <i class="bi bi-bank me-1"></i>{{ c }}
                                 </button>
                                 {% endfor %}
@@ -117,7 +111,6 @@
                             {% endif %}
 
                             {{ form.cuenta_bancaria_nombre }}
-                            <small class="text-muted d-block mt-1">Toca un banco o escribe uno nuevo.</small>
                             {% if form.cuenta_bancaria_nombre.errors %}
                                 <div class="invalid-feedback d-block">{{ form.cuenta_bancaria_nombre.errors.0 }}</div>
                             {% endif %}
@@ -137,7 +130,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
+                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripción</label>
                             {{ form.descripcion }}
                             {% if form.descripcion.errors %}
                                 <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>

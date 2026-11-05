@@ -62,13 +62,12 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.2
-          name: "Ga$tos Android APK v1.6.2"
+          tag_name: v1.6.3
+          name: "Ga$tos Android APK v1.6.3"
           body: |
-            ### App Android de Ga$tos v1.6.2
-            - **Chips táctiles de personas/tags y cuentas bancarias**: En los accesos rápidos de Gasto e Ingreso, ahora se muestran las personas y cuentas bancarias registradas como tarjetas/chips seleccionables al instante.
-            - **Auto-selección inteligente**: Tocar una cuenta bancaria autocompleta el banco y selecciona automáticamente "Transferencia".
-            - **Navbar nativo limpio**: Vista completa de la app web sin duplicaciones ni barras molestas.
+            ### App Android de Ga$tos v1.6.3
+            - **Formularios minimalistas**: Etiquetas limpias sin textos ni explicaciones redundantes.
+            - **Chips táctiles en scroll horizontal**: Selección rápida de tags/personas y bancos sin desplegables.
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

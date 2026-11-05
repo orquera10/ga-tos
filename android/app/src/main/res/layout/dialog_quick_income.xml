@@ -69,7 +69,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Presupuesto a acreditar"
+            android:text="Presupuesto"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
@@ -85,7 +85,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Tipo / Medio de Ingreso"
+            android:text="Medio de Ingreso"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
@@ -101,7 +101,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Banco / Billetera destino (Toca para elegir)"
+            android:text="Banco / Billetera"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 

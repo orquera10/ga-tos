@@ -37,7 +37,7 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto ({{ presupuesto.get_moneda_display }})</label>
+                            <label for="{{ form.monto.id_for_label }}" class="form-label">Monto</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 {{ form.monto }}
@@ -61,27 +61,23 @@
 
                     <div class="row g-3 form-section">
                         <div class="col-md-6">
-                            <label for="{{ form.tipo_ingreso.id_for_label }}" class="form-label">Tipo / Medio de Ingreso</label>
+                            <label for="{{ form.tipo_ingreso.id_for_label }}" class="form-label">Medio de Ingreso</label>
                             {{ form.tipo_ingreso }}
-                            <small class="text-muted d-block mt-1">
-                                Elige si es Sueldo mensual, Transferencia o Efectivo.
-                            </small>
                             {% if form.tipo_ingreso.errors %}
                                 <div class="invalid-feedback d-block">{{ form.tipo_ingreso.errors.0 }}</div>
                             {% endif %}
                         </div>
 
                         <div class="col-md-6">
-                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label d-flex justify-content-between align-items-center mb-1">
-                                <span><i class="bi bi-bank"></i> Banco / Billetera destino <small class="text-muted">(Opcional)</small></span>
-                                {% if cuentas_list %}<small class="text-muted" style="font-size: 0.75rem;">Cuentas</small>{% endif %}
+                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-1">
+                                <i class="bi bi-bank"></i> Banco / Billetera
                             </label>
 
                             {% if cuentas_list %}
                             <!-- Línea horizontal deslizable de cuentas bancarias -->
                             <div class="chips-scroll-container">
                                 {% for c in cuentas_list %}
-                                <button type="button" class="chip-item chip-bank js-chip-cuenta-ingreso" data-val="{{ c }}" title="Seleccionar {{ c }}">
+                                <button type="button" class="chip-item chip-bank js-chip-cuenta-ingreso" data-val="{{ c }}" title="{{ c }}">
                                     <i class="bi bi-bank me-1"></i>{{ c }}
                                 </button>
                                 {% endfor %}
@@ -89,7 +85,6 @@
                             {% endif %}
 
                             {{ form.cuenta_bancaria_nombre }}
-                            <small class="text-muted d-block mt-1">Toca un banco o escribe uno nuevo.</small>
                             {% if form.cuenta_bancaria_nombre.errors %}
                                 <div class="invalid-feedback d-block">{{ form.cuenta_bancaria_nombre.errors.0 }}</div>
                             {% endif %}
@@ -97,7 +92,7 @@
                     </div>
 
                     <div class="form-section">
-                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripcion <small class="text-muted">(Opcional)</small></label>
+                        <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripción</label>
                         {{ form.descripcion }}
                         {% if form.descripcion.errors %}
                             <div class="invalid-feedback d-block">{{ form.descripcion.errors.0 }}</div>

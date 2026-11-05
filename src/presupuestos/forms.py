@@ -46,7 +46,7 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Gastos de Mayo, Vacaciones...'}),
             'tipo': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo'}),
             'moneda': forms.Select(attrs={'class': 'form-select'}),
-            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Detalle o nota (opcional)...'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -128,7 +128,7 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
     cuenta_bancaria_nombre = forms.CharField(
         required=False,
         max_length=60,
-        label='Cuenta / Billetera (si es transf.)',
+        label='Banco / Billetera',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
@@ -156,7 +156,7 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
             'metodo_pago': forms.Select(attrs={'class': 'form-select', 'id': 'id_metodo_pago'}),
             'categoria': forms.Select(attrs={'class': 'form-select'}),
-            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'})
+            'descripcion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Detalle o nota (opcional)...'})
         }
         labels = {
             'metodo_pago': 'Medio de Pago'
@@ -214,7 +214,7 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
     cuenta_bancaria_nombre = forms.CharField(
         required=False,
         max_length=60,
-        label='Cuenta / Billetera destino',
+        label='Banco / Billetera',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': 'Ej: Brubank, Mercado Pago, Ualá...',
@@ -241,10 +241,10 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Sueldo, Cobro de honorarios...'}),
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
             'tipo_ingreso': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo_ingreso'}),
-            'descripcion': forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Detalle o nota (opcional)...'}),
         }
         labels = {
-            'tipo_ingreso': 'Tipo de Ingreso'
+            'tipo_ingreso': 'Medio de Ingreso'
         }
         
     def __init__(self, *args, user=None, **kwargs):
