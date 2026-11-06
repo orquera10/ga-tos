@@ -10,7 +10,17 @@
                 <span class="form-icon form-icon-success"><i class="bi bi-cash-stack"></i></span>
                 <div>
                     <p class="section-kicker mb-1">{{ presupuesto.nombre }}</p>
-                    <h4 class="mb-0">{% if ingreso %}Editar{% else %}Nuevo{% endif %} ingreso</h4>
+                    <h4 class="mb-0">
+                        {% if presupuesto.tipo == 'prestamo' %}
+                            {% if form.es_aporte_capital.value %}
+                                {% if ingreso %}Editar{% else %}Nuevo{% endif %} Ingreso Efectivo (0% interés)
+                            {% else %}
+                                {% if ingreso %}Editar{% else %}Nuevo{% endif %} Ingreso Tarjeta (+{{ presupuesto.tasa_interes_prestamo }}%)
+                            {% endif %}
+                        {% else %}
+                            {% if ingreso %}Editar{% else %}Nuevo{% endif %} ingreso
+                        {% endif %}
+                    </h4>
                 </div>
             </div>
 
@@ -28,7 +38,13 @@
                     {% endif %}
 
                     <div class="form-section">
-                        <label for="{{ form.nombre.id_for_label }}" class="form-label">Concepto</label>
+                        <label for="{{ form.nombre.id_for_label }}" class="form-label">
+                            {% if presupuesto.tipo == 'prestamo' %}
+                                {% if form.es_aporte_capital.value %}Detalle del aporte en efectivo{% else %}Tarjeta utilizada (ej: Tarjeta Patagonia, Tarjeta Naranja...){% endif %}
+                            {% else %}
+                                Concepto
+                            {% endif %}
+                        </label>
                         {{ form.nombre }}
                         {% if form.nombre.errors %}
                             <div class="invalid-feedback d-block">{{ form.nombre.errors.0 }}</div>
@@ -94,13 +110,22 @@
                     {% if presupuesto.tipo == 'prestamo' %}
                     <div class="p-3 mb-3 rounded" style="background: rgba(255, 193, 7, 0.06); border: 1px solid rgba(255, 193, 7, 0.3);">
                         <div class="fw-bold text-warning mb-2 d-flex align-items-center gap-2">
-                            <i class="bi bi-credit-card-2-front"></i> Operación del Préstamo
+                            <i class="bi bi-gear-wide-connected"></i> Tipo de Operación en el Préstamo
                         </div>
-                        <div class="form-check form-switch mb-2">
-                            {{ form.es_extraccion_tarjeta }}
-                            <label class="form-check-label fw-bold text-light" for="{{ form.es_extraccion_tarjeta.id_for_label }}">
-                                Extracción con tarjeta en la App (Aplica interés)
-                            </label>
+
+                        <div class="d-flex flex-column gap-2 mb-2">
+                            <div class="form-check form-switch">
+                                {{ form.es_extraccion_tarjeta }}
+                                <label class="form-check-label fw-bold text-light" for="{{ form.es_extraccion_tarjeta.id_for_label }}">
+                                    💳 Ingreso Tarjeta (Aplica {{ presupuesto.tasa_interes_prestamo }}% de interés para el mes siguiente)
+                                </label>
+                            </div>
+                            <div class="form-check form-switch">
+                                {{ form.es_aporte_capital }}
+                                <label class="form-check-label fw-bold text-success" for="{{ form.es_aporte_capital.id_for_label }}">
+                                    💵 Ingreso Efectivo (0% de interés - Achica deuda directamente)
+                                </label>
+                            </div>
                         </div>
 
                         <div id="div-interes-tarjeta" style="{% if not form.es_extraccion_tarjeta.value %}display: none;{% endif %}" class="mt-2 pt-2 border-top border-secondary">
@@ -115,13 +140,6 @@
                                 </div>
                             </div>
                             <div class="small text-muted mt-2" id="calculo-resumen-tarjeta"></div>
-                        </div>
-
-                        <div class="form-check form-switch mt-3 pt-2 border-top border-secondary">
-                            {{ form.es_aporte_capital }}
-                            <label class="form-check-label text-light" for="{{ form.es_aporte_capital.id_for_label }}">
-                                Es aporte de mi bolsillo para amortizar deuda (ej: $600.000)
-                            </label>
                         </div>
                     </div>
                     {% endif %}

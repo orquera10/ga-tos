@@ -69,26 +69,82 @@
                         <span class="small text-muted">Interés App: <strong class="text-warning">{{ presupuesto.tasa_interes_prestamo }}%</strong></span>
                     </div>
 
+                    <!-- Panel de Devolución de Este Mes (si hay deuda configurada o previa) -->
+                    {% if deuda_que_vence_este_mes > 0 %}
+                    <div class="p-3 mb-3 rounded" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 193, 7, 0.3);">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <div class="small text-uppercase fw-bold text-muted">
+                                <i class="bi bi-calendar-check me-1"></i> Devolución de Este Mes
+                            </div>
+                            {% if pendiente_devolucion_este_mes == 0 %}
+                            <span class="badge bg-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>100% Cubierto</span>
+                            {% else %}
+                            <span class="badge bg-danger fw-bold">Faltan: ${{ pendiente_devolucion_este_mes|floatformat:2 }}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex flex-wrap justify-content-between align-items-baseline my-2">
+                            <div>
+                                <span class="text-muted small">Total a devolver:</span>
+                                <span class="fs-4 fw-bold text-white ms-1">${{ deuda_que_vence_este_mes|floatformat:2 }}</span>
+                            </div>
+                            <div class="small text-muted">
+                                Cubierto: <strong class="text-success">${{ total_devuelto_este_mes|floatformat:2 }}</strong> ({{ porcentaje_cubierto }}%)
+                            </div>
+                        </div>
+
+                        <!-- Barra de progreso de devolución -->
+                        <div class="progress mb-2" style="height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08);">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ porcentaje_cubierto }}%; border-radius: 4px;" aria-valuenow="{{ porcentaje_cubierto }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+
+                        <div class="row g-2 text-center small mt-1">
+                            <div class="col-6">
+                                <div class="p-1 rounded" style="background: rgba(255,255,255,0.03);">
+                                    <span class="text-muted">Con nuevas tarjetas:</span>
+                                    <strong class="text-info d-block">${{ total_extraido_tarjeta|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-1 rounded" style="background: rgba(255,255,255,0.03);">
+                                    <span class="text-muted">Con aporte en efectivo:</span>
+                                    <strong class="text-success d-block">${{ total_aportes_propios|floatformat:2 }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Caja Destacada: Deuda que se generó para el Mes Siguiente -->
                     <div class="text-center my-3 py-3 rounded" style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 193, 7, 0.25);">
                         <div class="small text-warning text-uppercase fw-bold" style="letter-spacing: 0.5px;">
-                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Deuda Total a Pagar el Mes Siguiente
+                            <i class="bi bi-arrow-right-circle-fill me-1"></i> Deuda a Pagar el Mes Siguiente (+{{ presupuesto.tasa_interes_prestamo }}%)
                         </div>
                         <h1 class="display-6 fw-bold mb-0 text-warning">
                             ${{ deuda_total_proximo_mes|floatformat:2 }}
                         </h1>
-                        <div class="small text-muted mt-1">
-                            {% if tarjetas_actuales %}
-                                Suma de {{ tarjetas_actuales|length }} tarjeta{{ tarjetas_actuales|pluralize }} cargada{{ tarjetas_actuales|pluralize }} con el {{ presupuesto.tasa_interes_prestamo }}% de interés
+                        <div class="small text-muted mt-2 px-2">
+                            {% if total_extraido_tarjeta > 0 %}
+                                Tarjetas este mes: <strong class="text-light">${{ total_extraido_tarjeta|floatformat:2 }}</strong> + Interés ({{ presupuesto.tasa_interes_prestamo }}%): <strong class="text-danger">+${{ total_interes_acumulado|floatformat:2 }}</strong>
+                                {% if total_aportes_propios > 0 %}
+                                <span class="d-block text-success mt-1">
+                                    <i class="bi bi-info-circle me-1"></i>El efectivo puesto (${{ total_aportes_propios|floatformat:2 }}) <strong>no suma interés</strong> el mes que viene.
+                                </span>
+                                {% endif %}
+                                <div class="mt-2 text-light small border-top border-secondary pt-2">
+                                    Si el próximo mes ponés tu aporte de <strong class="text-success">${{ aporte_habitual|floatformat:2 }}</strong>, solo tendrás que sacar <strong class="text-warning">${{ tarjeta_necesaria_proximo_mes|floatformat:2 }}</strong> con tarjetas.
+                                </div>
                             {% else %}
-                                Sin tarjetas cargadas este ciclo. Cargá tus tarjetas abajo para calcular el vencimiento.
+                                Aún no cargaste extracciones con tarjeta para este ciclo. Usá el botón <strong>+ Ingreso Tarjeta</strong>.
                             {% endif %}
                         </div>
                     </div>
 
+                    <!-- Grilla de 4 Métricas Clave -->
                     <div class="row g-2 text-center">
                         <div class="col-6 col-md-3">
                             <div class="p-2 rounded h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
-                                <div class="small text-muted mb-1">Total Extraído</div>
+                                <div class="small text-muted mb-1">Ingreso Tarjeta</div>
                                 <h6 class="mb-0 fw-bold text-info">${{ total_extraido_tarjeta|floatformat:2 }}</h6>
                             </div>
                         </div>
@@ -100,7 +156,7 @@
                         </div>
                         <div class="col-6 col-md-3">
                             <div class="p-2 rounded h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
-                                <div class="small text-muted mb-1">Aporte en Efectivo</div>
+                                <div class="small text-muted mb-1">Ingreso Efectivo</div>
                                 <h6 class="mb-0 fw-bold text-success">${{ total_aportes_propios|floatformat:2 }}</h6>
                             </div>
                         </div>
@@ -112,14 +168,14 @@
                         </div>
                     </div>
 
-                    <!-- Botones de Acción Rápida para Cargar Tarjeta o Aporte -->
+                    <!-- Botones de Acción y Simulación -->
                     <div class="d-flex flex-wrap gap-2 mt-3 pt-3 border-top border-secondary justify-content-between align-items-center">
                         <div class="d-flex gap-2">
                             <a href="{% url 'presupuestos:crear_ingreso' presupuesto.id %}?es_extraccion=1" class="btn btn-sm btn-warning fw-bold">
-                                <i class="bi bi-credit-card me-1"></i> + Cargar Tarjeta (4.5%)
+                                <i class="bi bi-credit-card me-1"></i> + Ingreso Tarjeta
                             </a>
-                            <a href="{% url 'presupuestos:crear_ingreso' presupuesto.id %}?es_aporte=1" class="btn btn-sm btn-outline-success">
-                                <i class="bi bi-piggy-bank me-1"></i> + Aporte Efectivo
+                            <a href="{% url 'presupuestos:crear_ingreso' presupuesto.id %}?es_aporte=1" class="btn btn-sm btn-success fw-bold">
+                                <i class="bi bi-cash-stack me-1"></i> + Ingreso Efectivo
                             </a>
                         </div>
                         <div class="d-flex gap-2">
@@ -139,9 +195,9 @@
                     <div class="mt-3 pt-3 border-top border-secondary">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="small text-warning fw-bold text-uppercase">
-                                <i class="bi bi-credit-card-2-front me-1"></i> Tarjetas cargadas este ciclo ({{ tarjetas_actuales|length }})
+                                <i class="bi bi-credit-card-2-front me-1"></i> Tarjetas ingresadas este ciclo ({{ tarjetas_actuales|length }})
                             </span>
-                            <span class="badge bg-warning text-dark">Total: ${{ deuda_total_proximo_mes|floatformat:2 }}</span>
+                            <span class="badge bg-warning text-dark">Total Mes Prox: ${{ deuda_total_proximo_mes|floatformat:2 }}</span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-dark table-sm table-borderless align-middle mb-0" style="background: rgba(0,0,0,0.25); border-radius: 8px;">
@@ -175,36 +231,6 @@
                                     </tr>
                                 </tfoot>
                             </table>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if deuda_que_vence_este_mes > 0 %}
-                    <!-- Estado de Cancelación de la Deuda que Vencía Este Mes -->
-                    <div class="mt-3 p-3 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small text-muted fw-bold text-uppercase">
-                                <i class="bi bi-arrow-repeat me-1"></i> Devolución del Vencimiento Anterior
-                            </span>
-                            {% if pendiente_devolucion_este_mes == 0 %}
-                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Vencimiento 100% Cubierto</span>
-                            {% else %}
-                            <span class="badge bg-danger">Falta cubrir: ${{ pendiente_devolucion_este_mes|floatformat:2 }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="row g-2 text-center mt-2 small">
-                            <div class="col-4">
-                                <div class="text-muted">Vencía este mes:</div>
-                                <div class="fw-bold text-warning">${{ deuda_que_vence_este_mes|floatformat:2 }}</div>
-                            </div>
-                            <div class="col-4">
-                                <div class="text-muted">Nuevas tarjetas:</div>
-                                <div class="fw-bold text-info">${{ total_extraido_tarjeta|floatformat:2 }}</div>
-                            </div>
-                            <div class="col-4">
-                                <div class="text-muted">Aporte en efectivo:</div>
-                                <div class="fw-bold text-success">${{ total_aportes_propios|floatformat:2 }}</div>
-                            </div>
                         </div>
                     </div>
                     {% endif %}
@@ -493,20 +519,29 @@
 
     {% if puede_editar %}
     <div class="my-3 budget-action-row">
+        {% if presupuesto.tipo == 'prestamo' %}
+        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_extraccion=1" class="btn btn-warning fw-bold">
+            <i class="bi bi-credit-card me-1"></i> + Ingreso Tarjeta
+        </a>
+        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_aporte=1" class="btn btn-success fw-bold">
+            <i class="bi bi-cash-stack me-1"></i> + Ingreso Efectivo
+        </a>
+        {% else %}
         <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
             <i class="bi bi-plus-circle"></i> Ga$to
         </a>
         <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success">
             <i class="bi bi-plus-circle"></i> Ingreso
         </a>
+        {% endif %}
     </div>
     {% endif %}
 
     <section class="transactions-panel">
         <div class="transactions-panel-header">
             <div>
-                <p class="section-kicker mb-1">Movimientos</p>
-                <h3 class="transactions-title mb-0">Gastos e ingresos</h3>
+                <p class="section-kicker mb-1">{% if presupuesto.tipo == 'prestamo' %}Registro del Préstamo{% else %}Movimientos{% endif %}</p>
+                <h3 class="transactions-title mb-0">{% if presupuesto.tipo == 'prestamo' %}Tarjetas y Efectivo ingresado{% else %}Gastos e ingresos{% endif %}</h3>
             </div>
             <span class="transactions-count">{{ debug_gastos_count|add:debug_ingresos_count }} registros</span>
         </div>
@@ -612,24 +647,27 @@
                                     {% endif %}
                                 </h6>
                                 <p class="transaccion-detalle text-muted small mb-1">
-                                    Ingreso
-                                    {% if transaccion.tipo_ingreso == 'sueldo' %}
-                                        <span class="badge bg-success ms-1"><i class="bi bi-briefcase"></i> Sueldo</span>
-                                    {% elif transaccion.tipo_ingreso == 'efectivo' %}
-                                        <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
-                                    {% elif transaccion.tipo_ingreso == 'transferencia' %}
-                                        <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                    {% if transaccion.es_extraccion_tarjeta %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-credit-card me-1"></i>Ingreso Tarjeta (+{{ presupuesto.tasa_interes_prestamo }}%)</span>
+                                        <span class="badge bg-dark border border-warning text-warning ms-1">Vence próx: ${{ transaccion.monto_proximo_mes|floatformat:2 }}</span>
+                                        {% if transaccion.interes_monto %}
+                                        <span class="badge bg-danger ms-1">+${{ transaccion.interes_monto|floatformat:2 }} interés</span>
+                                        {% endif %}
+                                    {% elif transaccion.es_aporte_capital %}
+                                        <span class="badge bg-success"><i class="bi bi-cash-stack me-1"></i>Ingreso Efectivo (0% interés)</span>
+                                        <span class="badge bg-dark border border-success text-success ms-1">Achica deuda</span>
+                                    {% else %}
+                                        Ingreso
+                                        {% if transaccion.tipo_ingreso == 'sueldo' %}
+                                            <span class="badge bg-success ms-1"><i class="bi bi-briefcase"></i> Sueldo</span>
+                                        {% elif transaccion.tipo_ingreso == 'efectivo' %}
+                                            <span class="badge bg-secondary ms-1"><i class="bi bi-cash"></i> Efectivo</span>
+                                        {% elif transaccion.tipo_ingreso == 'transferencia' %}
+                                            <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.</span>
+                                        {% endif %}
                                     {% endif %}
                                     {% if transaccion.cuenta_bancaria %}
                                         <span class="badge bg-dark border border-secondary text-light ms-1"><i class="bi bi-wallet2"></i> {{ transaccion.cuenta_bancaria.nombre }}</span>
-                                    {% endif %}
-                                    {% if transaccion.es_extraccion_tarjeta %}
-                                        <span class="badge bg-warning text-dark ms-1" title="Extracción diferida con tarjeta"><i class="bi bi-credit-card me-1"></i>Vence próx: ${{ transaccion.monto_proximo_mes|floatformat:2 }}</span>
-                                        {% if transaccion.interes_monto %}
-                                        <span class="badge bg-danger ms-1" title="Interés del ciclo">+${{ transaccion.interes_monto|floatformat:2 }}</span>
-                                        {% endif %}
-                                    {% elif transaccion.es_aporte_capital %}
-                                        <span class="badge bg-success ms-1" title="Aporte para amortizar deuda"><i class="bi bi-piggy-bank me-1"></i>Aporte deuda</span>
                                     {% endif %}
                                 </p>
                                 {% if transaccion.descripcion %}

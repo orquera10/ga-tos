@@ -281,8 +281,11 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
             ciclo_actual = ciclos_ordenados[0] if ciclos_ordenados else None
             ciclo_anterior = ciclos_ordenados[1] if len(ciclos_ordenados) > 1 else None
 
-            # Deuda que vencía este mes (originada en el ciclo anterior)
-            deuda_que_vence_este_mes = ciclo_anterior['total_deuda_proximo_mes'] if ciclo_anterior else Decimal('0')
+            # Deuda que vencía este mes (originada en el ciclo anterior o configurada inicialmente)
+            if ciclo_anterior:
+                deuda_que_vence_este_mes = ciclo_anterior['total_deuda_proximo_mes']
+            else:
+                deuda_que_vence_este_mes = self.object.deuda_inicial_prestamo or Decimal('0')
 
             if ciclo_actual:
                 tarjetas_actuales = ciclo_actual['tarjetas']
@@ -299,9 +302,17 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 aportes_actuales = []
                 total_aportes_efectivo = Decimal('0')
 
-            # Para devolver la deuda del mes anterior:
+            # Para devolver la deuda de este mes:
             total_devuelto_este_mes = total_extraido_tarjetas + total_aportes_efectivo
             pendiente_devolucion_este_mes = max(Decimal('0'), deuda_que_vence_este_mes - total_devuelto_este_mes)
+            porcentaje_cubierto = 0
+            if deuda_que_vence_este_mes > 0:
+                porcentaje_cubierto = min(100, round((total_devuelto_este_mes / deuda_que_vence_este_mes) * 100))
+            elif total_devuelto_este_mes > 0:
+                porcentaje_cubierto = 100
+
+            aporte_habitual = self.object.aporte_mensual_prestamo or Decimal('600000.00')
+            tarjeta_necesaria_proximo_mes = max(Decimal('0'), deuda_total_proximo_mes - aporte_habitual)
 
             context['proyeccion_prestamo'] = proyeccion
             context['ciclos_prestamo'] = ciclos_ordenados
@@ -316,6 +327,9 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
             context['deuda_que_vence_este_mes'] = deuda_que_vence_este_mes
             context['total_devuelto_este_mes'] = total_devuelto_este_mes
             context['pendiente_devolucion_este_mes'] = pendiente_devolucion_este_mes
+            context['porcentaje_cubierto'] = porcentaje_cubierto
+            context['aporte_habitual'] = aporte_habitual
+            context['tarjeta_necesaria_proximo_mes'] = tarjeta_necesaria_proximo_mes
             context['proximo_a_pagar'] = deuda_total_proximo_mes if deuda_total_proximo_mes > 0 else (Decimal(str(proyeccion['deuda_actual'])) if proyeccion and proyeccion.get('deuda_actual') else Decimal('0'))
             context['deuda_actual'] = deuda_total_proximo_mes
         
