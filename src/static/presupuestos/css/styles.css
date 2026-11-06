@@ -2262,7 +2262,7 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 /* Transacción rápida pendiente de completar */
 .transaccion-rapida-marcada .transaccion-surface {
     border-left: 4px solid #ffc107 !important;
-    background: rgba(255, 193, 7, 0.07) !important;
+    background-color: #413d33 !important;
 }
 
 .transaccion-rapida-marcada .transaccion-icono {
