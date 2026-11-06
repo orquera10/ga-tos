@@ -103,16 +103,16 @@
             <!-- Widget de Control de Cierres de Tarjetas -->
             {% if tarjetas_info %}
             <div class="p-3 mb-3 rounded" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                     <span class="small fw-bold text-uppercase text-warning">
                         <i class="bi bi-calendar2-range me-1"></i> Control de Cierres de Tarjetas
                     </span>
                     {% if puede_editar %}
-                    <div class="d-flex align-items-center gap-1">
-                        <button class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjeta">
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                        <button class="btn btn-sm btn-outline-warning py-1 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjeta">
                             <i class="bi bi-plus-circle me-1"></i> + Agregar Tarjeta
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalTarjetas">
+                        <button class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalTarjetas">
                             <i class="bi bi-gear me-1"></i> Configurar
                         </button>
                     </div>
@@ -232,7 +232,7 @@
                         <div class="small text-warning text-uppercase fw-bold" style="letter-spacing: 0.5px;">
                             <i class="bi bi-arrow-right-circle-fill me-1"></i> Deuda a Pagar el Mes Siguiente (+{{ presupuesto.tasa_interes_prestamo }}%)
                         </div>
-                        <h1 class="display-6 fw-bold mb-0 text-warning">
+                        <h1 class="fw-bold mb-0 text-warning" style="font-size: clamp(1.6rem, 5.5vw, 2.4rem); word-break: break-word;">
                             ${{ deuda_total_proximo_mes|floatformat:2 }}
                         </h1>
                         <div class="small text-muted mt-2 px-2">
@@ -630,28 +630,30 @@
     {% endif %}
 
     {% if puede_editar %}
-    <div class="my-3 budget-action-row d-flex flex-wrap gap-2">
         {% if presupuesto.tipo == 'prestamo' %}
-        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_extraccion=1" class="btn btn-warning fw-bold">
-            <i class="bi bi-credit-card me-1"></i> + Ingreso Tarjeta
-        </a>
-        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_aporte=1" class="btn btn-success fw-bold">
-            <i class="bi bi-cash-stack me-1"></i> + Ingreso Efectivo
-        </a>
-        {% if not ciclo_actual.esta_cerrado %}
-        <button type="button" class="btn btn-outline-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalDiferenciaTarjeta">
-            <i class="bi bi-receipt me-1"></i> + Diferencia Tarjeta
-        </button>
-        {% endif %}
+        <div class="my-3 budget-action-row prestamo-actions">
+            <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_extraccion=1" class="btn btn-warning fw-bold">
+                <i class="bi bi-credit-card me-1"></i> + Ingreso Tarjeta
+            </a>
+            <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_aporte=1" class="btn btn-success fw-bold">
+                <i class="bi bi-cash-stack me-1"></i> + Ingreso Efectivo
+            </a>
+            {% if not ciclo_actual.esta_cerrado %}
+            <button type="button" class="btn btn-outline-warning fw-bold btn-diferencia" data-bs-toggle="modal" data-bs-target="#modalDiferenciaTarjeta">
+                <i class="bi bi-receipt me-1"></i> + Diferencia Tarjeta
+            </button>
+            {% endif %}
+        </div>
         {% else %}
-        <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
-            <i class="bi bi-plus-circle"></i> Ga$to
-        </a>
-        <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success">
-            <i class="bi bi-plus-circle"></i> Ingreso
-        </a>
+        <div class="my-3 budget-action-row">
+            <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
+                <i class="bi bi-plus-circle"></i> Ga$to
+            </a>
+            <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Ingreso
+            </a>
+        </div>
         {% endif %}
-    </div>
     {% endif %}
 
     <section class="transactions-panel">
