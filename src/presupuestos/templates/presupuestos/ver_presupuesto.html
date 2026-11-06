@@ -643,9 +643,6 @@
             <i class="bi bi-receipt me-1"></i> + Diferencia Tarjeta
         </button>
         {% endif %}
-        <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjeta">
-            <i class="bi bi-credit-card-2-front me-1"></i> + Agregar Tarjeta
-        </button>
         {% else %}
         <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
             <i class="bi bi-plus-circle"></i> Ga$to
