@@ -96,10 +96,12 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
     context_object_name = 'presupuesto'
 
     def _fecha_local(self, transaccion):
-        fecha = transaccion.fecha
-        if timezone.is_aware(fecha):
-            return timezone.localtime(fecha)
-        return fecha
+        fecha = getattr(transaccion, 'fecha', None)
+        if not fecha:
+            return timezone.localtime(timezone.now())
+        if timezone.is_naive(fecha):
+            fecha = timezone.make_aware(fecha, timezone.get_current_timezone())
+        return timezone.localtime(fecha)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

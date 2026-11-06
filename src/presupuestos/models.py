@@ -172,9 +172,9 @@ class Gasto(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk and not self.fecha:
-            self.fecha = timezone.localtime(timezone.now())
-        if timezone.is_aware(self.fecha):
-            self.fecha = timezone.localtime(self.fecha).replace(tzinfo=None)
+            self.fecha = timezone.now()
+        elif self.fecha and timezone.is_naive(self.fecha):
+            self.fecha = timezone.make_aware(self.fecha, timezone.get_current_timezone())
             
         super().save(*args, **kwargs)
         if self.presupuesto:
@@ -212,9 +212,9 @@ class Ingreso(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk and not self.fecha:
-            self.fecha = timezone.localtime(timezone.now())
-        if timezone.is_aware(self.fecha):
-            self.fecha = timezone.localtime(self.fecha).replace(tzinfo=None)
+            self.fecha = timezone.now()
+        elif self.fecha and timezone.is_naive(self.fecha):
+            self.fecha = timezone.make_aware(self.fecha, timezone.get_current_timezone())
             
         super().save(*args, **kwargs)
         if self.presupuesto:
