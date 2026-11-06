@@ -52,3 +52,19 @@ def sub(value, arg):
         return float(value) - float(arg)
     except (ValueError, TypeError):
         return ''
+
+@register.filter
+def es_transaccion_rapida(transaccion):
+    """
+    Determina si un gasto o ingreso fue cargado rápido y requiere completarse/editarse.
+    Detecta si tiene 'rapido', 'rápido', '⚡' en el nombre, o si es un gasto sin categoría.
+    """
+    if not transaccion:
+        return False
+    nombre = str(getattr(transaccion, 'nombre', '') or '').lower()
+    if any(k in nombre for k in ['rápido', 'rapido', '⚡', 'rapida', 'rápida']):
+        return True
+    if hasattr(transaccion, 'categoria') and transaccion.categoria is None:
+        return True
+    return False
+

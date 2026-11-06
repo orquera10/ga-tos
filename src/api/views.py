@@ -233,10 +233,13 @@ def crear_gasto_api(request):
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         count_rapidos = Gasto.objects.filter(
-            presupuesto=presupuesto,
-            nombre__icontains='gasto rápido'
+            presupuesto=presupuesto
+        ).filter(
+            Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Gasto rápido {count_rapidos + 1:02d}"
+    elif not nombre.startswith('⚡'):
+        nombre = f"⚡ {nombre}"
 
     # Categoría opcional
     categoria = None
@@ -343,10 +346,13 @@ def crear_ingreso_api(request):
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         count_rapidos = Ingreso.objects.filter(
-            presupuesto=presupuesto,
-            nombre__icontains='ingreso rápido'
+            presupuesto=presupuesto
+        ).filter(
+            Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Ingreso rápido {count_rapidos + 1:02d}"
+    elif not nombre.startswith('⚡'):
+        nombre = f"⚡ {nombre}"
 
     tipo_ingreso = (data.get('tipo_ingreso') or 'transferencia').lower().strip()
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:

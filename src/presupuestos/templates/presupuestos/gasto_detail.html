@@ -1,10 +1,11 @@
 {% extends 'presupuestos/base.html' %}
+{% load filters %}
 
 {% block title %}Detalles del Gasto{% endblock %}
 
 {% block content %}
 <div class="detail-shell">
-    {% if "rápido" in gasto.nombre|lower or "⚡" in gasto.nombre %}
+    {% if gasto|es_transaccion_rapida %}
     <div class="alert alert-warning d-flex align-items-center justify-content-between p-2 px-3 mb-3 rounded" style="background: rgba(255, 193, 7, 0.12); border: 1px solid rgba(255, 193, 7, 0.4); color: #ffc107;">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-lightning-charge-fill fs-5"></i>
