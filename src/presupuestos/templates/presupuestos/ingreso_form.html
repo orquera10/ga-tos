@@ -190,11 +190,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     const chkTarjeta = document.getElementById('{{ form.es_extraccion_tarjeta.id_for_label }}');
+    const chkAporte = document.getElementById('{{ form.es_aporte_capital.id_for_label }}');
     const divTarjeta = document.getElementById('div-interes-tarjeta');
     const inputMonto = document.getElementById('{{ form.monto.id_for_label }}');
     const inputTasa = document.getElementById('{{ form.tasa_interes.id_for_label }}');
     const inputProxMes = document.getElementById('{{ form.monto_proximo_mes.id_for_label }}');
     const txtResumen = document.getElementById('calculo-resumen-tarjeta');
+    const inputNombre = document.getElementById('{{ form.nombre.id_for_label }}');
+
+    {% if presupuesto.tipo == 'prestamo' %}
+    if (inputNombre && !inputNombre.value) {
+        inputNombre.placeholder = "Ej: Tarjeta Patagonia, Tarjeta Naranja...";
+    }
+    {% endif %}
 
     function recalcularTarjeta() {
         if (!chkTarjeta) return;
@@ -216,7 +224,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (chkTarjeta) {
-        chkTarjeta.addEventListener('change', recalcularTarjeta);
+        chkTarjeta.addEventListener('change', function() {
+            if (this.checked && chkAporte) chkAporte.checked = false;
+            recalcularTarjeta();
+        });
+        if (chkAporte) {
+            chkAporte.addEventListener('change', function() {
+                if (this.checked && chkTarjeta) {
+                    chkTarjeta.checked = false;
+                    recalcularTarjeta();
+                }
+            });
+        }
         if (inputMonto) inputMonto.addEventListener('input', recalcularTarjeta);
         if (inputTasa) inputTasa.addEventListener('input', recalcularTarjeta);
         recalcularTarjeta();

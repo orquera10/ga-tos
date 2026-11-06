@@ -244,18 +244,80 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
 
         if self.object.tipo == 'prestamo':
             proyeccion = self.object.proyeccion_prestamo()
-            extracciones = [i for i in ingresos if getattr(i, 'es_extraccion_tarjeta', False)]
-            aportes = [i for i in ingresos if getattr(i, 'es_aporte_capital', False)]
-            ult_ext = extracciones[0] if extracciones else None
+            tasa_factor = Decimal('1') + (self.object.tasa_interes_prestamo / Decimal('100'))
+
+            # Agrupar ingresos por ciclos mensuales (año, mes)
+            ciclos_dict = {}
+            for ing in ingresos:
+                f = ing.fecha_local
+                key = (f.year, f.month)
+                if key not in ciclos_dict:
+                    ciclos_dict[key] = {
+                        'year': f.year,
+                        'month': f.month,
+                        'nombre_mes': f.strftime('%B %Y').capitalize(),
+                        'tarjetas': [],
+                        'aportes': [],
+                        'otros_ingresos': [],
+                        'total_extraido_tarjeta': Decimal('0'),
+                        'total_interes_tarjeta': Decimal('0'),
+                        'total_deuda_proximo_mes': Decimal('0'),
+                        'total_aportes_efectivo': Decimal('0'),
+                    }
+                if getattr(ing, 'es_extraccion_tarjeta', False):
+                    ciclos_dict[key]['tarjetas'].append(ing)
+                    ciclos_dict[key]['total_extraido_tarjeta'] += ing.monto
+                    ciclos_dict[key]['total_interes_tarjeta'] += (ing.interes_monto or Decimal('0'))
+                    prox = ing.monto_proximo_mes or round(ing.monto * tasa_factor, 2)
+                    ciclos_dict[key]['total_deuda_proximo_mes'] += prox
+                elif getattr(ing, 'es_aporte_capital', False):
+                    ciclos_dict[key]['aportes'].append(ing)
+                    ciclos_dict[key]['total_aportes_efectivo'] += ing.monto
+                else:
+                    ciclos_dict[key]['otros_ingresos'].append(ing)
+
+            # Ordenar ciclos por fecha descendente
+            ciclos_ordenados = [ciclos_dict[k] for k in sorted(ciclos_dict.keys(), reverse=True)]
+            ciclo_actual = ciclos_ordenados[0] if ciclos_ordenados else None
+            ciclo_anterior = ciclos_ordenados[1] if len(ciclos_ordenados) > 1 else None
+
+            # Deuda que vencía este mes (originada en el ciclo anterior)
+            deuda_que_vence_este_mes = ciclo_anterior['total_deuda_proximo_mes'] if ciclo_anterior else Decimal('0')
+
+            if ciclo_actual:
+                tarjetas_actuales = ciclo_actual['tarjetas']
+                total_extraido_tarjetas = ciclo_actual['total_extraido_tarjeta']
+                total_interes_tarjetas = ciclo_actual['total_interes_tarjeta']
+                deuda_total_proximo_mes = ciclo_actual['total_deuda_proximo_mes']
+                aportes_actuales = ciclo_actual['aportes']
+                total_aportes_efectivo = ciclo_actual['total_aportes_efectivo']
+            else:
+                tarjetas_actuales = []
+                total_extraido_tarjetas = Decimal('0')
+                total_interes_tarjetas = Decimal('0')
+                deuda_total_proximo_mes = Decimal('0')
+                aportes_actuales = []
+                total_aportes_efectivo = Decimal('0')
+
+            # Para devolver la deuda del mes anterior:
+            total_devuelto_este_mes = total_extraido_tarjetas + total_aportes_efectivo
+            pendiente_devolucion_este_mes = max(Decimal('0'), deuda_que_vence_este_mes - total_devuelto_este_mes)
 
             context['proyeccion_prestamo'] = proyeccion
-            context['extracciones_tarjeta'] = extracciones
-            context['total_extraido_tarjeta'] = sum(i.monto for i in extracciones)
-            context['total_interes_acumulado'] = sum(i.interes_monto for i in extracciones)
-            context['total_aportes_propios'] = sum(i.monto for i in aportes)
-            context['ultima_extraccion'] = ult_ext
-            context['proximo_a_pagar'] = ult_ext.monto_proximo_mes if (ult_ext and ult_ext.monto_proximo_mes) else (proyeccion['proximo_a_pagar'] if proyeccion else 0.0)
-            context['deuda_actual'] = proyeccion['deuda_actual'] if proyeccion else float(self.object.deuda_inicial_prestamo)
+            context['ciclos_prestamo'] = ciclos_ordenados
+            context['ciclo_actual'] = ciclo_actual
+            context['ciclo_anterior'] = ciclo_anterior
+            context['tarjetas_actuales'] = tarjetas_actuales
+            context['aportes_actuales'] = aportes_actuales
+            context['total_extraido_tarjeta'] = total_extraido_tarjetas
+            context['total_interes_acumulado'] = total_interes_tarjetas
+            context['total_aportes_propios'] = total_aportes_efectivo
+            context['deuda_total_proximo_mes'] = deuda_total_proximo_mes
+            context['deuda_que_vence_este_mes'] = deuda_que_vence_este_mes
+            context['total_devuelto_este_mes'] = total_devuelto_este_mes
+            context['pendiente_devolucion_este_mes'] = pendiente_devolucion_este_mes
+            context['proximo_a_pagar'] = deuda_total_proximo_mes if deuda_total_proximo_mes > 0 else (Decimal(str(proyeccion['deuda_actual'])) if proyeccion and proyeccion.get('deuda_actual') else Decimal('0'))
+            context['deuda_actual'] = deuda_total_proximo_mes
         
         return context
 
@@ -384,10 +446,20 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
             initial['es_extraccion_tarjeta'] = True
         if 'es_aporte' in self.request.GET:
             initial['es_aporte_capital'] = True
+            initial['es_extraccion_tarjeta'] = False
+            initial['tipo_ingreso'] = 'efectivo'
+            if not initial.get('nombre'):
+                initial['nombre'] = 'Aporte propio en efectivo'
         if 'tasa' in self.request.GET:
             initial['tasa_interes'] = self.request.GET.get('tasa')
         if 'prox_mes' in self.request.GET:
             initial['monto_proximo_mes'] = self.request.GET.get('prox_mes')
+
+        presupuesto = Presupuesto.objects.filter(pk=self.kwargs['presupuesto_pk']).first()
+        if presupuesto and presupuesto.tipo == 'prestamo':
+            if 'es_aporte' not in self.request.GET and not initial.get('es_aporte_capital'):
+                initial.setdefault('es_extraccion_tarjeta', True)
+                initial.setdefault('tasa_interes', presupuesto.tasa_interes_prestamo)
         kwargs['initial'] = initial
         kwargs['user'] = self.request.user
         return kwargs
@@ -576,10 +648,20 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
             initial['es_extraccion_tarjeta'] = True
         if 'es_aporte' in self.request.GET:
             initial['es_aporte_capital'] = True
+            initial['es_extraccion_tarjeta'] = False
+            initial['tipo_ingreso'] = 'efectivo'
+            if not initial.get('nombre'):
+                initial['nombre'] = 'Aporte propio en efectivo'
         if 'tasa' in self.request.GET:
             initial['tasa_interes'] = self.request.GET.get('tasa')
         if 'prox_mes' in self.request.GET:
             initial['monto_proximo_mes'] = self.request.GET.get('prox_mes')
+
+        presupuesto = Presupuesto.objects.filter(pk=self.kwargs['presupuesto_pk']).first()
+        if presupuesto and presupuesto.tipo == 'prestamo':
+            if 'es_aporte' not in self.request.GET and not initial.get('es_aporte_capital'):
+                initial.setdefault('es_extraccion_tarjeta', True)
+                initial.setdefault('tasa_interes', presupuesto.tasa_interes_prestamo)
         kwargs['initial'] = initial
         kwargs['user'] = self.request.user
         return kwargs

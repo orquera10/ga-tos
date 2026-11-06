@@ -35,7 +35,7 @@ class Presupuesto(models.Model):
     fecha_creacion = models.DateTimeField(default=timezone.now)
     tasa_interes_prestamo = models.DecimalField(max_digits=5, decimal_places=2, default=4.50, verbose_name="Tasa de interés de la app (%)")
     aporte_mensual_prestamo = models.DecimalField(max_digits=12, decimal_places=2, default=600000.00, verbose_name="Aporte propio mensual")
-    deuda_inicial_prestamo = models.DecimalField(max_digits=12, decimal_places=2, default=10000000.00, verbose_name="Deuda total inicial")
+    deuda_inicial_prestamo = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, blank=True, verbose_name="Deuda total inicial (opcional)")
 
     def __str__(self):
         return f"{self.nombre} - {self.fecha_inicio} a {self.fecha_fin}"
@@ -113,19 +113,45 @@ class Presupuesto(models.Model):
         if self.tipo != 'prestamo':
             return None
         
-        deuda = float(self.deuda_inicial_prestamo)
-        ult_extraccion = self.ingresos.filter(es_extraccion_tarjeta=True).order_by('-fecha').first()
-        if ult_extraccion and ult_extraccion.monto_proximo_mes:
-            deuda = float(ult_extraccion.monto_proximo_mes)
+        # Obtener extracciones con tarjeta
+        extracciones = self.ingresos.filter(es_extraccion_tarjeta=True).order_by('-fecha')
+        deuda = 0.0
+        if extracciones.exists():
+            # Tomar las tarjetas del mes más reciente
+            ult_fecha = extracciones.first().fecha
+            extracciones_ultimo_mes = [
+                e for e in extracciones 
+                if e.fecha.year == ult_fecha.year and e.fecha.month == ult_fecha.month
+            ]
+            tasa_factor = 1.0 + (float(self.tasa_interes_prestamo or 4.50) / 100.0)
+            suma_vence_proximo = sum(
+                float(e.monto_proximo_mes if e.monto_proximo_mes else (float(e.monto) * tasa_factor))
+                for e in extracciones_ultimo_mes
+            )
+            deuda = suma_vence_proximo
+        
+        if deuda <= 0 and self.deuda_inicial_prestamo:
+            deuda = float(self.deuda_inicial_prestamo)
             
-        aporte = float(self.aporte_mensual_prestamo)
-        tasa = float(self.tasa_interes_prestamo) / 100.0
+        aporte = float(self.aporte_mensual_prestamo) if self.aporte_mensual_prestamo else 600000.0
+        tasa = float(self.tasa_interes_prestamo or 4.50) / 100.0
+        
+        if deuda <= 0:
+            return {
+                'cronograma': [],
+                'total_meses': 0,
+                'meses_totales': 0,
+                'total_intereses': 0.0,
+                'deuda_actual': 0.0,
+                'proximo_a_pagar': 0.0,
+            }
         
         cronograma = []
         mes = 0
         total_intereses = 0.0
+        deuda_inicial_base = deuda
         
-        while deuda > 0 and mes < 48:
+        while deuda > 0 and mes < 60:
             mes += 1
             saca = max(0.0, deuda - aporte)
             if saca <= 0:
@@ -135,6 +161,7 @@ class Presupuesto(models.Model):
                     'aporte': round(deuda, 2),
                     'saca_tarjeta': 0.0,
                     'interes': 0.0,
+                    'vence_proximo': 0.0,
                     'deuda_fin': 0.0,
                     'es_ultimo': True
                 })
@@ -148,6 +175,7 @@ class Presupuesto(models.Model):
                 'aporte': round(aporte, 2),
                 'saca_tarjeta': round(saca, 2),
                 'interes': round(interes, 2),
+                'vence_proximo': round(deuda_sig, 2),
                 'deuda_fin': round(deuda_sig, 2),
                 'es_ultimo': False
             })
@@ -156,9 +184,10 @@ class Presupuesto(models.Model):
         return {
             'cronograma': cronograma,
             'total_meses': mes,
+            'meses_totales': mes,
             'total_intereses': round(total_intereses, 2),
-            'deuda_actual': round(cronograma[0]['deuda_inicio'] if cronograma else 0.0, 2),
-            'proximo_a_pagar': round(cronograma[0]['deuda_fin'] if cronograma else 0.0, 2),
+            'deuda_actual': round(deuda_inicial_base, 2),
+            'proximo_a_pagar': round(cronograma[0]['vence_proximo'] if cronograma else 0.0, 2),
         }
 
     def puede_ver(self, user):

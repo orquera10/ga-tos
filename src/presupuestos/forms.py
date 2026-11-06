@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
 from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
@@ -226,11 +227,11 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         es_extraccion = cleaned_data.get('es_extraccion_tarjeta')
         monto = cleaned_data.get('monto')
         tasa = cleaned_data.get('tasa_interes')
-        if tasa is None:
-            tasa = Decimal('4.50')
         monto_prox = cleaned_data.get('monto_proximo_mes')
         
         if es_extraccion and monto:
+            if tasa is None:
+                tasa = Decimal('4.50')
             cleaned_data['tasa_interes'] = tasa
             if not monto_prox:
                 cleaned_data['monto_proximo_mes'] = round(monto * (Decimal('1') + (tasa / Decimal('100'))), 2)
@@ -354,11 +355,11 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         es_extraccion = cleaned_data.get('es_extraccion_tarjeta')
         monto = cleaned_data.get('monto')
         tasa = cleaned_data.get('tasa_interes')
-        if tasa is None:
-            tasa = Decimal('4.50')
         monto_prox = cleaned_data.get('monto_proximo_mes')
         
         if es_extraccion and monto:
+            if tasa is None:
+                tasa = Decimal('4.50')
             cleaned_data['tasa_interes'] = tasa
             if not monto_prox:
                 cleaned_data['monto_proximo_mes'] = round(monto * (Decimal('1') + (tasa / Decimal('100'))), 2)
