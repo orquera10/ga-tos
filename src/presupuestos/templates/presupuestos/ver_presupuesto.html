@@ -59,6 +59,87 @@
             </div>
 
             {% if presupuesto.tipo == 'prestamo' %}
+            <!-- Barra Superior del Período / Ciclo -->
+            <div class="p-3 mb-3 rounded d-flex flex-wrap justify-content-between align-items-center gap-2" style="background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 193, 7, 0.35); border-radius: 12px;">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {% if ciclo_actual.esta_cerrado %}bg-secondary{% else %}bg-warning text-dark{% endif %} fw-bold">
+                            {% if ciclo_actual.esta_cerrado %}Período Histórico (Cerrado){% else %}<i class="bi bi-play-circle-fill me-1"></i>Período Activo{% endif %}
+                        </span>
+                        <h5 class="mb-0 fw-bold text-white">{{ ciclo_actual.nombre }}</h5>
+                    </div>
+                    <div class="small text-muted mt-1">
+                        Desde: <strong>{{ ciclo_actual.fecha_inicio|date:"d/m/Y" }}</strong>
+                        {% if ciclo_actual.fecha_fin %}&mdash; Hasta: <strong>{{ ciclo_actual.fecha_fin|date:"d/m/Y" }}</strong>{% endif %}
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    {% if ciclos_prestamo|length > 1 %}
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dropCiclos" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-clock-history me-1"></i> Ver Períodos
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="dropCiclos">
+                            {% for c in ciclos_prestamo %}
+                            <li>
+                                <a class="dropdown-item {% if c.id == ciclo_actual.id %}active{% endif %}" href="?ciclo_id={{ c.id }}">
+                                    {{ c.nombre }} {% if not c.esta_cerrado %}<span class="badge bg-warning text-dark ms-1">Activo</span>{% endif %}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if puede_editar and not ciclo_actual.esta_cerrado %}
+                    <button type="button" class="btn btn-sm btn-outline-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalCerrarCiclo">
+                        <i class="bi bi-lock-fill me-1"></i> Cerrar Período y Abrir Próximo
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Widget de Control de Cierres de Tarjetas -->
+            {% if tarjetas_info %}
+            <div class="p-3 mb-3 rounded" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-bold text-uppercase text-warning">
+                        <i class="bi bi-calendar2-range me-1"></i> Control de Cierres de Tarjetas
+                    </span>
+                    {% if puede_editar %}
+                    <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalTarjetas">
+                        <i class="bi bi-gear me-1"></i> Configurar Tarjetas / Fechas
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="row g-2">
+                    {% for item in tarjetas_info %}
+                    <div class="col-12 col-md-4">
+                        <div class="p-2 rounded h-100" style="background: rgba(0,0,0,0.3); border: 1px solid {% if item.info.es_seguro_sacar %}rgba(25, 135, 84, 0.5){% else %}rgba(255, 193, 7, 0.4){% endif %};">
+                            <div class="d-flex justify-content-between align-items-start gap-1">
+                                <strong class="text-white small">{{ item.tarjeta.nombre }}</strong>
+                                {% if item.info.es_seguro_sacar %}
+                                <span class="badge bg-success" style="font-size: 0.65rem;" title="El cierre ya pasó. Lo que saques entra al próximo mes.">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Ya cerró (Seguro sacar)
+                                </span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark" style="font-size: 0.65rem;" title="Aún no cerró. Si sacás hoy entrará en el resumen que vence ahora.">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Cierra el {{ item.info.fecha_cierre|date:"d/m" }}
+                                </span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted mt-1" style="font-size: 0.74rem;">
+                                <div>Cierre: <strong>{{ item.info.fecha_cierre|date:"d/m/Y" }}</strong> ({% if item.info.es_seguro_sacar %}cerró hace {{ item.info.dias_pasados }} días{% else %}en {{ item.info.dias_para_cierre }} días{% endif %})</div>
+                                <div>Vence resumen: <strong>{{ item.info.fecha_vencimiento|date:"d/m/Y" }}</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Hero Especial Préstamo / Refinanciación con Tarjetas -->
             <div class="card mb-3 border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(255, 193, 7, 0.12) 0%, rgba(20, 24, 30, 0.95) 100%); border: 1px solid rgba(255, 193, 7, 0.3) !important; border-radius: 12px;">
                 <div class="card-body p-3">
@@ -649,6 +730,9 @@
                                 <p class="transaccion-detalle text-muted small mb-1">
                                     {% if transaccion.es_extraccion_tarjeta %}
                                         <span class="badge bg-warning text-dark"><i class="bi bi-credit-card me-1"></i>Ingreso Tarjeta (+{{ presupuesto.tasa_interes_prestamo }}%)</span>
+                                        {% if transaccion.tarjeta_prestamo %}
+                                        <span class="badge bg-secondary ms-1"><i class="bi bi-credit-card-2-front"></i> {{ transaccion.tarjeta_prestamo.nombre }}</span>
+                                        {% endif %}
                                         <span class="badge bg-dark border border-warning text-warning ms-1">Vence próx: ${{ transaccion.monto_proximo_mes|floatformat:2 }}</span>
                                         {% if transaccion.interes_monto %}
                                         <span class="badge bg-danger ms-1">+${{ transaccion.interes_monto|floatformat:2 }} interés</span>
@@ -758,6 +842,7 @@
     </div>
     </section>
 
+    {% if presupuesto.tipo != 'prestamo' %}
     <section class="expense-summary-panel" aria-labelledby="expense-summary-title">
         <div class="expense-summary-header">
             <div>
@@ -824,6 +909,156 @@
         </div>
         {% endif %}
     </section>
+    {% endif %}
+
+    {% if presupuesto.tipo == 'prestamo' and puede_editar %}
+    <!-- Modal Cerrar Período -->
+    <div class="modal fade" id="modalCerrarCiclo" tabindex="-1" aria-labelledby="modalCerrarCicloLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white" style="background: #1a1e24; border: 1px solid rgba(255, 193, 7, 0.4); border-radius: 14px;">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning" id="modalCerrarCicloLabel">
+                        <i class="bi bi-lock-fill me-2"></i>Cerrar Período y Abrir Próximo
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'presupuestos:cerrar_ciclo_prestamo' presupuesto.id %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="p-3 mb-3 rounded" style="background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <div class="small text-muted mb-1">Cerrando: <strong class="text-white">{{ ciclo_actual.nombre }}</strong></div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>Deuda a devolver del período:</span>
+                                <span class="text-white fw-bold">${{ ciclo_actual.deuda_a_devolver|floatformat:2 }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>Devuelto con Efectivo (0% int.):</span>
+                                <span class="text-success fw-bold">${{ ciclo_actual.total_efectivo|floatformat:2 }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span>Devuelto con Tarjetas:</span>
+                                <span class="text-warning fw-bold">${{ ciclo_actual.total_tarjetas|floatformat:2 }}</span>
+                            </div>
+                            <hr class="my-2 border-secondary">
+                            <div class="d-flex justify-content-between">
+                                <span class="small fw-bold text-white">Deuda resultante para el próximo período (+{{ presupuesto.tasa_interes_prestamo }}%):</span>
+                                <span class="text-warning fw-bold">${{ ciclo_actual.deuda_proximo_ciclo|floatformat:2 }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Nombre del Nuevo Período</label>
+                            {{ form_cerrar_ciclo.nuevo_nombre }}
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Fecha de Inicio Nuevo Período</label>
+                                {{ form_cerrar_ciclo.nueva_fecha_inicio }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Deuda a Devolver Nuevo Período</label>
+                                {{ form_cerrar_ciclo.deuda_a_devolver }}
+                            </div>
+                        </div>
+                        <p class="small text-muted mb-0">
+                            <i class="bi bi-info-circle me-1"></i> Al cerrar, los nuevos ingresos con tarjeta o efectivo se asignarán automáticamente al nuevo período activo.
+                        </p>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning fw-bold">
+                            <i class="bi bi-check2-circle me-1"></i> Confirmar y Cerrar Período
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Gestión de Tarjetas y Cierres -->
+    <div class="modal fade" id="modalTarjetas" tabindex="-1" aria-labelledby="modalTarjetasLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content text-white" style="background: #1a1e24; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 14px;">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning" id="modalTarjetasLabel">
+                        <i class="bi bi-credit-card-2-front-fill me-2"></i>Tarjetas de Crédito y Cierres
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Lista de tarjetas actuales -->
+                    <h6 class="small text-uppercase text-muted fw-bold mb-2">Tarjetas Registradas</h6>
+                    <div class="list-group mb-4">
+                        {% for item in tarjetas_info %}
+                        <div class="list-group-item bg-dark text-white border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <div class="fw-bold">{{ item.tarjeta.nombre }}</div>
+                                <div class="small text-muted">
+                                    Cierre habitual: día {{ item.tarjeta.dia_cierre_habitual }} &bull; Próximo cierre: <strong>{{ item.tarjeta.proxima_fecha_cierre|date:"d/m/Y"|default:"-" }}</strong> &bull; Vence: <strong>{{ item.tarjeta.proxima_fecha_vencimiento|date:"d/m/Y"|default:"-" }}</strong>
+                                </div>
+                                {% if item.tarjeta.nota %}<div class="small text-info">{{ item.tarjeta.nota }}</div>{% endif %}
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <form method="post" action="{% url 'presupuestos:eliminar_tarjeta_prestamo' item.tarjeta.id %}" onsubmit="return confirm('¿Seguro que deseas eliminar esta tarjeta?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Eliminar tarjeta">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-muted small">No hay tarjetas registradas.</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Formulario Agregar / Modificar Tarjeta -->
+                    <div class="p-3 rounded" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08);">
+                        <h6 class="small text-uppercase text-warning fw-bold mb-3">
+                            <i class="bi bi-plus-circle me-1"></i> Agregar Tarjeta
+                        </h6>
+                        <form method="post" action="{% url 'presupuestos:guardar_tarjeta_prestamo' presupuesto.id %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">Nombre de la Tarjeta</label>
+                                {{ form_tarjeta.nombre }}
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Día Cierre Habitual</label>
+                                    {{ form_tarjeta.dia_cierre_habitual }}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Próxima Fecha de Cierre</label>
+                                    {{ form_tarjeta.proxima_fecha_cierre }}
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Día Vencimiento Habitual</label>
+                                    {{ form_tarjeta.dia_vencimiento_habitual }}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small text-muted">Próxima Fecha de Vencimiento</label>
+                                    {{ form_tarjeta.proxima_fecha_vencimiento }}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">Nota</label>
+                                {{ form_tarjeta.nota }}
+                            </div>
+                            <div class="text-end">
+                                <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                    <i class="bi bi-save me-1"></i> Guardar Tarjeta
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 {% endblock %}
 
 {% block extra_js %}

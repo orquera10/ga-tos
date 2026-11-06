@@ -11,11 +11,11 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from itertools import groupby
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, time, timedelta
+from datetime import datetime, date, time, timedelta
 import re
 from core.auth import asignar_presupuestos_sin_usuario
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria
-from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria, CicloPrestamo, TarjetaPrestamo
+from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm, TarjetaPrestamoForm, CerrarCicloPrestamoForm
 
 
 def presupuestos_visibles(user):
@@ -243,81 +243,113 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         context['debug_ingresos_count'] = len(ingresos)
 
         if self.object.tipo == 'prestamo':
-            proyeccion = self.object.proyeccion_prestamo()
-            tasa_factor = Decimal('1') + (self.object.tasa_interes_prestamo / Decimal('100'))
+            # 1. Sembrado automático de tarjetas si no existen
+            if not self.object.tarjetas_prestamo.exists():
+                TarjetaPrestamo.objects.bulk_create([
+                    TarjetaPrestamo(
+                        presupuesto=self.object,
+                        nombre="Patagonia Rubén",
+                        dia_cierre_habitual=21,
+                        proxima_fecha_cierre=date(2026, 11, 19),
+                        dia_vencimiento_habitual=5,
+                        nota="Vence del 1 al 5"
+                    ),
+                    TarjetaPrestamo(
+                        presupuesto=self.object,
+                        nombre="Patagonia Palmira",
+                        dia_cierre_habitual=22,
+                        proxima_fecha_cierre=date(2026, 11, 19),
+                        dia_vencimiento_habitual=5,
+                        nota="Vence del 1 al 5"
+                    ),
+                    TarjetaPrestamo(
+                        presupuesto=self.object,
+                        nombre="Naranja",
+                        dia_cierre_habitual=27,
+                        proxima_fecha_cierre=date(2026, 11, 27),
+                        dia_vencimiento_habitual=10,
+                        nota="Vence el 10"
+                    ),
+                ])
 
-            # Agrupar ingresos por ciclos mensuales (año, mes)
-            ciclos_dict = {}
-            for ing in ingresos:
-                f = ing.fecha_local
-                key = (f.year, f.month)
-                if key not in ciclos_dict:
-                    ciclos_dict[key] = {
-                        'year': f.year,
-                        'month': f.month,
-                        'nombre_mes': f.strftime('%B %Y').capitalize(),
-                        'tarjetas': [],
-                        'aportes': [],
-                        'otros_ingresos': [],
-                        'total_extraido_tarjeta': Decimal('0'),
-                        'total_interes_tarjeta': Decimal('0'),
-                        'total_deuda_proximo_mes': Decimal('0'),
-                        'total_aportes_efectivo': Decimal('0'),
-                    }
-                if getattr(ing, 'es_extraccion_tarjeta', False):
-                    ciclos_dict[key]['tarjetas'].append(ing)
-                    ciclos_dict[key]['total_extraido_tarjeta'] += ing.monto
-                    ciclos_dict[key]['total_interes_tarjeta'] += (ing.interes_monto or Decimal('0'))
-                    prox = ing.monto_proximo_mes or round(ing.monto * tasa_factor, 2)
-                    ciclos_dict[key]['total_deuda_proximo_mes'] += prox
-                elif getattr(ing, 'es_aporte_capital', False):
-                    ciclos_dict[key]['aportes'].append(ing)
-                    ciclos_dict[key]['total_aportes_efectivo'] += ing.monto
-                else:
-                    ciclos_dict[key]['otros_ingresos'].append(ing)
+            # 2. Inicializar ciclo activo si no existe
+            if not self.object.ciclos_prestamo.exists():
+                ciclo_inicial = CicloPrestamo.objects.create(
+                    presupuesto=self.object,
+                    nombre="Período Noviembre 2026",
+                    fecha_inicio=date(2026, 10, 21),
+                    deuda_a_devolver=self.object.deuda_inicial_prestamo or Decimal('10129746.00'),
+                    esta_cerrado=False
+                )
+                self.object.ingresos.filter(ciclo_prestamo__isnull=True).update(ciclo_prestamo=ciclo_inicial)
 
-            # Ordenar ciclos por fecha descendente
-            ciclos_ordenados = [ciclos_dict[k] for k in sorted(ciclos_dict.keys(), reverse=True)]
-            ciclo_actual = ciclos_ordenados[0] if ciclos_ordenados else None
-            ciclo_anterior = ciclos_ordenados[1] if len(ciclos_ordenados) > 1 else None
-
-            # Deuda que vencía este mes (originada en el ciclo anterior o configurada inicialmente)
-            if ciclo_anterior:
-                deuda_que_vence_este_mes = ciclo_anterior['total_deuda_proximo_mes']
+            ciclos = self.object.ciclos_prestamo.all()
+            ciclo_activo = ciclos.filter(esta_cerrado=False).first()
+            
+            # Selector de ciclo (o por defecto el activo)
+            ciclo_id = self.request.GET.get('ciclo_id')
+            if ciclo_id:
+                ciclo_seleccionado = ciclos.filter(pk=ciclo_id).first() or ciclo_activo
             else:
-                deuda_que_vence_este_mes = self.object.deuda_inicial_prestamo or Decimal('0')
+                ciclo_seleccionado = ciclo_activo or ciclos.first()
 
-            if ciclo_actual:
-                tarjetas_actuales = ciclo_actual['tarjetas']
-                total_extraido_tarjetas = ciclo_actual['total_extraido_tarjeta']
-                total_interes_tarjetas = ciclo_actual['total_interes_tarjeta']
-                deuda_total_proximo_mes = ciclo_actual['total_deuda_proximo_mes']
-                aportes_actuales = ciclo_actual['aportes']
-                total_aportes_efectivo = ciclo_actual['total_aportes_efectivo']
+            # Asegurar que ingresos huérfanos se vinculen al ciclo activo
+            if ciclo_activo:
+                self.object.ingresos.filter(ciclo_prestamo__isnull=True).update(ciclo_prestamo=ciclo_activo)
+
+            # Información de las tarjetas y cierres
+            tarjetas_info = []
+            for t in self.object.tarjetas_prestamo.all():
+                tarjetas_info.append({
+                    'tarjeta': t,
+                    'info': t.info_cierre()
+                })
+
+            if ciclo_seleccionado:
+                deuda_que_vence_este_mes = ciclo_seleccionado.deuda_a_devolver
+                tarjetas_actuales = ciclo_seleccionado.ingresos.filter(es_extraccion_tarjeta=True)
+                aportes_actuales = ciclo_seleccionado.ingresos.filter(es_aporte_capital=True)
+                total_extraido_tarjetas = ciclo_seleccionado.total_tarjetas()
+                total_interes_tarjetas = ciclo_seleccionado.total_interes_tarjetas()
+                deuda_total_proximo_mes = ciclo_seleccionado.deuda_proximo_ciclo()
+                total_aportes_efectivo = ciclo_seleccionado.total_efectivo()
+                total_devuelto_este_mes = ciclo_seleccionado.total_devuelto()
+                pendiente_devolucion_este_mes = ciclo_seleccionado.pendiente_devolver()
+                porcentaje_cubierto = ciclo_seleccionado.porcentaje_cubierto()
+
+                # Filtrar transacciones visibles por el ciclo seleccionado
+                ingresos_ciclo = list(ciclo_seleccionado.ingresos.select_related('cuenta_bancaria', 'tarjeta_prestamo').order_by('-fecha'))
+                for item in ingresos_ciclo:
+                    item.fecha_local = self._fecha_local(item)
+                ingresos_ciclo.sort(key=lambda x: x.fecha_local, reverse=True)
+                transacciones_por_dia = [
+                    {'grouper': fecha, 'list': list(items)}
+                    for fecha, items in groupby(ingresos_ciclo, key=lambda x: x.fecha_local.date())
+                ]
+                context['transacciones_por_dia'] = transacciones_por_dia
+                context['debug_ingresos_count'] = len(ingresos_ciclo)
+                context['debug_gastos_count'] = 0
             else:
+                deuda_que_vence_este_mes = Decimal('0')
                 tarjetas_actuales = []
+                aportes_actuales = []
                 total_extraido_tarjetas = Decimal('0')
                 total_interes_tarjetas = Decimal('0')
                 deuda_total_proximo_mes = Decimal('0')
-                aportes_actuales = []
                 total_aportes_efectivo = Decimal('0')
+                total_devuelto_este_mes = Decimal('0')
+                pendiente_devolucion_este_mes = Decimal('0')
+                porcentaje_cubierto = 0
 
-            # Para devolver la deuda de este mes:
-            total_devuelto_este_mes = total_extraido_tarjetas + total_aportes_efectivo
-            pendiente_devolucion_este_mes = max(Decimal('0'), deuda_que_vence_este_mes - total_devuelto_este_mes)
-            porcentaje_cubierto = 0
-            if deuda_que_vence_este_mes > 0:
-                porcentaje_cubierto = min(100, round((total_devuelto_este_mes / deuda_que_vence_este_mes) * 100))
-            elif total_devuelto_este_mes > 0:
-                porcentaje_cubierto = 100
-
+            proyeccion = self.object.proyeccion_prestamo()
             aporte_habitual = self.object.aporte_mensual_prestamo or Decimal('600000.00')
             tarjeta_necesaria_proximo_mes = max(Decimal('0'), deuda_total_proximo_mes - aporte_habitual)
 
             context['proyeccion_prestamo'] = proyeccion
-            context['ciclos_prestamo'] = ciclos_ordenados
-            context['ciclo_actual'] = ciclo_actual
-            context['ciclo_anterior'] = ciclo_anterior
+            context['ciclos_prestamo'] = ciclos
+            context['ciclo_actual'] = ciclo_seleccionado
+            context['ciclo_activo'] = ciclo_activo
+            context['tarjetas_info'] = tarjetas_info
             context['tarjetas_actuales'] = tarjetas_actuales
             context['aportes_actuales'] = aportes_actuales
             context['total_extraido_tarjeta'] = total_extraido_tarjetas
@@ -330,8 +362,16 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
             context['porcentaje_cubierto'] = porcentaje_cubierto
             context['aporte_habitual'] = aporte_habitual
             context['tarjeta_necesaria_proximo_mes'] = tarjeta_necesaria_proximo_mes
-            context['proximo_a_pagar'] = deuda_total_proximo_mes if deuda_total_proximo_mes > 0 else (Decimal(str(proyeccion['deuda_actual'])) if proyeccion and proyeccion.get('deuda_actual') else Decimal('0'))
+            context['proximo_a_pagar'] = deuda_total_proximo_mes if deuda_total_proximo_mes > 0 else deuda_que_vence_este_mes
             context['deuda_actual'] = deuda_total_proximo_mes
+
+            # Forms de apoyo
+            context['form_tarjeta'] = TarjetaPrestamoForm()
+            context['form_cerrar_ciclo'] = CerrarCicloPrestamoForm(initial={
+                'nuevo_nombre': "Período Diciembre 2026 (desde 20/11)",
+                'nueva_fecha_inicio': date(2026, 11, 20),
+                'deuda_a_devolver': deuda_total_proximo_mes
+            })
         
         return context
 
@@ -476,6 +516,7 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
                 initial.setdefault('tasa_interes', presupuesto.tasa_interes_prestamo)
         kwargs['initial'] = initial
         kwargs['user'] = self.request.user
+        kwargs['presupuesto'] = presupuesto
         return kwargs
 
     def form_valid(self, form):
@@ -520,6 +561,8 @@ class GastoUpdateView(GastoEditableMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
+        if hasattr(self.object, 'presupuesto'):
+            kwargs['presupuesto'] = self.object.presupuesto
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -588,6 +631,8 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
+        if hasattr(self.object, 'presupuesto'):
+            kwargs['presupuesto'] = self.object.presupuesto
         return kwargs
     
     def form_valid(self, form):
@@ -678,6 +723,7 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
                 initial.setdefault('tasa_interes', presupuesto.tasa_interes_prestamo)
         kwargs['initial'] = initial
         kwargs['user'] = self.request.user
+        kwargs['presupuesto'] = presupuesto
         return kwargs
 
     def form_valid(self, form):
@@ -913,3 +959,63 @@ def extraer_fecha_chat(texto):
             return datetime.combine(fecha, time(hour=hora, minute=minuto))
 
     return datetime.combine(fecha, ahora.time().replace(microsecond=0))
+
+
+@login_required
+def cerrar_ciclo_prestamo(request, pk):
+    presupuesto = get_object_or_404(presupuestos_editables(request.user), pk=pk)
+    if request.method == 'POST':
+        form = CerrarCicloPrestamoForm(request.POST)
+        if form.is_valid():
+            ciclo_activo = presupuesto.ciclos_prestamo.filter(esta_cerrado=False).first()
+            nuevo_nombre = form.cleaned_data['nuevo_nombre']
+            nueva_fecha = form.cleaned_data['nueva_fecha_inicio']
+            deuda_sig = form.cleaned_data['deuda_a_devolver']
+
+            if ciclo_activo:
+                ciclo_activo.esta_cerrado = True
+                ciclo_activo.fecha_fin = nueva_fecha - timedelta(days=1)
+                ciclo_activo.fecha_cierre = timezone.now()
+                ciclo_activo.save()
+
+            CicloPrestamo.objects.create(
+                presupuesto=presupuesto,
+                nombre=nuevo_nombre,
+                fecha_inicio=nueva_fecha,
+                deuda_a_devolver=deuda_sig,
+                esta_cerrado=False
+            )
+            messages.success(request, f"¡Período cerrado con éxito! Se inició '{nuevo_nombre}' con deuda a devolver de ${deuda_sig:,.2f}.")
+        else:
+            messages.error(request, "Error al cerrar el período. Verifique los datos ingresados.")
+    return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+
+@login_required
+def guardar_tarjeta_prestamo(request, pk):
+    presupuesto = get_object_or_404(presupuestos_editables(request.user), pk=pk)
+    if request.method == 'POST':
+        tarjeta_id = request.POST.get('tarjeta_id')
+        tarjeta = None
+        if tarjeta_id:
+            tarjeta = get_object_or_404(presupuesto.tarjetas_prestamo, pk=tarjeta_id)
+        form = TarjetaPrestamoForm(request.POST, instance=tarjeta)
+        if form.is_valid():
+            tarjeta = form.save(commit=False)
+            tarjeta.presupuesto = presupuesto
+            tarjeta.save()
+            messages.success(request, f"Tarjeta '{tarjeta.nombre}' guardada correctamente.")
+        else:
+            messages.error(request, "Error al guardar la tarjeta. Verifique los campos.")
+    return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+
+@login_required
+def eliminar_tarjeta_prestamo(request, pk):
+    tarjeta = get_object_or_404(TarjetaPrestamo.objects.filter(presupuesto__in=presupuestos_editables(request.user)), pk=pk)
+    presupuesto_pk = tarjeta.presupuesto_id
+    if request.method == 'POST':
+        nombre = tarjeta.nombre
+        tarjeta.delete()
+        messages.success(request, f"Tarjeta '{nombre}' eliminada.")
+    return redirect('presupuestos:ver_presupuesto', pk=presupuesto_pk)

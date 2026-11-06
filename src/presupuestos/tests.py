@@ -92,3 +92,55 @@ class PrestamoTarjetasTest(TestCase):
         # Con el aporte del mes que viene (600k), solo necesitará sacar 9.358.584,57 con tarjeta
         tarjeta_necesaria_sig = deuda_proximo_mes - self.presupuesto.aporte_mensual_prestamo
         self.assertEqual(tarjeta_necesaria_sig, Decimal('9358584.57'))
+
+    def test_ciclo_prestamo_y_tarjetas(self):
+        from .models import CicloPrestamo, TarjetaPrestamo
+        from datetime import date
+
+        # Crear tarjeta
+        tarjeta = TarjetaPrestamo.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Patagonia Rubén',
+            dia_cierre_habitual=21,
+            proxima_fecha_cierre=date(2026, 11, 19),
+            dia_vencimiento_habitual=5,
+            proxima_fecha_vencimiento=date(2026, 12, 5)
+        )
+        info = tarjeta.info_cierre(hoy=date(2026, 11, 6))
+        self.assertFalse(info['es_seguro_sacar'])
+        self.assertEqual(info['dias_para_cierre'], 13)
+
+        info_post = tarjeta.info_cierre(hoy=date(2026, 11, 20))
+        self.assertTrue(info_post['es_seguro_sacar'])
+
+        # Crear ciclo
+        ciclo = CicloPrestamo.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Período Noviembre 2026',
+            fecha_inicio=date(2026, 10, 21),
+            deuda_a_devolver=Decimal('10129746.00')
+        )
+
+        ing_tarjeta = Ingreso.objects.create(
+            presupuesto=self.presupuesto,
+            ciclo_prestamo=ciclo,
+            tarjeta_prestamo=tarjeta,
+            nombre='Extracción Patagonia',
+            monto=Decimal('9529746.00'),
+            es_extraccion_tarjeta=True,
+            tasa_interes=Decimal('4.50'),
+            monto_proximo_mes=round(Decimal('9529746.00') * Decimal('1.045'), 2)
+        )
+        ing_efectivo = Ingreso.objects.create(
+            presupuesto=self.presupuesto,
+            ciclo_prestamo=ciclo,
+            nombre='Aporte Efectivo',
+            monto=Decimal('600000.00'),
+            es_aporte_capital=True
+        )
+
+        self.assertEqual(ciclo.total_tarjetas(), Decimal('9529746.00'))
+        self.assertEqual(ciclo.total_efectivo(), Decimal('600000.00'))
+        self.assertEqual(ciclo.total_devuelto(), Decimal('10129746.00'))
+        self.assertEqual(ciclo.pendiente_devolver(), Decimal('0.00'))
+        self.assertEqual(ciclo.deuda_proximo_ciclo(), Decimal('9958584.57'))

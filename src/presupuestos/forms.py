@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CicloPrestamo, TarjetaPrestamo
 from django.utils import timezone
 
 class CapitalizeFieldsMixin:
@@ -291,12 +291,19 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         label='Aporte propio para amortizar deuda',
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+    tarjeta_prestamo = forms.ModelChoiceField(
+        queryset=TarjetaPrestamo.objects.none(),
+        required=False,
+        label='Tarjeta utilizada',
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_tarjeta_prestamo'}),
+        empty_label='-- Seleccionar Tarjeta --'
+    )
 
     class Meta:
         model = Ingreso
         fields = [
             'nombre', 'monto', 'tipo_ingreso', 'cuenta_bancaria_nombre', 'fecha', 'descripcion',
-            'es_extraccion_tarjeta', 'tasa_interes', 'monto_proximo_mes', 'es_aporte_capital', 'presupuesto_pk'
+            'es_extraccion_tarjeta', 'tasa_interes', 'monto_proximo_mes', 'es_aporte_capital', 'tarjeta_prestamo', 'presupuesto_pk'
         ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Sueldo, Cobro de honorarios...'}),
@@ -308,15 +315,28 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'tipo_ingreso': 'Medio de Ingreso'
         }
         
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, presupuesto=None, **kwargs):
         self.user = user
+        self.presupuesto = presupuesto
         super().__init__(*args, **kwargs)
+
+        p = self.presupuesto
+        if not p and self.instance and self.instance.pk and hasattr(self.instance, 'presupuesto'):
+            p = self.instance.presupuesto
+        
+        if p and p.tipo == 'prestamo':
+            self.fields['tarjeta_prestamo'].queryset = p.tarjetas_prestamo.all()
+        else:
+            self.fields['tarjeta_prestamo'].widget = forms.HiddenInput()
+
         if self.instance and self.instance.pk:
             if self.instance.cuenta_bancaria:
                 self.initial['cuenta_bancaria_nombre'] = self.instance.cuenta_bancaria.nombre
             if self.instance.fecha:
                 local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
                 self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+            if self.instance.tarjeta_prestamo_id:
+                self.initial['tarjeta_prestamo'] = self.instance.tarjeta_prestamo_id
         else:
             local_dt = timezone.localtime(timezone.now())
             self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
@@ -348,11 +368,19 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             self.instance.monto_proximo_mes = self.cleaned_data['monto_proximo_mes']
         if 'tasa_interes' in self.cleaned_data:
             self.instance.tasa_interes = self.cleaned_data['tasa_interes']
+        if 'tarjeta_prestamo' in self.cleaned_data and self.cleaned_data['tarjeta_prestamo']:
+            self.instance.tarjeta_prestamo = self.cleaned_data['tarjeta_prestamo']
+            if not self.cleaned_data.get('nombre'):
+                self.instance.nombre = self.instance.tarjeta_prestamo.nombre
         return super().save(commit)
 
     def clean(self):
         cleaned_data = super().clean()
         es_extraccion = cleaned_data.get('es_extraccion_tarjeta')
+        tarjeta = cleaned_data.get('tarjeta_prestamo')
+        nombre = cleaned_data.get('nombre')
+        if tarjeta and not nombre:
+            cleaned_data['nombre'] = tarjeta.nombre
         monto = cleaned_data.get('monto')
         tasa = cleaned_data.get('tasa_interes')
         monto_prox = cleaned_data.get('monto_proximo_mes')
@@ -370,3 +398,41 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         if monto is not None and monto <= 0:
             raise forms.ValidationError('El monto debe ser mayor a cero')
         return monto
+
+
+class TarjetaPrestamoForm(CapitalizeFieldsMixin, forms.ModelForm):
+    class Meta:
+        model = TarjetaPrestamo
+        fields = ['nombre', 'dia_cierre_habitual', 'dia_vencimiento_habitual', 'proxima_fecha_cierre', 'proxima_fecha_vencimiento', 'nota']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Patagonia Rubén, Naranja...'}),
+            'dia_cierre_habitual': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
+            'dia_vencimiento_habitual': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 31}),
+            'proxima_fecha_cierre': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'proxima_fecha_vencimiento': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'nota': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nota adicional...'}),
+        }
+        labels = {
+            'nombre': 'Nombre de la Tarjeta',
+            'dia_cierre_habitual': 'Día de Cierre Habitual',
+            'dia_vencimiento_habitual': 'Día de Vencimiento Habitual',
+            'proxima_fecha_cierre': 'Próxima Fecha de Cierre Exacta',
+            'proxima_fecha_vencimiento': 'Próxima Fecha de Vencimiento Exacta',
+            'nota': 'Nota o Titular',
+        }
+
+
+class CerrarCicloPrestamoForm(forms.Form):
+    nuevo_nombre = forms.CharField(
+        max_length=100,
+        label="Nombre del Nuevo Período",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Período Diciembre 2026 (desde 20/11)'})
+    )
+    nueva_fecha_inicio = forms.DateField(
+        label="Fecha de Inicio del Nuevo Período",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    deuda_a_devolver = forms.DecimalField(
+        label="Deuda a Devolver en el Nuevo Período ($)",
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )

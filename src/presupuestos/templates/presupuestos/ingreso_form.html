@@ -129,6 +129,14 @@
                         </div>
 
                         <div id="div-interes-tarjeta" style="{% if not form.es_extraccion_tarjeta.value %}display: none;{% endif %}" class="mt-2 pt-2 border-top border-secondary">
+                            {% if form.tarjeta_prestamo and form.tarjeta_prestamo.field.queryset.exists %}
+                            <div class="mb-2">
+                                <label for="{{ form.tarjeta_prestamo.id_for_label }}" class="form-label small text-warning fw-bold">
+                                    <i class="bi bi-credit-card-2-front me-1"></i> Seleccionar Tarjeta del Préstamo
+                                </label>
+                                {{ form.tarjeta_prestamo }}
+                            </div>
+                            {% endif %}
                             <div class="row g-2">
                                 <div class="col-6">
                                     <label for="{{ form.tasa_interes.id_for_label }}" class="form-label small text-muted">Tasa de interés (%)</label>
@@ -221,6 +229,18 @@ document.addEventListener('DOMContentLoaded', function () {
         inputNombre.placeholder = "Ej: Tarjeta Patagonia, Tarjeta Naranja...";
     }
     {% endif %}
+
+    const selTarjeta = document.getElementById('id_tarjeta_prestamo');
+    if (selTarjeta) {
+        selTarjeta.addEventListener('change', function() {
+            if (this.value && this.selectedIndex >= 0) {
+                const optText = this.options[this.selectedIndex].text;
+                if (optText && !optText.startsWith('--')) {
+                    if (inputNombre) inputNombre.value = optText;
+                }
+            }
+        });
+    }
 
     function recalcularTarjeta() {
         if (!chkTarjeta) return;

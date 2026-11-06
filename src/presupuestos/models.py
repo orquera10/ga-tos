@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -113,22 +114,30 @@ class Presupuesto(models.Model):
         if self.tipo != 'prestamo':
             return None
         
-        # Obtener extracciones con tarjeta
-        extracciones = self.ingresos.filter(es_extraccion_tarjeta=True).order_by('-fecha')
+        # Obtener deuda base del ciclo activo o extracciones
+        ciclo_activo = self.ciclos_prestamo.filter(esta_cerrado=False).order_by('-fecha_inicio').first()
         deuda = 0.0
-        if extracciones.exists():
-            # Tomar las tarjetas del mes más reciente
-            ult_fecha = extracciones.first().fecha
-            extracciones_ultimo_mes = [
-                e for e in extracciones 
-                if e.fecha.year == ult_fecha.year and e.fecha.month == ult_fecha.month
-            ]
-            tasa_factor = 1.0 + (float(self.tasa_interes_prestamo or 4.50) / 100.0)
-            suma_vence_proximo = sum(
-                float(e.monto_proximo_mes if e.monto_proximo_mes else (float(e.monto) * tasa_factor))
-                for e in extracciones_ultimo_mes
-            )
-            deuda = suma_vence_proximo
+        if ciclo_activo:
+            deuda_prox = float(ciclo_activo.deuda_proximo_ciclo())
+            if deuda_prox > 0:
+                deuda = deuda_prox
+            elif ciclo_activo.deuda_a_devolver > 0:
+                deuda = float(ciclo_activo.deuda_a_devolver)
+
+        if deuda <= 0:
+            extracciones = self.ingresos.filter(es_extraccion_tarjeta=True).order_by('-fecha')
+            if extracciones.exists():
+                ult_fecha = extracciones.first().fecha
+                extracciones_ultimo_mes = [
+                    e for e in extracciones 
+                    if e.fecha.year == ult_fecha.year and e.fecha.month == ult_fecha.month
+                ]
+                tasa_factor = 1.0 + (float(self.tasa_interes_prestamo or 4.50) / 100.0)
+                suma_vence_proximo = sum(
+                    float(e.monto_proximo_mes if e.monto_proximo_mes else (float(e.monto) * tasa_factor))
+                    for e in extracciones_ultimo_mes
+                )
+                deuda = suma_vence_proximo
         
         if deuda <= 0 and self.deuda_inicial_prestamo:
             deuda = float(self.deuda_inicial_prestamo)
@@ -276,6 +285,100 @@ class Gasto(models.Model):
         return f"{self.nombre} - ${self.monto} ({self.get_metodo_pago_display()})"
 
 
+class CicloPrestamo(models.Model):
+    presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='ciclos_prestamo')
+    nombre = models.CharField(max_length=100)
+    fecha_inicio = models.DateField(default=timezone.now)
+    fecha_fin = models.DateField(null=True, blank=True)
+    deuda_a_devolver = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name="Deuda que vence en este período")
+    esta_cerrado = models.BooleanField(default=False, verbose_name="Período cerrado")
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-fecha_inicio', '-id']
+        verbose_name = 'Ciclo de Préstamo'
+        verbose_name_plural = 'Ciclos de Préstamo'
+
+    def __str__(self):
+        return f"{self.nombre} ({'Cerrado' if self.esta_cerrado else 'Activo'})"
+
+    def total_tarjetas(self):
+        return self.ingresos.filter(es_extraccion_tarjeta=True).aggregate(t=models.Sum('monto'))['t'] or Decimal('0')
+
+    def total_interes_tarjetas(self):
+        return sum(i.interes_monto for i in self.ingresos.filter(es_extraccion_tarjeta=True)) or Decimal('0')
+
+    def deuda_proximo_ciclo(self):
+        tasa_factor = Decimal('1') + (self.presupuesto.tasa_interes_prestamo / Decimal('100'))
+        return sum((i.monto_proximo_mes or round(i.monto * tasa_factor, 2)) for i in self.ingresos.filter(es_extraccion_tarjeta=True)) or Decimal('0')
+
+    def total_efectivo(self):
+        return self.ingresos.filter(es_aporte_capital=True).aggregate(t=models.Sum('monto'))['t'] or Decimal('0')
+
+    def total_devuelto(self):
+        return self.total_tarjetas() + self.total_efectivo()
+
+    def pendiente_devolver(self):
+        return max(Decimal('0'), self.deuda_a_devolver - self.total_devuelto())
+
+    def porcentaje_cubierto(self):
+        if self.deuda_a_devolver > 0:
+            return min(100, round((self.total_devuelto() / self.deuda_a_devolver) * 100))
+        return 100 if self.total_devuelto() > 0 else 0
+
+
+class TarjetaPrestamo(models.Model):
+    presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='tarjetas_prestamo')
+    nombre = models.CharField(max_length=100)
+    dia_cierre_habitual = models.PositiveSmallIntegerField(default=21, verbose_name="Día de cierre habitual")
+    dia_vencimiento_habitual = models.PositiveSmallIntegerField(default=5, verbose_name="Día de vencimiento habitual")
+    proxima_fecha_cierre = models.DateField(null=True, blank=True, verbose_name="Próxima fecha exacta de cierre")
+    proxima_fecha_vencimiento = models.DateField(null=True, blank=True, verbose_name="Próxima fecha de vencimiento")
+    nota = models.CharField(max_length=200, blank=True, null=True)
+
+    class Meta:
+        ordering = ['dia_cierre_habitual', 'nombre']
+        verbose_name = 'Tarjeta del Préstamo'
+        verbose_name_plural = 'Tarjetas del Préstamo'
+
+    def __str__(self):
+        return self.nombre
+
+    def info_cierre(self, hoy=None):
+        if hoy is None:
+            hoy = timezone.localdate()
+        cierre = self.proxima_fecha_cierre
+        if not cierre:
+            try:
+                cierre = hoy.replace(day=min(self.dia_cierre_habitual, 28))
+            except ValueError:
+                cierre = hoy
+
+        vence = self.proxima_fecha_vencimiento
+        if not vence:
+            try:
+                mes_vence = hoy.month + 1 if self.dia_vencimiento_habitual <= self.dia_cierre_habitual else hoy.month
+                year_vence = hoy.year + (1 if mes_vence > 12 else 0)
+                mes_vence = 1 if mes_vence > 12 else mes_vence
+                vence = hoy.replace(year=year_vence, month=mes_vence, day=min(self.dia_vencimiento_habitual, 28))
+            except ValueError:
+                vence = hoy
+
+        ya_cerro = (hoy > cierre)
+        dias_para_cierre = (cierre - hoy).days if not ya_cerro else 0
+        dias_pasados = (hoy - cierre).days if ya_cerro else 0
+
+        return {
+            'ya_cerro': ya_cerro,
+            'fecha_cierre': cierre,
+            'fecha_vencimiento': vence,
+            'dias_para_cierre': dias_para_cierre,
+            'dias_pasados': dias_pasados,
+            'es_seguro_sacar': ya_cerro,
+            'mensaje': "Habilitada para sacar (diferido)" if ya_cerro else f"Cierra el {cierre.strftime('%d/%m')} (en {dias_para_cierre} días)"
+        }
+
+
 class Ingreso(models.Model):
     TIPOS_INGRESO = [
         ('transferencia', 'Transferencia'),
@@ -283,6 +386,8 @@ class Ingreso(models.Model):
         ('sueldo', 'Sueldo'),
     ]
     presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='ingresos')
+    ciclo_prestamo = models.ForeignKey(CicloPrestamo, null=True, blank=True, on_delete=models.SET_NULL, related_name='ingresos')
+    tarjeta_prestamo = models.ForeignKey(TarjetaPrestamo, null=True, blank=True, on_delete=models.SET_NULL, related_name='extracciones')
     cuenta_bancaria = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='ingresos')
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True, null=True)
@@ -314,6 +419,19 @@ class Ingreso(models.Model):
         elif self.fecha and timezone.is_naive(self.fecha):
             self.fecha = timezone.make_aware(self.fecha, timezone.get_current_timezone())
             
+        if self.presupuesto and self.presupuesto.tipo == 'prestamo' and not self.ciclo_prestamo:
+            ciclo = self.presupuesto.ciclos_prestamo.filter(esta_cerrado=False).order_by('-fecha_inicio').first()
+            if not ciclo:
+                nombre_ciclo = f"Período {self.fecha.strftime('%B %Y').capitalize()}"
+                ciclo = CicloPrestamo.objects.create(
+                    presupuesto=self.presupuesto,
+                    nombre=nombre_ciclo,
+                    fecha_inicio=self.fecha.date(),
+                    deuda_a_devolver=self.presupuesto.deuda_inicial_prestamo or Decimal('0.00'),
+                    esta_cerrado=False
+                )
+            self.ciclo_prestamo = ciclo
+
         super().save(*args, **kwargs)
         if self.presupuesto:
             self.presupuesto.actualizar_monto_restante()
