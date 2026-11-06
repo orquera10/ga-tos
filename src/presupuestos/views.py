@@ -241,6 +241,21 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         # Para depuración
         context['debug_gastos_count'] = len(gastos)
         context['debug_ingresos_count'] = len(ingresos)
+
+        if self.object.tipo == 'prestamo':
+            proyeccion = self.object.proyeccion_prestamo()
+            extracciones = [i for i in ingresos if getattr(i, 'es_extraccion_tarjeta', False)]
+            aportes = [i for i in ingresos if getattr(i, 'es_aporte_capital', False)]
+            ult_ext = extracciones[0] if extracciones else None
+
+            context['proyeccion_prestamo'] = proyeccion
+            context['extracciones_tarjeta'] = extracciones
+            context['total_extraido_tarjeta'] = sum(i.monto for i in extracciones)
+            context['total_interes_acumulado'] = sum(i.interes_monto for i in extracciones)
+            context['total_aportes_propios'] = sum(i.monto for i in aportes)
+            context['ultima_extraccion'] = ult_ext
+            context['proximo_a_pagar'] = ult_ext.monto_proximo_mes if (ult_ext and ult_ext.monto_proximo_mes) else (proyeccion['proximo_a_pagar'] if proyeccion else 0.0)
+            context['deuda_actual'] = proyeccion['deuda_actual'] if proyeccion else float(self.object.deuda_inicial_prestamo)
         
         return context
 
@@ -360,7 +375,20 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        initial = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        if 'monto' in self.request.GET:
+            initial['monto'] = self.request.GET.get('monto')
+        if 'nombre' in self.request.GET:
+            initial['nombre'] = self.request.GET.get('nombre')
+        if 'es_extraccion' in self.request.GET:
+            initial['es_extraccion_tarjeta'] = True
+        if 'es_aporte' in self.request.GET:
+            initial['es_aporte_capital'] = True
+        if 'tasa' in self.request.GET:
+            initial['tasa_interes'] = self.request.GET.get('tasa')
+        if 'prox_mes' in self.request.GET:
+            initial['monto_proximo_mes'] = self.request.GET.get('prox_mes')
+        kwargs['initial'] = initial
         kwargs['user'] = self.request.user
         return kwargs
 
@@ -539,7 +567,20 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['initial'] = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        initial = {'presupuesto_pk': self.kwargs['presupuesto_pk']}
+        if 'monto' in self.request.GET:
+            initial['monto'] = self.request.GET.get('monto')
+        if 'nombre' in self.request.GET:
+            initial['nombre'] = self.request.GET.get('nombre')
+        if 'es_extraccion' in self.request.GET:
+            initial['es_extraccion_tarjeta'] = True
+        if 'es_aporte' in self.request.GET:
+            initial['es_aporte_capital'] = True
+        if 'tasa' in self.request.GET:
+            initial['tasa_interes'] = self.request.GET.get('tasa')
+        if 'prox_mes' in self.request.GET:
+            initial['monto_proximo_mes'] = self.request.GET.get('prox_mes')
+        kwargs['initial'] = initial
         kwargs['user'] = self.request.user
         return kwargs
 

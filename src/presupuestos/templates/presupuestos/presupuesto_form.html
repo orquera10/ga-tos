@@ -94,6 +94,38 @@
                         </div>
                     </div>
 
+                    <div id="prestamoSection" class="p-3 mb-3 rounded" style="background: rgba(255, 193, 7, 0.05); border: 1px solid rgba(255, 193, 7, 0.25); display: none;">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-warning fw-bold">
+                            <i class="bi bi-bank"></i> Configuración del Préstamo con Tarjetas
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="{{ form.deuda_inicial_prestamo.id_for_label }}" class="form-label small">Deuda total inicial</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.deuda_inicial_prestamo }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.aporte_mensual_prestamo.id_for_label }}" class="form-label small">Aporte propio mensual</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">$</span>
+                                    {{ form.aporte_mensual_prestamo }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="{{ form.tasa_interes_prestamo.id_for_label }}" class="form-label small">Tasa de la app (%)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ form.tasa_interes_prestamo }}
+                                    <span class="input-group-text">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            Ej: Debes 10 millones, aportas 600 mil de tu bolsillo por mes y sacas el resto con tarjeta al 4.5% de interés.
+                        </small>
+                    </div>
+
                     <div class="form-actions">
                         <a href="{% if presupuesto %}{% url 'presupuestos:ver_presupuesto' presupuesto.pk %}{% else %}{% url 'presupuestos:index' %}{% endif %}" class="btn btn-outline-danger">
                             <i class="bi bi-arrow-left"></i> Cancelar
@@ -113,21 +145,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoSelect = document.getElementById('id_tipo');
     const montoLabel = document.getElementById('montoLabel');
     const montoInput = document.getElementById('id_monto_total');
-    const montoHelp = document.getElementById('montoHelpText');
+    const prestamoSection = document.getElementById('prestamoSection');
 
     function updateTipoView() {
         if (!tipoSelect) return;
-        if (tipoSelect.value === 'abierto' || tipoSelect.value === 'prestamo') {
+        if (tipoSelect.value === 'prestamo') {
             montoLabel.textContent = 'Monto inicial (Opcional)';
-            if (tipoSelect.value === 'prestamo') {
-                montoHelp.textContent = 'Para préstamos: puedes dejarlo en 0 e ingresar el monto prestado y los cobros/pagos según corresponda.';
-            } else {
-                montoHelp.textContent = 'En presupuesto abierto puedes dejarlo en 0 e ir sumando ingresos y gastos.';
-            }
             if (!montoInput.value) montoInput.value = '0';
+            if (prestamoSection) prestamoSection.style.display = 'block';
+        } else if (tipoSelect.value === 'abierto') {
+            montoLabel.textContent = 'Monto inicial (Opcional)';
+            if (!montoInput.value) montoInput.value = '0';
+            if (prestamoSection) prestamoSection.style.display = 'none';
         } else {
             montoLabel.textContent = 'Monto total inicial';
-            montoHelp.textContent = 'Cupo límite total asignado a este presupuesto.';
+            if (prestamoSection) prestamoSection.style.display = 'none';
         }
     }
 

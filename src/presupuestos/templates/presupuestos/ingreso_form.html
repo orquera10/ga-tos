@@ -91,6 +91,41 @@
                         </div>
                     </div>
 
+                    {% if presupuesto.tipo == 'prestamo' %}
+                    <div class="p-3 mb-3 rounded" style="background: rgba(255, 193, 7, 0.06); border: 1px solid rgba(255, 193, 7, 0.3);">
+                        <div class="fw-bold text-warning mb-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-credit-card-2-front"></i> Operación del Préstamo
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            {{ form.es_extraccion_tarjeta }}
+                            <label class="form-check-label fw-bold text-light" for="{{ form.es_extraccion_tarjeta.id_for_label }}">
+                                Extracción con tarjeta en la App (Aplica interés)
+                            </label>
+                        </div>
+
+                        <div id="div-interes-tarjeta" style="{% if not form.es_extraccion_tarjeta.value %}display: none;{% endif %}" class="mt-2 pt-2 border-top border-secondary">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label for="{{ form.tasa_interes.id_for_label }}" class="form-label small text-muted">Tasa de interés (%)</label>
+                                    {{ form.tasa_interes }}
+                                </div>
+                                <div class="col-6">
+                                    <label for="{{ form.monto_proximo_mes.id_for_label }}" class="form-label small text-warning fw-bold">A pagar el mes siguiente</label>
+                                    {{ form.monto_proximo_mes }}
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2" id="calculo-resumen-tarjeta"></div>
+                        </div>
+
+                        <div class="form-check form-switch mt-3 pt-2 border-top border-secondary">
+                            {{ form.es_aporte_capital }}
+                            <label class="form-check-label text-light" for="{{ form.es_aporte_capital.id_for_label }}">
+                                Es aporte de mi bolsillo para amortizar deuda (ej: $600.000)
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div class="form-section">
                         <label for="{{ form.descripcion.id_for_label }}" class="form-label">Descripción</label>
                         {{ form.descripcion }}
@@ -152,6 +187,39 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
         cuentaInput.addEventListener('input', syncCuentaActive);
+    }
+
+    const chkTarjeta = document.getElementById('{{ form.es_extraccion_tarjeta.id_for_label }}');
+    const divTarjeta = document.getElementById('div-interes-tarjeta');
+    const inputMonto = document.getElementById('{{ form.monto.id_for_label }}');
+    const inputTasa = document.getElementById('{{ form.tasa_interes.id_for_label }}');
+    const inputProxMes = document.getElementById('{{ form.monto_proximo_mes.id_for_label }}');
+    const txtResumen = document.getElementById('calculo-resumen-tarjeta');
+
+    function recalcularTarjeta() {
+        if (!chkTarjeta) return;
+        if (!chkTarjeta.checked) {
+            if (divTarjeta) divTarjeta.style.display = 'none';
+            return;
+        }
+        if (divTarjeta) divTarjeta.style.display = 'block';
+        const monto = parseFloat(inputMonto.value) || 0;
+        const tasa = parseFloat(inputTasa.value) || 4.5;
+        if (monto > 0) {
+            const interes = monto * (tasa / 100);
+            const prox = monto + interes;
+            inputProxMes.value = prox.toFixed(2);
+            if (txtResumen) {
+                txtResumen.innerHTML = `Sacas hoy: <strong>$${monto.toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong> + Interés (${tasa}%): <strong>$${interes.toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong> = A pagar mes siguiente: <strong class="text-warning">$${prox.toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong>`;
+            }
+        }
+    }
+
+    if (chkTarjeta) {
+        chkTarjeta.addEventListener('change', recalcularTarjeta);
+        if (inputMonto) inputMonto.addEventListener('input', recalcularTarjeta);
+        if (inputTasa) inputTasa.addEventListener('input', recalcularTarjeta);
+        recalcularTarjeta();
     }
 });
 </script>

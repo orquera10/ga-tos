@@ -41,12 +41,23 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
     
     class Meta:
         model = Presupuesto
-        fields = ['nombre', 'tipo', 'monto_total', 'moneda', 'fecha_inicio', 'fecha_fin', 'descripcion']
+        fields = [
+            'nombre', 'tipo', 'monto_total', 'moneda', 'fecha_inicio', 'fecha_fin', 'descripcion',
+            'deuda_inicial_prestamo', 'aporte_mensual_prestamo', 'tasa_interes_prestamo'
+        ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Gastos de Mayo, Vacaciones...'}),
             'tipo': forms.Select(attrs={'class': 'form-select', 'id': 'id_tipo'}),
             'moneda': forms.Select(attrs={'class': 'form-select'}),
             'descripcion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control', 'placeholder': 'Detalle o nota (opcional)...'}),
+            'deuda_inicial_prestamo': forms.NumberInput(attrs={'class': 'form-control', 'step': '1000', 'placeholder': '10000000.00'}),
+            'aporte_mensual_prestamo': forms.NumberInput(attrs={'class': 'form-control', 'step': '1000', 'placeholder': '600000.00'}),
+            'tasa_interes_prestamo': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '4.50'}),
+        }
+        labels = {
+            'deuda_inicial_prestamo': 'Deuda total inicial',
+            'aporte_mensual_prestamo': 'Aporte mensual para amortizar',
+            'tasa_interes_prestamo': 'Tasa de interés de la App (%)',
         }
 
     def __init__(self, *args, **kwargs):
@@ -200,7 +211,30 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
+        if 'es_extraccion_tarjeta' in self.cleaned_data:
+            self.instance.es_extraccion_tarjeta = self.cleaned_data['es_extraccion_tarjeta']
+        if 'es_aporte_capital' in self.cleaned_data:
+            self.instance.es_aporte_capital = self.cleaned_data['es_aporte_capital']
+        if 'monto_proximo_mes' in self.cleaned_data:
+            self.instance.monto_proximo_mes = self.cleaned_data['monto_proximo_mes']
+        if 'tasa_interes' in self.cleaned_data:
+            self.instance.tasa_interes = self.cleaned_data['tasa_interes']
         return super().save(commit)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        es_extraccion = cleaned_data.get('es_extraccion_tarjeta')
+        monto = cleaned_data.get('monto')
+        tasa = cleaned_data.get('tasa_interes')
+        if tasa is None:
+            tasa = Decimal('4.50')
+        monto_prox = cleaned_data.get('monto_proximo_mes')
+        
+        if es_extraccion and monto:
+            cleaned_data['tasa_interes'] = tasa
+            if not monto_prox:
+                cleaned_data['monto_proximo_mes'] = round(monto * (Decimal('1') + (tasa / Decimal('100'))), 2)
+        return cleaned_data
 
     def clean_monto(self):
         monto = self.cleaned_data.get('monto')
@@ -233,10 +267,36 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         input_formats=['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'],
         required=True
     )
+    tasa_interes = forms.DecimalField(
+        required=False,
+        initial=4.50,
+        label='Tasa de interés (%)',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '4.50'})
+    )
+    monto_proximo_mes = forms.DecimalField(
+        required=False,
+        label='A pagar el mes siguiente (con interés)',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Calculado automáticamente...'})
+    )
+    es_extraccion_tarjeta = forms.BooleanField(
+        required=False,
+        initial=False,
+        label='Extracción con tarjeta en la App (con interés 4.5%)',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    es_aporte_capital = forms.BooleanField(
+        required=False,
+        initial=False,
+        label='Aporte propio para amortizar deuda',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
 
     class Meta:
         model = Ingreso
-        fields = ['nombre', 'monto', 'tipo_ingreso', 'cuenta_bancaria_nombre', 'fecha', 'descripcion', 'presupuesto_pk']
+        fields = [
+            'nombre', 'monto', 'tipo_ingreso', 'cuenta_bancaria_nombre', 'fecha', 'descripcion',
+            'es_extraccion_tarjeta', 'tasa_interes', 'monto_proximo_mes', 'es_aporte_capital', 'presupuesto_pk'
+        ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Sueldo, Cobro de honorarios...'}),
             'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
@@ -279,7 +339,30 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
+        if 'es_extraccion_tarjeta' in self.cleaned_data:
+            self.instance.es_extraccion_tarjeta = self.cleaned_data['es_extraccion_tarjeta']
+        if 'es_aporte_capital' in self.cleaned_data:
+            self.instance.es_aporte_capital = self.cleaned_data['es_aporte_capital']
+        if 'monto_proximo_mes' in self.cleaned_data:
+            self.instance.monto_proximo_mes = self.cleaned_data['monto_proximo_mes']
+        if 'tasa_interes' in self.cleaned_data:
+            self.instance.tasa_interes = self.cleaned_data['tasa_interes']
         return super().save(commit)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        es_extraccion = cleaned_data.get('es_extraccion_tarjeta')
+        monto = cleaned_data.get('monto')
+        tasa = cleaned_data.get('tasa_interes')
+        if tasa is None:
+            tasa = Decimal('4.50')
+        monto_prox = cleaned_data.get('monto_proximo_mes')
+        
+        if es_extraccion and monto:
+            cleaned_data['tasa_interes'] = tasa
+            if not monto_prox:
+                cleaned_data['monto_proximo_mes'] = round(monto * (Decimal('1') + (tasa / Decimal('100'))), 2)
+        return cleaned_data
 
     def clean_monto(self):
         monto = self.cleaned_data.get('monto')

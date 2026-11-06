@@ -33,6 +33,9 @@ class Presupuesto(models.Model):
     monto_restante = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     moneda = models.CharField(max_length=3, choices=MONEDAS, default='ARS')
     fecha_creacion = models.DateTimeField(default=timezone.now)
+    tasa_interes_prestamo = models.DecimalField(max_digits=5, decimal_places=2, default=4.50, verbose_name="Tasa de interés de la app (%)")
+    aporte_mensual_prestamo = models.DecimalField(max_digits=12, decimal_places=2, default=600000.00, verbose_name="Aporte propio mensual")
+    deuda_inicial_prestamo = models.DecimalField(max_digits=12, decimal_places=2, default=10000000.00, verbose_name="Deuda total inicial")
 
     def __str__(self):
         return f"{self.nombre} - {self.fecha_inicio} a {self.fecha_fin}"
@@ -104,6 +107,59 @@ class Presupuesto(models.Model):
         if self.tipo in ['abierto', 'prestamo']:
             return self.total_ingresos
         return self.monto_total + self.total_ingresos
+
+    def proyeccion_prestamo(self):
+        """Calcula el cronograma de amortización del préstamo mes a mes con tarjeta al 4.5%."""
+        if self.tipo != 'prestamo':
+            return None
+        
+        deuda = float(self.deuda_inicial_prestamo)
+        ult_extraccion = self.ingresos.filter(es_extraccion_tarjeta=True).order_by('-fecha').first()
+        if ult_extraccion and ult_extraccion.monto_proximo_mes:
+            deuda = float(ult_extraccion.monto_proximo_mes)
+            
+        aporte = float(self.aporte_mensual_prestamo)
+        tasa = float(self.tasa_interes_prestamo) / 100.0
+        
+        cronograma = []
+        mes = 0
+        total_intereses = 0.0
+        
+        while deuda > 0 and mes < 48:
+            mes += 1
+            saca = max(0.0, deuda - aporte)
+            if saca <= 0:
+                cronograma.append({
+                    'mes': mes,
+                    'deuda_inicio': round(deuda, 2),
+                    'aporte': round(deuda, 2),
+                    'saca_tarjeta': 0.0,
+                    'interes': 0.0,
+                    'deuda_fin': 0.0,
+                    'es_ultimo': True
+                })
+                break
+            interes = saca * tasa
+            total_intereses += interes
+            deuda_sig = saca + interes
+            cronograma.append({
+                'mes': mes,
+                'deuda_inicio': round(deuda, 2),
+                'aporte': round(aporte, 2),
+                'saca_tarjeta': round(saca, 2),
+                'interes': round(interes, 2),
+                'deuda_fin': round(deuda_sig, 2),
+                'es_ultimo': False
+            })
+            deuda = deuda_sig
+            
+        return {
+            'cronograma': cronograma,
+            'total_meses': mes,
+            'total_intereses': round(total_intereses, 2),
+            'deuda_actual': round(cronograma[0]['deuda_inicio'] if cronograma else 0.0, 2),
+            'proximo_a_pagar': round(cronograma[0]['deuda_fin'] if cronograma else 0.0, 2),
+        }
 
     def puede_ver(self, user):
         if not user or not user.is_authenticated:
@@ -205,6 +261,18 @@ class Ingreso(models.Model):
     tipo_ingreso = models.CharField(max_length=20, choices=TIPOS_INGRESO, default='transferencia')
     fecha = models.DateTimeField(default=timezone.now)
     es_rapido = models.BooleanField(default=False, verbose_name="Carga rápida pendiente")
+    monto_proximo_mes = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Monto a pagar próximo mes (con interés)")
+    tasa_interes = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Tasa de interés aplicada (%)")
+    es_extraccion_tarjeta = models.BooleanField(default=False, verbose_name="Extracción con tarjeta para préstamo")
+    es_aporte_capital = models.BooleanField(default=False, verbose_name="Aporte propio para amortizar deuda")
+
+    @property
+    def interes_monto(self):
+        if self.monto_proximo_mes and self.monto and self.monto_proximo_mes > self.monto:
+            return self.monto_proximo_mes - self.monto
+        if self.tasa_interes and self.monto and self.es_extraccion_tarjeta:
+            return (self.monto * self.tasa_interes) / 100
+        return 0
 
     def clean(self):
         super().clean()
