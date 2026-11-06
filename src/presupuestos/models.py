@@ -20,6 +20,7 @@ class Presupuesto(models.Model):
     TIPOS = [
         ('fijo', 'Monto fijo inicial'),
         ('abierto', 'Flujo continuo (Abierto)'),
+        ('prestamo', 'Control de Préstamo (Flujo abierto)'),
     ]
     
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name='presupuestos', null=True, blank=True)
@@ -41,7 +42,7 @@ class Presupuesto(models.Model):
         total_gastos = self.gastos.exclude(metodo_pago='tarjeta').aggregate(total=models.Sum('monto'))['total'] or 0
         total_ingresos = self.ingresos.aggregate(total=models.Sum('monto'))['total'] or 0
         
-        if self.tipo == 'abierto':
+        if self.tipo in ['abierto', 'prestamo']:
             self.monto_restante = total_ingresos - total_gastos
         else:
             self.monto_restante = (self.monto_total + total_ingresos) - total_gastos
@@ -52,7 +53,7 @@ class Presupuesto(models.Model):
         total_gastos = self.gastos.exclude(metodo_pago='tarjeta').aggregate(total=models.Sum('monto'))['total'] or 0
         total_ingresos = self.ingresos.aggregate(total=models.Sum('monto'))['total'] or 0
         
-        if self.tipo == 'abierto':
+        if self.tipo in ['abierto', 'prestamo']:
             if total_ingresos == 0:
                 return 0
             porcentaje = (total_gastos / total_ingresos) * 100
@@ -100,7 +101,7 @@ class Presupuesto(models.Model):
         
     def monto_total_con_ingresos(self):
         """Devuelve el monto total disponible antes de egresos."""
-        if self.tipo == 'abierto':
+        if self.tipo in ['abierto', 'prestamo']:
             return self.total_ingresos
         return self.monto_total + self.total_ingresos
 

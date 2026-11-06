@@ -211,7 +211,7 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         ]
         
         monto_total_con_ingresos = (
-            total_ingresos if self.object.tipo == 'abierto' else (self.object.monto_total + total_ingresos)
+            total_ingresos if self.object.tipo in ['abierto', 'prestamo'] else (self.object.monto_total + total_ingresos)
         )
         saldo_restante = monto_total_con_ingresos - total_gastos_computables
 

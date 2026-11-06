@@ -20,6 +20,8 @@
                         <h2 class="h4 fw-bold mb-0 text-white">{{ presupuesto.nombre }}</h2>
                         {% if presupuesto.tipo == 'abierto' %}
                             <span class="badge bg-info text-dark" style="font-size: 0.72rem;">Flujo Abierto</span>
+                        {% elif presupuesto.tipo == 'prestamo' %}
+                            <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.72rem;"><i class="bi bi-bank me-1"></i>Control de Préstamo</span>
                         {% else %}
                             <span class="badge bg-secondary" style="font-size: 0.72rem;">Presupuesto Fijo</span>
                         {% endif %}

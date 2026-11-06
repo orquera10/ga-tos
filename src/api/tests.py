@@ -157,6 +157,45 @@ class ApiEndpointsTestCase(TestCase):
         p_abierto.refresh_from_db()
         self.assertEqual(p_abierto.monto_restante, Decimal('60000.00'))
 
+    def test_presupuesto_prestamo_excluido_de_widget(self):
+        p_prestamo = Presupuesto.objects.create(
+            usuario=self.user,
+            nombre='Préstamo Auto',
+            tipo='prestamo',
+            monto_total=Decimal('0.00'),
+            monto_restante=Decimal('0.00'),
+            fecha_inicio=timezone.localdate(),
+            fecha_fin=timezone.localdate() + timezone.timedelta(days=365),
+            moneda='ARS'
+        )
+        # Verificar que funciona como flujo abierto
+        self.client.post(
+            '/api/ingresos/crear/',
+            data=json.dumps({'presupuesto_id': p_prestamo.id, 'nombre': 'Desembolso Préstamo', 'monto': 500000.00, 'tipo_ingreso': 'transferencia'}),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({'presupuesto_id': p_prestamo.id, 'nombre': 'Pago Cuota 1', 'monto': 50000.00, 'metodo_pago': 'transferencia'}),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        p_prestamo.refresh_from_db()
+        self.assertEqual(p_prestamo.monto_restante, Decimal('450000.00'))
+
+        # Verificar que no aparece en /api/presupuestos/ para el widget
+        resp_list = self.client.get('/api/presupuestos/', **self.auth_headers)
+        data_list = resp_list.json()
+        ids = [p['id'] for p in data_list['presupuestos']]
+        self.assertNotIn(p_prestamo.id, ids)
+
+        # Verificar que widget_resumen_api no auto-selecciona el préstamo
+        resp_widget = self.client.get('/api/widget/resumen/', **self.auth_headers)
+        data_widget = resp_widget.json()
+        if data_widget.get('presupuesto'):
+            self.assertNotEqual(data_widget['presupuesto']['tipo'], 'prestamo')
+
     def test_gasto_con_persona_y_cuenta_bancaria(self):
         resp_ing = self.client.post(
             '/api/ingresos/crear/',

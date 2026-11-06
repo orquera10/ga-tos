@@ -109,7 +109,7 @@ def presupuestos_api(request):
     Lista todos los presupuestos en los que el usuario puede cargar gastos.
     GET /api/presupuestos/
     """
-    presupuestos = presupuestos_editables(request.api_user).order_by('-fecha_inicio')
+    presupuestos = presupuestos_editables(request.api_user).exclude(tipo='prestamo').order_by('-fecha_inicio')
     hoy = timezone.localdate()
 
     items = []
@@ -238,8 +238,6 @@ def crear_gasto_api(request):
             Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Gasto rápido {count_rapidos + 1:02d}"
-    elif not nombre.startswith('⚡'):
-        nombre = f"⚡ {nombre}"
 
     # Categoría opcional
     categoria = None
@@ -352,8 +350,6 @@ def crear_ingreso_api(request):
             Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Ingreso rápido {count_rapidos + 1:02d}"
-    elif not nombre.startswith('⚡'):
-        nombre = f"⚡ {nombre}"
 
     tipo_ingreso = (data.get('tipo_ingreso') or 'transferencia').lower().strip()
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:
@@ -410,7 +406,7 @@ def widget_resumen_api(request):
     - Últimos 5 movimientos.
     GET /api/widget/resumen/?presupuesto_id=1
     """
-    presupuestos_qs = presupuestos_editables(request.api_user).order_by('-fecha_inicio')
+    presupuestos_qs = presupuestos_editables(request.api_user).exclude(tipo='prestamo').order_by('-fecha_inicio')
     presupuesto_id = request.GET.get('presupuesto_id')
 
     presupuesto = None

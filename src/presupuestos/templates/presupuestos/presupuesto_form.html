@@ -117,9 +117,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateTipoView() {
         if (!tipoSelect) return;
-        if (tipoSelect.value === 'abierto') {
+        if (tipoSelect.value === 'abierto' || tipoSelect.value === 'prestamo') {
             montoLabel.textContent = 'Monto inicial (Opcional)';
-            montoHelp.textContent = 'En presupuesto abierto puedes dejarlo en 0 e ir sumando ingresos y gastos.';
+            if (tipoSelect.value === 'prestamo') {
+                montoHelp.textContent = 'Para préstamos: puedes dejarlo en 0 e ingresar el monto prestado y los cobros/pagos según corresponda.';
+            } else {
+                montoHelp.textContent = 'En presupuesto abierto puedes dejarlo en 0 e ir sumando ingresos y gastos.';
+            }
             if (!montoInput.value) montoInput.value = '0';
         } else {
             montoLabel.textContent = 'Monto total inicial';

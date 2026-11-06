@@ -59,7 +59,7 @@ class PresupuestoForm(CapitalizeFieldsMixin, forms.ModelForm):
         cleaned_data = super().clean()
         tipo = cleaned_data.get('tipo')
         monto_total = cleaned_data.get('monto_total')
-        if tipo == 'abierto':
+        if tipo in ['abierto', 'prestamo']:
             cleaned_data['monto_total'] = monto_total or 0
         else:
             if monto_total is None or monto_total <= 0:
