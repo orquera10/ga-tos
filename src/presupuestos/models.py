@@ -163,6 +163,7 @@ class Gasto(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
     fecha = models.DateTimeField(default=timezone.now)
+    es_rapido = models.BooleanField(default=False, verbose_name="Carga rápida pendiente")
 
     def clean(self):
         super().clean()
@@ -202,6 +203,7 @@ class Ingreso(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     tipo_ingreso = models.CharField(max_length=20, choices=TIPOS_INGRESO, default='transferencia')
     fecha = models.DateTimeField(default=timezone.now)
+    es_rapido = models.BooleanField(default=False, verbose_name="Carga rápida pendiente")
 
     def clean(self):
         super().clean()

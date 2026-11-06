@@ -305,16 +305,20 @@
                         <div class="transaccion-surface">
                         <!-- Columna 1: Contenido -->
                         {% if transaccion|model_name == 'gasto' %}
-                        <a href="{% url 'presupuestos:ver_gasto' transaccion.id %}" class="transaccion-contenido text-decoration-none gasto-contenido">
+                        <a href="{% if transaccion|es_transaccion_rapida %}{% url 'presupuestos:editar_gasto' transaccion.id %}{% else %}{% url 'presupuestos:ver_gasto' transaccion.id %}{% endif %}" class="transaccion-contenido text-decoration-none gasto-contenido">
                             <span class="transaccion-icono" aria-hidden="true">
+                                {% if transaccion|es_transaccion_rapida %}
+                                <i class="bi bi-lightning-charge-fill"></i>
+                                {% else %}
                                 <i class="bi bi-credit-card"></i>
+                                {% endif %}
                             </span>
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1 d-flex align-items-center flex-wrap gap-1">
                                     <span>{{ transaccion.nombre }}</span>
                                     {% if transaccion|es_transaccion_rapida %}
                                     <span class="badge bg-warning text-dark fw-bold d-inline-flex align-items-center" style="font-size: 0.68rem; padding: 2px 7px; border-radius: 5px; box-shadow: 0 0 6px rgba(255, 193, 7, 0.45);" title="Cargado rápido - Toca para completar">
-                                        <i class="bi bi-pencil-fill me-1"></i>Completar
+                                        <i class="bi bi-lightning-charge-fill me-1"></i>Modificar
                                     </span>
                                     {% endif %}
                                 </h6>
@@ -341,16 +345,20 @@
                             </div>
                         </a>
                         {% else %}
-                        <a href="{% url 'presupuestos:ver_ingreso' transaccion.id %}" class="transaccion-contenido text-decoration-none gasto-contenido">
+                        <a href="{% if transaccion|es_transaccion_rapida %}{% url 'presupuestos:editar_ingreso' transaccion.id %}{% else %}{% url 'presupuestos:ver_ingreso' transaccion.id %}{% endif %}" class="transaccion-contenido text-decoration-none gasto-contenido">
                             <span class="transaccion-icono" aria-hidden="true">
+                                {% if transaccion|es_transaccion_rapida %}
+                                <i class="bi bi-lightning-charge-fill"></i>
+                                {% else %}
                                 <i class="bi bi-cash-coin"></i>
+                                {% endif %}
                             </span>
                             <div class="transaccion-info">
                                 <h6 class="transaccion-nombre gasto-nombre mb-1 d-flex align-items-center flex-wrap gap-1">
                                     <span>{{ transaccion.nombre }}</span>
                                     {% if transaccion|es_transaccion_rapida %}
                                     <span class="badge bg-warning text-dark fw-bold d-inline-flex align-items-center" style="font-size: 0.68rem; padding: 2px 7px; border-radius: 5px; box-shadow: 0 0 6px rgba(255, 193, 7, 0.45);" title="Cargado rápido - Toca para completar">
-                                        <i class="bi bi-pencil-fill me-1"></i>Completar
+                                        <i class="bi bi-lightning-charge-fill me-1"></i>Modificar
                                     </span>
                                     {% endif %}
                                 </h6>
@@ -396,18 +404,12 @@
                                 </div>
                             </div>
                             {% if puede_editar %}
-                            <div class="transaccion-accion gasto-accion d-flex align-items-center gap-2">
+                            <div class="transaccion-accion gasto-accion">
                                 {% if transaccion|model_name == 'gasto' %}
-                                <a href="{% url 'presupuestos:editar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-warning p-0" title="Editar gasto" aria-label="Editar gasto">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </a>
                                 <a href="{% url 'presupuestos:eliminar_gasto' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0 js-delete-modal" title="Eliminar gasto" aria-label="Eliminar gasto" data-delete-type="gasto" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="-{{ transaccion.monto|floatformat:2 }} {{ transaccion.get_moneda_display }}">
                                     <i class="bi bi-trash-fill"></i>
                                 </a>
                                 {% else %}
-                                <a href="{% url 'presupuestos:editar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-warning p-0" title="Editar ingreso" aria-label="Editar ingreso">
-                                    <i class="bi bi-pencil-fill"></i>
-                                </a>
                                 <a href="{% url 'presupuestos:eliminar_ingreso' transaccion.id %}" class="btn btn-sm btn-link text-danger p-0 js-delete-modal" title="Eliminar ingreso" aria-label="Eliminar ingreso" data-delete-type="ingreso" data-delete-name="{{ transaccion.nombre }}" data-delete-amount="+{{ transaccion.monto|floatformat:2 }}">
                                     <i class="bi bi-trash-fill"></i>
                                 </a>

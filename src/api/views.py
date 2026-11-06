@@ -279,7 +279,8 @@ def crear_gasto_api(request):
         monto=monto,
         metodo_pago=metodo_pago,
         descripcion=descripcion or None,
-        fecha=fecha or timezone.localtime(timezone.now())
+        fecha=fecha or timezone.localtime(timezone.now()),
+        es_rapido=True
     )
     gasto.full_clean()
     gasto.save()
@@ -373,7 +374,8 @@ def crear_ingreso_api(request):
         monto=monto,
         tipo_ingreso=tipo_ingreso,
         cuenta_bancaria=cuenta_bancaria,
-        descripcion=data.get('descripcion') or None
+        descripcion=data.get('descripcion') or None,
+        es_rapido=True
     )
     ingreso.full_clean()
     ingreso.save()

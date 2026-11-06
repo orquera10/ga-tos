@@ -415,10 +415,17 @@ class GastoUpdateView(GastoEditableMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        # Guardar el gasto con el archivo adjunto
-        gasto = form.save(user=self.request.user)
+        response = super().form_valid(form)
+        gasto = self.object
+        gasto.es_rapido = False
+        if gasto.nombre:
+            if gasto.nombre.startswith('⚡ '):
+                gasto.nombre = gasto.nombre[2:].strip()
+            elif gasto.nombre.startswith('⚡'):
+                gasto.nombre = gasto.nombre[1:].strip()
+        gasto.save()
         messages.success(self.request, 'Gasto actualizado exitosamente')
-        return super().form_valid(form)
+        return response
 
 class GastoDeleteView(GastoEditableMixin, DeleteView):
     model = Gasto
@@ -460,7 +467,7 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
     template_name = 'presupuestos/ingreso_form.html'
     
     def get_success_url(self):
-        return reverse_lazy('presupuestos:ver_ingreso', kwargs={'pk': self.object.pk})
+        return reverse_lazy('presupuestos:ver_presupuesto', kwargs={'pk': self.object.presupuesto.pk})
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -468,8 +475,15 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
         return kwargs
     
     def form_valid(self, form):
-        # Guardar el ingreso
         response = super().form_valid(form)
+        ingreso = self.object
+        ingreso.es_rapido = False
+        if ingreso.nombre:
+            if ingreso.nombre.startswith('⚡ '):
+                ingreso.nombre = ingreso.nombre[2:].strip()
+            elif ingreso.nombre.startswith('⚡'):
+                ingreso.nombre = ingreso.nombre[1:].strip()
+        ingreso.save()
         self.object.presupuesto.actualizar_monto_restante()
         messages.success(self.request, 'Ingreso actualizado correctamente')
         return response

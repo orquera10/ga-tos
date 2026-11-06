@@ -57,10 +57,12 @@ def sub(value, arg):
 def es_transaccion_rapida(transaccion):
     """
     Determina si un gasto o ingreso fue cargado rápido y requiere completarse/editarse.
-    Detecta si tiene 'rapido', 'rápido', '⚡' en el nombre, o si es un gasto sin categoría.
+    Detecta si tiene flag es_rapido, 'rapido', 'rápido', '⚡' en el nombre, o si es un gasto sin categoría.
     """
     if not transaccion:
         return False
+    if getattr(transaccion, 'es_rapido', False):
+        return True
     nombre = str(getattr(transaccion, 'nombre', '') or '').lower()
     if any(k in nombre for k in ['rápido', 'rapido', '⚡', 'rapida', 'rápida']):
         return True
