@@ -144,3 +144,16 @@ class PrestamoTarjetasTest(TestCase):
         self.assertEqual(ciclo.total_devuelto(), Decimal('10129746.00'))
         self.assertEqual(ciclo.pendiente_devolver(), Decimal('0.00'))
         self.assertEqual(ciclo.deuda_proximo_ciclo(), Decimal('9958584.57'))
+
+        # Probar Diferencia de Tarjeta / Mantenimiento
+        from .models import DiferenciaTarjeta
+        diff = DiferenciaTarjeta.objects.create(
+            ciclo_prestamo=ciclo,
+            tarjeta=tarjeta,
+            monto=Decimal('14500.00'),
+            concepto='Mantenimiento y sellos resumen'
+        )
+        self.assertEqual(ciclo.total_diferencias(), Decimal('14500.00'))
+        self.assertEqual(ciclo.deuda_total_a_devolver(), Decimal('10144246.00'))
+        self.assertEqual(ciclo.pendiente_devolver(), Decimal('14500.00'))
+        self.assertEqual(len(ciclo.resumen_diferencias_por_tarjeta()), 1)

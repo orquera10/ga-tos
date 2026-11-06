@@ -108,9 +108,14 @@
                         <i class="bi bi-calendar2-range me-1"></i> Control de Cierres de Tarjetas
                     </span>
                     {% if puede_editar %}
-                    <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalTarjetas">
-                        <i class="bi bi-gear me-1"></i> Configurar Tarjetas / Fechas
-                    </button>
+                    <div class="d-flex align-items-center gap-1">
+                        <button class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjeta">
+                            <i class="bi bi-plus-circle me-1"></i> + Agregar Tarjeta
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalTarjetas">
+                            <i class="bi bi-gear me-1"></i> Configurar
+                        </button>
+                    </div>
                     {% endif %}
                 </div>
                 <div class="row g-2">
@@ -168,11 +173,37 @@
                             <div>
                                 <span class="text-muted small">Total a devolver:</span>
                                 <span class="fs-4 fw-bold text-white ms-1">${{ deuda_que_vence_este_mes|floatformat:2 }}</span>
+                                {% if total_diferencias_este_mes > 0 %}
+                                <div class="small text-warning mt-1" style="font-size: 0.8rem;">
+                                    (Base anterior: <strong>${{ deuda_base_este_mes|floatformat:2 }}</strong> + Resúmenes tarjetas: <strong>+${{ total_diferencias_este_mes|floatformat:2 }}</strong>)
+                                </div>
+                                {% endif %}
                             </div>
                             <div class="small text-muted">
                                 Cubierto: <strong class="text-success">${{ total_devuelto_este_mes|floatformat:2 }}</strong> ({{ porcentaje_cubierto }}%)
                             </div>
                         </div>
+
+                        {% if resumen_diferencias_tarjetas %}
+                        <!-- Desglose de diferencias por tarjeta -->
+                        <div class="p-2 mb-2 rounded" style="background: rgba(255, 193, 7, 0.08); border: 1px dashed rgba(255, 193, 7, 0.35); font-size: 0.78rem;">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-warning fw-bold"><i class="bi bi-receipt me-1"></i>Gastos extras / Resúmenes cargados:</span>
+                                {% if puede_editar and not ciclo_actual.esta_cerrado %}
+                                <button type="button" class="btn btn-sm text-warning p-0" data-bs-toggle="modal" data-bs-target="#modalDiferenciaTarjeta" style="font-size: 0.75rem;">
+                                    <i class="bi bi-pencil-square me-1"></i>Gestionar
+                                </button>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for item in resumen_diferencias_tarjetas %}
+                                <span class="badge bg-dark border border-warning text-light py-1 px-2">
+                                    {{ item.tarjeta.nombre }}: <strong class="text-warning">+${{ item.total|floatformat:2 }}</strong>
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
 
                         <!-- Barra de progreso de devolución -->
                         <div class="progress mb-2" style="height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08);">
@@ -599,7 +630,7 @@
     {% endif %}
 
     {% if puede_editar %}
-    <div class="my-3 budget-action-row">
+    <div class="my-3 budget-action-row d-flex flex-wrap gap-2">
         {% if presupuesto.tipo == 'prestamo' %}
         <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_extraccion=1" class="btn btn-warning fw-bold">
             <i class="bi bi-credit-card me-1"></i> + Ingreso Tarjeta
@@ -607,6 +638,14 @@
         <a href="{% url 'presupuestos:crear_ingreso' presupuesto_pk=presupuesto.id %}?es_aporte=1" class="btn btn-success fw-bold">
             <i class="bi bi-cash-stack me-1"></i> + Ingreso Efectivo
         </a>
+        {% if not ciclo_actual.esta_cerrado %}
+        <button type="button" class="btn btn-outline-warning fw-bold" data-bs-toggle="modal" data-bs-target="#modalDiferenciaTarjeta">
+            <i class="bi bi-receipt me-1"></i> + Diferencia Tarjeta
+        </button>
+        {% endif %}
+        <button type="button" class="btn btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjeta">
+            <i class="bi bi-credit-card-2-front me-1"></i> + Agregar Tarjeta
+        </button>
         {% else %}
         <a href="{% url 'presupuestos:crear_gasto' presupuesto_pk=presupuesto.id %}" class="btn btn-danger">
             <i class="bi bi-plus-circle"></i> Ga$to
@@ -1055,6 +1094,131 @@
                         </form>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Registrar Diferencia de Tarjeta / Resumen -->
+    <div class="modal fade" id="modalDiferenciaTarjeta" tabindex="-1" aria-labelledby="modalDiferenciaTarjetaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white" style="background: #1a1e24; border: 1px solid rgba(255, 193, 7, 0.4); border-radius: 14px;">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning" id="modalDiferenciaTarjetaLabel">
+                        <i class="bi bi-receipt me-2"></i>Diferencia / Gastos Resumen de Tarjeta
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-3">
+                        Cargá acá los costos extras del resumen (mantenimiento, sellos, o consumos mínimos). <strong>Se sumarán al monto a pagar de {{ ciclo_actual.nombre }}</strong> para que coincida exactamente con lo cobrado por el banco.
+                    </p>
+
+                    <!-- Lista de diferencias ya cargadas en este ciclo -->
+                    {% if diferencias_actuales %}
+                    <h6 class="small text-uppercase text-muted fw-bold mb-2">Diferencias Registradas en este Período</h6>
+                    <div class="list-group mb-3">
+                        {% for d in diferencias_actuales %}
+                        <div class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center py-2 px-3">
+                            <div>
+                                <span class="fw-bold text-white">{{ d.tarjeta.nombre }}</span>:
+                                <strong class="text-warning">+${{ d.monto|floatformat:2 }}</strong>
+                                <div class="small text-muted" style="font-size: 0.75rem;">{{ d.concepto }} &bull; {{ d.fecha|date:"d/m/Y" }}</div>
+                            </div>
+                            <form method="post" action="{% url 'presupuestos:eliminar_diferencia_tarjeta' d.id %}" onsubmit="return confirm('¿Eliminar esta diferencia?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Formulario para agregar una diferencia -->
+                    <form method="post" action="{% url 'presupuestos:agregar_diferencia_tarjeta' presupuesto.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="ciclo_id" value="{{ ciclo_actual.id }}">
+                        
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Seleccionar Tarjeta</label>
+                            {{ form_diferencia.tarjeta }}
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Monto Extra / Diferencia ($)</label>
+                                {{ form_diferencia.monto }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Fecha del Resumen</label>
+                                {{ form_diferencia.fecha }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Concepto o Detalle</label>
+                            {{ form_diferencia.concepto }}
+                        </div>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cerrar</button>
+                            <button type="submit" class="btn btn-warning fw-bold">
+                                <i class="bi bi-plus-circle me-1"></i> Sumar al Total a Pagar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Agregar Nueva Tarjeta (Directo) -->
+    <div class="modal fade" id="modalNuevaTarjeta" tabindex="-1" aria-labelledby="modalNuevaTarjetaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white" style="background: #1a1e24; border: 1px solid rgba(255, 193, 7, 0.4); border-radius: 14px;">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-warning" id="modalNuevaTarjetaLabel">
+                        <i class="bi bi-credit-card-2-front me-2"></i>Agregar Nueva Tarjeta
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'presupuestos:guardar_tarjeta_prestamo' presupuesto.id %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Nombre de la Tarjeta</label>
+                            {{ form_tarjeta.nombre }}
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Día de Cierre Habitual</label>
+                                {{ form_tarjeta.dia_cierre_habitual }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Próximo Cierre Exacto</label>
+                                {{ form_tarjeta.proxima_fecha_cierre }}
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Día de Vencimiento Habitual</label>
+                                {{ form_tarjeta.dia_vencimiento_habitual }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small text-muted">Próximo Vencimiento Exacto</label>
+                                {{ form_tarjeta.proxima_fecha_vencimiento }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Nota o Titular (opcional)</label>
+                            {{ form_tarjeta.nota }}
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-warning fw-bold">
+                            <i class="bi bi-check-circle me-1"></i> Guardar Tarjeta
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

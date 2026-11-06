@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CicloPrestamo, TarjetaPrestamo
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta
 from django.utils import timezone
 
 class CapitalizeFieldsMixin:
@@ -436,3 +436,31 @@ class CerrarCicloPrestamoForm(forms.Form):
         label="Deuda a Devolver en el Nuevo Período ($)",
         widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
     )
+
+
+class DiferenciaTarjetaForm(CapitalizeFieldsMixin, forms.ModelForm):
+    class Meta:
+        model = DiferenciaTarjeta
+        fields = ['tarjeta', 'monto', 'fecha', 'concepto']
+        widgets = {
+            'tarjeta': forms.Select(attrs={'class': 'form-select'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'}),
+            'fecha': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'concepto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: Mantenimiento, Sellos, Compra súper...'}),
+        }
+        labels = {
+            'tarjeta': 'Tarjeta del Resumen',
+            'monto': 'Monto de la Diferencia / Gasto Extra ($)',
+            'fecha': 'Fecha',
+            'concepto': 'Concepto o Detalle',
+        }
+
+    def __init__(self, *args, **kwargs):
+        presupuesto = kwargs.pop('presupuesto', None)
+        super().__init__(*args, **kwargs)
+        if presupuesto:
+            self.fields['tarjeta'].queryset = presupuesto.tarjetas_prestamo.all()
+        if not self.initial.get('fecha'):
+            self.initial['fecha'] = timezone.localdate()
+        if not self.initial.get('concepto'):
+            self.initial['concepto'] = 'Mantenimiento / Sellos resumen'

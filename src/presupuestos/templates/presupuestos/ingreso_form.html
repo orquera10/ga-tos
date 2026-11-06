@@ -129,11 +129,16 @@
                         </div>
 
                         <div id="div-interes-tarjeta" style="{% if not form.es_extraccion_tarjeta.value %}display: none;{% endif %}" class="mt-2 pt-2 border-top border-secondary">
-                            {% if form.tarjeta_prestamo and form.tarjeta_prestamo.field.queryset.exists %}
+                            {% if form.tarjeta_prestamo %}
                             <div class="mb-2">
-                                <label for="{{ form.tarjeta_prestamo.id_for_label }}" class="form-label small text-warning fw-bold">
-                                    <i class="bi bi-credit-card-2-front me-1"></i> Seleccionar Tarjeta del Préstamo
-                                </label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="{{ form.tarjeta_prestamo.id_for_label }}" class="form-label small text-warning fw-bold mb-0">
+                                        <i class="bi bi-credit-card-2-front me-1"></i> Seleccionar Tarjeta del Préstamo
+                                    </label>
+                                    <button type="button" class="btn btn-sm text-warning p-0 fw-bold" style="font-size: 0.78rem;" data-bs-toggle="modal" data-bs-target="#modalNuevaTarjetaForm">
+                                        <i class="bi bi-plus-circle me-1"></i>+ Agregar Tarjeta
+                                    </button>
+                                </div>
                                 {{ form.tarjeta_prestamo }}
                             </div>
                             {% endif %}
@@ -173,6 +178,62 @@
         </div>
     </div>
 </div>
+
+{% if presupuesto.tipo == 'prestamo' and form_tarjeta %}
+<!-- Modal Agregar Nueva Tarjeta en formulario -->
+<div class="modal fade" id="modalNuevaTarjetaForm" tabindex="-1" aria-labelledby="modalNuevaTarjetaFormLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white" style="background: #1a1e24; border: 1px solid rgba(255, 193, 7, 0.4); border-radius: 14px;">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-warning" id="modalNuevaTarjetaFormLabel">
+                    <i class="bi bi-credit-card-2-front me-2"></i>Agregar Nueva Tarjeta
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'presupuestos:guardar_tarjeta_prestamo' presupuesto.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Nombre de la Tarjeta</label>
+                        {{ form_tarjeta.nombre }}
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small text-muted">Día Cierre Habitual</label>
+                            {{ form_tarjeta.dia_cierre_habitual }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted">Próximo Cierre Exacto</label>
+                            {{ form_tarjeta.proxima_fecha_cierre }}
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small text-muted">Día Vencimiento Habitual</label>
+                            {{ form_tarjeta.dia_vencimiento_habitual }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small text-muted">Próximo Vencimiento Exacto</label>
+                            {{ form_tarjeta.proxima_fecha_vencimiento }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Nota o Titular (opcional)</label>
+                        {{ form_tarjeta.nota }}
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold">
+                        <i class="bi bi-check-circle me-1"></i> Guardar Tarjeta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}

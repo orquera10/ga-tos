@@ -14,8 +14,8 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time, timedelta
 import re
 from core.auth import asignar_presupuestos_sin_usuario
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria, CicloPrestamo, TarjetaPrestamo
-from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm, TarjetaPrestamoForm, CerrarCicloPrestamoForm
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta
+from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm, TarjetaPrestamoForm, CerrarCicloPrestamoForm, DiferenciaTarjetaForm
 
 
 def presupuestos_visibles(user):
@@ -306,7 +306,9 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 })
 
             if ciclo_seleccionado:
-                deuda_que_vence_este_mes = ciclo_seleccionado.deuda_a_devolver
+                deuda_base_este_mes = ciclo_seleccionado.deuda_a_devolver
+                total_diferencias_este_mes = ciclo_seleccionado.total_diferencias()
+                deuda_que_vence_este_mes = ciclo_seleccionado.deuda_total_a_devolver()
                 tarjetas_actuales = ciclo_seleccionado.ingresos.filter(es_extraccion_tarjeta=True)
                 aportes_actuales = ciclo_seleccionado.ingresos.filter(es_aporte_capital=True)
                 total_extraido_tarjetas = ciclo_seleccionado.total_tarjetas()
@@ -316,6 +318,8 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 total_devuelto_este_mes = ciclo_seleccionado.total_devuelto()
                 pendiente_devolucion_este_mes = ciclo_seleccionado.pendiente_devolver()
                 porcentaje_cubierto = ciclo_seleccionado.porcentaje_cubierto()
+                diferencias_actuales = ciclo_seleccionado.diferencias_tarjetas.select_related('tarjeta').all()
+                resumen_diferencias_tarjetas = ciclo_seleccionado.resumen_diferencias_por_tarjeta()
 
                 # Filtrar transacciones visibles por el ciclo seleccionado
                 ingresos_ciclo = list(ciclo_seleccionado.ingresos.select_related('cuenta_bancaria', 'tarjeta_prestamo').order_by('-fecha'))
@@ -330,6 +334,8 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 context['debug_ingresos_count'] = len(ingresos_ciclo)
                 context['debug_gastos_count'] = 0
             else:
+                deuda_base_este_mes = Decimal('0')
+                total_diferencias_este_mes = Decimal('0')
                 deuda_que_vence_este_mes = Decimal('0')
                 tarjetas_actuales = []
                 aportes_actuales = []
@@ -340,6 +346,8 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 total_devuelto_este_mes = Decimal('0')
                 pendiente_devolucion_este_mes = Decimal('0')
                 porcentaje_cubierto = 0
+                diferencias_actuales = []
+                resumen_diferencias_tarjetas = []
 
             proyeccion = self.object.proyeccion_prestamo()
             aporte_habitual = self.object.aporte_mensual_prestamo or Decimal('600000.00')
@@ -356,7 +364,11 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
             context['total_interes_acumulado'] = total_interes_tarjetas
             context['total_aportes_propios'] = total_aportes_efectivo
             context['deuda_total_proximo_mes'] = deuda_total_proximo_mes
+            context['deuda_base_este_mes'] = deuda_base_este_mes
+            context['total_diferencias_este_mes'] = total_diferencias_este_mes
             context['deuda_que_vence_este_mes'] = deuda_que_vence_este_mes
+            context['diferencias_actuales'] = diferencias_actuales
+            context['resumen_diferencias_tarjetas'] = resumen_diferencias_tarjetas
             context['total_devuelto_este_mes'] = total_devuelto_este_mes
             context['pendiente_devolucion_este_mes'] = pendiente_devolucion_este_mes
             context['porcentaje_cubierto'] = porcentaje_cubierto
@@ -367,6 +379,7 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
 
             # Forms de apoyo
             context['form_tarjeta'] = TarjetaPrestamoForm()
+            context['form_diferencia'] = DiferenciaTarjetaForm(presupuesto=self.object)
             context['form_cerrar_ciclo'] = CerrarCicloPrestamoForm(initial={
                 'nuevo_nombre': "Período Diciembre 2026 (desde 20/11)",
                 'nueva_fecha_inicio': date(2026, 11, 20),
@@ -654,6 +667,8 @@ class IngresoUpdateView(IngresoEditableMixin, UpdateView):
         context['presupuesto'] = self.object.presupuesto
         context['editing'] = True
         context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
+        if self.object.presupuesto.tipo == 'prestamo':
+            context['form_tarjeta'] = TarjetaPrestamoForm()
         return context
 
 
@@ -748,8 +763,11 @@ class IngresoCreateView(LoginRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['presupuesto'] = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
+        presupuesto = get_object_or_404(presupuestos_editables(self.request.user), pk=self.kwargs['presupuesto_pk'])
+        context['presupuesto'] = presupuesto
         context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
+        if presupuesto.tipo == 'prestamo':
+            context['form_tarjeta'] = TarjetaPrestamoForm()
         return context
 
 
@@ -1007,6 +1025,9 @@ def guardar_tarjeta_prestamo(request, pk):
             messages.success(request, f"Tarjeta '{tarjeta.nombre}' guardada correctamente.")
         else:
             messages.error(request, "Error al guardar la tarjeta. Verifique los campos.")
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
     return redirect('presupuestos:ver_presupuesto', pk=pk)
 
 
@@ -1018,4 +1039,48 @@ def eliminar_tarjeta_prestamo(request, pk):
         nombre = tarjeta.nombre
         tarjeta.delete()
         messages.success(request, f"Tarjeta '{nombre}' eliminada.")
+    next_url = request.POST.get('next') or request.GET.get('next')
+    if next_url:
+        return redirect(next_url)
+    return redirect('presupuestos:ver_presupuesto', pk=presupuesto_pk)
+
+
+@login_required
+def agregar_diferencia_tarjeta(request, pk):
+    presupuesto = get_object_or_404(presupuestos_editables(request.user), pk=pk)
+    if request.method == 'POST':
+        ciclo_id = request.POST.get('ciclo_id')
+        ciclo = None
+        if ciclo_id:
+            ciclo = presupuesto.ciclos_prestamo.filter(pk=ciclo_id).first()
+        if not ciclo:
+            ciclo = presupuesto.ciclos_prestamo.filter(esta_cerrado=False).first()
+
+        if not ciclo:
+            messages.error(request, "No hay un período activo para agregar la diferencia.")
+            return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+        form = DiferenciaTarjetaForm(request.POST, presupuesto=presupuesto)
+        if form.is_valid():
+            diferencia = form.save(commit=False)
+            diferencia.ciclo_prestamo = ciclo
+            diferencia.save()
+            messages.success(request, f"Diferencia de +${diferencia.monto:,.2f} agregada a '{diferencia.tarjeta.nombre}'.")
+        else:
+            messages.error(request, "Error al registrar la diferencia. Verifique los datos.")
+    return redirect('presupuestos:ver_presupuesto', pk=pk)
+
+
+@login_required
+def eliminar_diferencia_tarjeta(request, pk):
+    diferencia = get_object_or_404(
+        DiferenciaTarjeta.objects.filter(ciclo_prestamo__presupuesto__in=presupuestos_editables(request.user)),
+        pk=pk
+    )
+    presupuesto_pk = diferencia.ciclo_prestamo.presupuesto_id
+    if request.method == 'POST':
+        monto = diferencia.monto
+        tarjeta_nom = diferencia.tarjeta.nombre
+        diferencia.delete()
+        messages.success(request, f"Diferencia de ${monto:,.2f} de '{tarjeta_nom}' eliminada.")
     return redirect('presupuestos:ver_presupuesto', pk=presupuesto_pk)

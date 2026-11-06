@@ -318,13 +318,29 @@ class CicloPrestamo(models.Model):
     def total_devuelto(self):
         return self.total_tarjetas() + self.total_efectivo()
 
+    def total_diferencias(self):
+        return self.diferencias_tarjetas.aggregate(t=models.Sum('monto'))['t'] or Decimal('0.00')
+
+    def deuda_total_a_devolver(self):
+        return self.deuda_a_devolver + self.total_diferencias()
+
     def pendiente_devolver(self):
-        return max(Decimal('0'), self.deuda_a_devolver - self.total_devuelto())
+        return max(Decimal('0'), self.deuda_total_a_devolver() - self.total_devuelto())
 
     def porcentaje_cubierto(self):
-        if self.deuda_a_devolver > 0:
-            return min(100, round((self.total_devuelto() / self.deuda_a_devolver) * 100))
+        deuda = self.deuda_total_a_devolver()
+        if deuda > 0:
+            return min(100, round((self.total_devuelto() / deuda) * 100))
         return 100 if self.total_devuelto() > 0 else 0
+
+    def resumen_diferencias_por_tarjeta(self):
+        res = []
+        for t in self.presupuesto.tarjetas_prestamo.all():
+            diffs = list(self.diferencias_tarjetas.filter(tarjeta=t))
+            tot = sum(d.monto for d in diffs)
+            if diffs:
+                res.append({'tarjeta': t, 'total': tot, 'items': diffs})
+        return res
 
 
 class TarjetaPrestamo(models.Model):
@@ -377,6 +393,23 @@ class TarjetaPrestamo(models.Model):
             'es_seguro_sacar': ya_cerro,
             'mensaje': "Habilitada para sacar (diferido)" if ya_cerro else f"Cierra el {cierre.strftime('%d/%m')} (en {dias_para_cierre} días)"
         }
+
+
+class DiferenciaTarjeta(models.Model):
+    ciclo_prestamo = models.ForeignKey(CicloPrestamo, on_delete=models.CASCADE, related_name='diferencias_tarjetas')
+    tarjeta = models.ForeignKey(TarjetaPrestamo, on_delete=models.CASCADE, related_name='diferencias')
+    monto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'), verbose_name="Monto extra / diferencia")
+    fecha = models.DateField(default=timezone.now, verbose_name="Fecha del resumen")
+    concepto = models.CharField(max_length=150, default="Mantenimiento / Sellos resumen", verbose_name="Concepto / Detalle")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-created_at']
+        verbose_name = 'Diferencia de Tarjeta'
+        verbose_name_plural = 'Diferencias de Tarjetas'
+
+    def __str__(self):
+        return f"{self.tarjeta.nombre} - +${self.monto} ({self.concepto})"
 
 
 class Ingreso(models.Model):

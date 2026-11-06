@@ -16,6 +16,8 @@ urlpatterns = [
     path('presupuesto/<int:pk>/cerrar-ciclo/', views.cerrar_ciclo_prestamo, name='cerrar_ciclo_prestamo'),
     path('presupuesto/<int:pk>/guardar-tarjeta/', views.guardar_tarjeta_prestamo, name='guardar_tarjeta_prestamo'),
     path('tarjeta-prestamo/<int:pk>/eliminar/', views.eliminar_tarjeta_prestamo, name='eliminar_tarjeta_prestamo'),
+    path('presupuesto/<int:pk>/agregar-diferencia/', views.agregar_diferencia_tarjeta, name='agregar_diferencia_tarjeta'),
+    path('diferencia-tarjeta/<int:pk>/eliminar/', views.eliminar_diferencia_tarjeta, name='eliminar_diferencia_tarjeta'),
     path('presupuesto/<int:pk>/', views.PresupuestoDetailView.as_view(), name='ver_presupuesto'),
 
     # URLs de Categoría
