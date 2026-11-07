@@ -174,8 +174,9 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             'metodo_pago': 'Medio de Pago'
         }
         
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, user=None, presupuesto=None, **kwargs):
         self.user = user
+        self.presupuesto = presupuesto
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             if self.instance.persona:

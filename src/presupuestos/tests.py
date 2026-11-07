@@ -157,3 +157,17 @@ class PrestamoTarjetasTest(TestCase):
         self.assertEqual(ciclo.deuda_total_a_devolver(), Decimal('10144246.00'))
         self.assertEqual(ciclo.pendiente_devolver(), Decimal('14500.00'))
         self.assertEqual(len(ciclo.resumen_diferencias_por_tarjeta()), 1)
+
+    def test_editar_gasto_view_no_falla_con_presupuesto(self):
+        from .models import Gasto
+        from django.urls import reverse
+        gasto = Gasto.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Gasto rapido prueba',
+            monto=Decimal('500.00'),
+            es_rapido=True
+        )
+        self.client.force_login(self.user)
+        url = reverse('presupuestos:editar_gasto', kwargs={'pk': gasto.pk})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
