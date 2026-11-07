@@ -129,23 +129,8 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         owner = self.object.usuario
         user_cuentas = list(CuentaBancaria.objects.filter(usuario=owner).order_by('nombre'))
 
-        # Auto-vincular movimientos previos cuyo concepto coincida con el nombre de una cuenta
-        for c in user_cuentas:
-            c_low = c.nombre.lower()
-            for i in ingresos:
-                if not i.cuenta_bancaria and c_low in i.nombre.lower():
-                    i.cuenta_bancaria = c
-                    i.save(update_fields=['cuenta_bancaria'])
-            for g in gastos:
-                if not g.cuenta_bancaria and c_low in g.nombre.lower():
-                    g.cuenta_bancaria = c
-                    g.save(update_fields=['cuenta_bancaria'])
-
         # Desglose de saldos por cuenta bancaria / billetera
-        cuentas_map = {
-            c.nombre: {'nombre': c.nombre, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
-            for c in user_cuentas
-        }
+        cuentas_map = {}
         for i in ingresos:
             if i.cuenta_bancaria:
                 c_nom = i.cuenta_bancaria.nombre
@@ -161,7 +146,9 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
 
         for c in cuentas_map.values():
             c['saldo'] = c['ingresos'] - c['gastos']
-        saldos_por_cuenta = sorted(cuentas_map.values(), key=lambda x: -x['saldo'])
+
+        # Filtrar solo cuentas y billeteras con saldo diferente de cero
+        saldos_por_cuenta = [c for c in sorted(cuentas_map.values(), key=lambda x: -x['saldo']) if c['saldo'] != Decimal('0')]
 
         # Desglose de gastos por persona / destinatario
         personas_map = {}

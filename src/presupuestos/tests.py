@@ -171,3 +171,35 @@ class PrestamoTarjetasTest(TestCase):
         url = reverse('presupuestos:editar_gasto', kwargs={'pk': gasto.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+    def test_ingreso_efectivo_no_tiene_cuenta_bancaria(self):
+        from .models import CuentaBancaria
+        cuenta = CuentaBancaria.objects.create(usuario=self.user, nombre='Billetera')
+        ingreso = Ingreso.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Ingreso en mano',
+            monto=Decimal('5000.00'),
+            tipo_ingreso='efectivo',
+            cuenta_bancaria=cuenta
+        )
+        self.assertIsNone(ingreso.cuenta_bancaria)
+
+    def test_saldos_por_cuenta_solo_muestra_con_saldo(self):
+        from .models import CuentaBancaria
+        from django.urls import reverse
+        c0 = CuentaBancaria.objects.create(usuario=self.user, nombre='Vacia')
+        c1 = CuentaBancaria.objects.create(usuario=self.user, nombre='Mercadopago')
+        Ingreso.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Cobro MP',
+            monto=Decimal('1000.00'),
+            tipo_ingreso='transferencia',
+            cuenta_bancaria=c1
+        )
+        self.client.force_login(self.user)
+        url = reverse('presupuestos:ver_presupuesto', kwargs={'pk': self.presupuesto.pk})
+        res = self.client.get(url)
+        saldos = res.context['saldos_por_cuenta']
+        nombres = [s['nombre'] for s in saldos]
+        self.assertIn('Mercadopago', nombres)
+        self.assertNotIn('Vacia', nombres)

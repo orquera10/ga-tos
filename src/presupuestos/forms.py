@@ -195,8 +195,11 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
         if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
             current_user = self.instance.presupuesto.usuario
 
+        metodo_pago = self.cleaned_data.get('metodo_pago')
         cuenta_nom = (self.cleaned_data.get('cuenta_bancaria_nombre') or '').strip()
-        if cuenta_nom and current_user:
+        if metodo_pago == 'efectivo' or not cuenta_nom:
+            self.instance.cuenta_bancaria = None
+        elif cuenta_nom and current_user:
             from .models import CuentaBancaria
             cuenta, _ = CuentaBancaria.objects.get_or_create(
                 usuario=current_user,
@@ -204,8 +207,6 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
                 defaults={'nombre': cuenta_nom.title()}
             )
             self.instance.cuenta_bancaria = cuenta
-        elif not cuenta_nom:
-            self.instance.cuenta_bancaria = None
 
         if 'persona' in self.cleaned_data:
             p = (self.cleaned_data.get('persona') or '').strip()
@@ -347,8 +348,11 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
         if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
             current_user = self.instance.presupuesto.usuario
 
+        tipo_ingreso = self.cleaned_data.get('tipo_ingreso')
         cuenta_nom = (self.cleaned_data.get('cuenta_bancaria_nombre') or '').strip()
-        if cuenta_nom and current_user:
+        if tipo_ingreso == 'efectivo' or not cuenta_nom:
+            self.instance.cuenta_bancaria = None
+        elif cuenta_nom and current_user:
             from .models import CuentaBancaria
             cuenta, _ = CuentaBancaria.objects.get_or_create(
                 usuario=current_user,
@@ -356,8 +360,6 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
                 defaults={'nombre': cuenta_nom.title()}
             )
             self.instance.cuenta_bancaria = cuenta
-        elif not cuenta_nom:
-            self.instance.cuenta_bancaria = None
 
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']

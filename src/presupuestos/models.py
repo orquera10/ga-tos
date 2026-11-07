@@ -266,6 +266,9 @@ class Gasto(models.Model):
             raise ValidationError({'monto': 'El monto debe ser un número positivo'})
 
     def save(self, *args, **kwargs):
+        if self.metodo_pago == 'efectivo':
+            self.cuenta_bancaria = None
+
         if not self.pk and not self.fecha:
             self.fecha = timezone.now()
         elif self.fecha and timezone.is_naive(self.fecha):
@@ -447,6 +450,9 @@ class Ingreso(models.Model):
             raise ValidationError({'monto': 'El monto debe ser un número positivo'})
 
     def save(self, *args, **kwargs):
+        if self.tipo_ingreso == 'efectivo':
+            self.cuenta_bancaria = None
+
         if not self.pk and not self.fecha:
             self.fecha = timezone.now()
         elif self.fecha and timezone.is_naive(self.fecha):

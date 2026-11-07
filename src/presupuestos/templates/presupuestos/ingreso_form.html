@@ -84,10 +84,15 @@
                             {% endif %}
                         </div>
 
-                        <div class="col-md-6">
-                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-1">
-                                <i class="bi bi-bank"></i> Banco / Billetera <span class="text-muted fw-normal small">(opcional)</span>
-                            </label>
+                        <div class="col-md-6" id="div-banco-billetera">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-0">
+                                    <i class="bi bi-bank"></i> Banco / Billetera <span class="text-muted fw-normal small">(opcional)</span>
+                                </label>
+                                <button type="button" class="btn btn-sm text-muted p-0" id="btn-limpiar-cuenta" style="font-size: 0.75rem;" title="Quitar cuenta vinculada">
+                                    <i class="bi bi-x-circle me-1"></i>Sin cuenta
+                                </button>
+                            </div>
 
                             {% if cuentas_list %}
                             <!-- Línea horizontal deslizable de cuentas bancarias -->
@@ -266,14 +271,46 @@ document.addEventListener('DOMContentLoaded', function () {
                     cuentaInput.value = '';
                 } else {
                     cuentaInput.value = val;
-                    if (tipoSelect) {
+                    if (tipoSelect && tipoSelect.value === 'efectivo') {
                         tipoSelect.value = 'transferencia';
+                        syncMedioIngreso();
                     }
                 }
                 syncCuentaActive();
             });
         });
         cuentaInput.addEventListener('input', syncCuentaActive);
+    }
+
+    const divBanco = document.getElementById('div-banco-billetera');
+    const btnLimpiarCuenta = document.getElementById('btn-limpiar-cuenta');
+
+    function syncMedioIngreso() {
+        if (!tipoSelect) return;
+        if (tipoSelect.value === 'efectivo') {
+            if (divBanco) divBanco.style.display = 'none';
+            if (cuentaInput) {
+                cuentaInput.value = '';
+                syncCuentaActive();
+            }
+        } else {
+            if (divBanco) divBanco.style.display = 'block';
+        }
+    }
+
+    if (btnLimpiarCuenta) {
+        btnLimpiarCuenta.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (cuentaInput) {
+                cuentaInput.value = '';
+                syncCuentaActive();
+            }
+        });
+    }
+
+    if (tipoSelect) {
+        tipoSelect.addEventListener('change', syncMedioIngreso);
+        syncMedioIngreso();
     }
 
     const chkTarjeta = document.getElementById('{{ form.es_extraccion_tarjeta.id_for_label }}');
@@ -324,13 +361,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (chkTarjeta) {
         chkTarjeta.addEventListener('change', function() {
-            if (this.checked && chkAporte) chkAporte.checked = false;
+            if (this.checked) {
+                if (chkAporte) chkAporte.checked = false;
+                if (tipoSelect && tipoSelect.value === 'efectivo') {
+                    tipoSelect.value = 'transferencia';
+                    syncMedioIngreso();
+                }
+            }
             recalcularTarjeta();
         });
         if (chkAporte) {
             chkAporte.addEventListener('change', function() {
-                if (this.checked && chkTarjeta) {
-                    chkTarjeta.checked = false;
+                if (this.checked) {
+                    if (chkTarjeta) chkTarjeta.checked = false;
+                    if (tipoSelect) {
+                        tipoSelect.value = 'efectivo';
+                        syncMedioIngreso();
+                    }
                     recalcularTarjeta();
                 }
             });
