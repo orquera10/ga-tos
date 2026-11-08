@@ -95,9 +95,14 @@
                         </div>
 
                         <div class="col-md-6" id="div-cuenta-bancaria">
-                            <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-1">
-                                <i class="bi bi-bank"></i> Banco / Billetera <span class="text-muted fw-normal small">(opcional)</span>
-                            </label>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label for="{{ form.cuenta_bancaria_nombre.id_for_label }}" class="form-label mb-0">
+                                    <i class="bi bi-bank"></i> Banco / Billetera <span class="text-muted fw-normal small">(opcional)</span>
+                                </label>
+                                <button type="button" class="btn btn-sm text-muted p-0" id="btn-limpiar-cuenta-gasto" style="font-size: 0.75rem;" title="Quitar cuenta vinculada">
+                                    <i class="bi bi-x-circle me-1"></i>Sin cuenta
+                                </button>
+                            </div>
 
                             {% if cuentas_list %}
                             <!-- Línea horizontal deslizable de cuentas -->
@@ -156,16 +161,23 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Manejo de chips de persona/tags
+    // Manejo de chips de persona/tags (Multi-selección)
     const personaInput = document.getElementById('{{ form.persona.id_for_label }}');
     const personaChips = document.querySelectorAll('.js-chip-persona');
 
+    function getSelectedPersonas() {
+        if (!personaInput || !personaInput.value) return [];
+        return personaInput.value.split(',')
+            .map(p => p.trim())
+            .filter(p => p.length > 0);
+    }
+
     function syncPersonaActive() {
         if (!personaInput) return;
-        const currentVal = (personaInput.value || '').trim().toLowerCase();
+        const selected = getSelectedPersonas().map(p => p.toLowerCase());
         personaChips.forEach(chip => {
             const chipVal = (chip.dataset.val || '').trim().toLowerCase();
-            if (chipVal && chipVal === currentVal) {
+            if (chipVal && selected.includes(chipVal)) {
                 chip.classList.add('active');
             } else {
                 chip.classList.remove('active');
@@ -178,12 +190,17 @@ document.addEventListener('DOMContentLoaded', function () {
         personaChips.forEach(chip => {
             chip.addEventListener('click', function (e) {
                 e.preventDefault();
-                const val = this.dataset.val || '';
-                if ((personaInput.value || '').trim().toLowerCase() === val.trim().toLowerCase()) {
-                    personaInput.value = '';
+                const val = (this.dataset.val || '').trim();
+                if (!val) return;
+
+                let selected = getSelectedPersonas();
+                const index = selected.findIndex(p => p.toLowerCase() === val.toLowerCase());
+                if (index >= 0) {
+                    selected.splice(index, 1);
                 } else {
-                    personaInput.value = val;
+                    selected.push(val);
                 }
+                personaInput.value = selected.join(', ');
                 syncPersonaActive();
             });
         });
@@ -194,6 +211,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const cuentaInput = document.getElementById('{{ form.cuenta_bancaria_nombre.id_for_label }}');
     const metodoSelect = document.getElementById('id_metodo_pago');
     const cuentaChips = document.querySelectorAll('.js-chip-cuenta');
+    const divCuenta = document.getElementById('div-cuenta-bancaria');
+    const btnLimpiarCuentaGasto = document.getElementById('btn-limpiar-cuenta-gasto');
 
     function syncCuentaActive() {
         if (!cuentaInput) return;
@@ -208,6 +227,34 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    function syncMetodoPago() {
+        if (!metodoSelect) return;
+        if (metodoSelect.value === 'efectivo') {
+            if (divCuenta) divCuenta.style.display = 'none';
+            if (cuentaInput) {
+                cuentaInput.value = '';
+                syncCuentaActive();
+            }
+        } else {
+            if (divCuenta) divCuenta.style.display = 'block';
+        }
+    }
+
+    if (btnLimpiarCuentaGasto) {
+        btnLimpiarCuentaGasto.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (cuentaInput) {
+                cuentaInput.value = '';
+                syncCuentaActive();
+            }
+        });
+    }
+
+    if (metodoSelect) {
+        metodoSelect.addEventListener('change', syncMetodoPago);
+        syncMetodoPago();
+    }
+
     if (cuentaInput && cuentaChips.length > 0) {
         syncCuentaActive();
         cuentaChips.forEach(chip => {
@@ -218,11 +265,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     cuentaInput.value = '';
                 } else {
                     cuentaInput.value = val;
-                    if (metodoSelect) {
+                    if (metodoSelect && metodoSelect.value === 'efectivo') {
                         metodoSelect.value = 'transferencia';
                     }
                 }
                 syncCuentaActive();
+                syncMetodoPago();
             });
         });
         cuentaInput.addEventListener('input', syncCuentaActive);

@@ -39,9 +39,10 @@ def get_user_recent_personas(user):
     )
     result = []
     for p in raw:
-        clean = p.strip()
-        if clean and clean not in result:
-            result.append(clean)
+        for single in p.split(','):
+            clean = single.strip().title()
+            if clean and clean not in result:
+                result.append(clean)
     return result
 
 
@@ -153,23 +154,36 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         # Desglose de gastos por persona / destinatario
         personas_map = {}
         for g in gastos:
-            p_nom = g.persona.strip() if g.persona else 'Sin asignar'
-            if p_nom not in personas_map:
-                personas_map[p_nom] = {'persona': p_nom, 'total': Decimal('0'), 'cantidad': 0}
-            personas_map[p_nom]['total'] += g.monto
-            personas_map[p_nom]['cantidad'] += 1
+            if g.persona and g.persona.strip():
+                parts = [p.strip().title() for p in g.persona.split(',') if p.strip()]
+            else:
+                parts = ['Sin asignar']
+            for p_nom in parts:
+                if p_nom not in personas_map:
+                    personas_map[p_nom] = {'persona': p_nom, 'total': Decimal('0'), 'cantidad': 0}
+                personas_map[p_nom]['total'] += g.monto
+                personas_map[p_nom]['cantidad'] += 1
 
         resumen_gastos_por_persona = sorted(personas_map.values(), key=lambda x: -x['total'])
         for item in resumen_gastos_por_persona:
             item['porcentaje'] = round((item['total'] / total_gastos) * 100) if total_gastos else 0
 
         # Personas en este presupuesto y todas las personas del usuario
-        personas_list = sorted(list({g.persona.strip() for g in gastos if g.persona and g.persona.strip()}))
-        todas_las_personas = sorted(list({
-            p.strip()
-            for p in Gasto.objects.filter(presupuesto__usuario=owner).exclude(persona='').values_list('persona', flat=True)
-            if p.strip()
-        }))
+        personas_set = set()
+        for g in gastos:
+            if g.persona and g.persona.strip():
+                for p in g.persona.split(','):
+                    if p.strip():
+                        personas_set.add(p.strip().title())
+        personas_list = sorted(list(personas_set))
+
+        todas_set = set()
+        for p_raw in Gasto.objects.filter(presupuesto__usuario=owner).exclude(persona='').values_list('persona', flat=True):
+            if p_raw:
+                for p in p_raw.split(','):
+                    if p.strip():
+                        todas_set.add(p.strip().title())
+        todas_las_personas = sorted(list(todas_set))
         if not personas_list:
             personas_list = todas_las_personas
 

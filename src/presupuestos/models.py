@@ -252,13 +252,19 @@ class Gasto(models.Model):
     presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='gastos')
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, null=True, blank=True)
     nombre = models.CharField(max_length=100)
-    persona = models.CharField(max_length=60, blank=True, default='')
+    persona = models.CharField(max_length=200, blank=True, default='')
     cuenta_bancaria = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='gastos')
     descripcion = models.TextField(blank=True, null=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
     fecha = models.DateTimeField(default=timezone.now)
     es_rapido = models.BooleanField(default=False, verbose_name="Carga rápida pendiente")
+
+    @property
+    def persona_list(self):
+        if not self.persona:
+            return []
+        return [p.strip() for p in self.persona.split(',') if p.strip()]
 
     def clean(self):
         super().clean()

@@ -737,7 +737,7 @@
                                     {% elif transaccion.metodo_pago == 'transferencia' %}
                                         <span class="badge bg-primary ms-1"><i class="bi bi-bank"></i> Transf.{% if transaccion.cuenta_bancaria %} ({{ transaccion.cuenta_bancaria.nombre }}){% endif %}</span>
                                     {% elif transaccion.metodo_pago == 'tarjeta' %}
-                                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-credit-card"></i> Tarjeta (Próx. mes)</span>
+                                        <span class="badge bg-warning text-dark ms-1"><i class="bi bi-credit-card"></i> Tarjeta (Próx. mes){% if transaccion.cuenta_bancaria %} ({{ transaccion.cuenta_bancaria.nombre }}){% endif %}</span>
                                     {% endif %}
                                 </p>
                                 {% if transaccion.descripcion %}
@@ -1329,13 +1329,18 @@
                     });
                     btn.classList.add('active');
 
-                    var target = btn.getAttribute('data-persona');
+                    var target = (btn.getAttribute('data-persona') || '').trim().toLowerCase();
                     document.querySelectorAll('.transaccion-item').forEach(function(item) {
-                        var p = (item.getAttribute('data-persona') || '').trim();
-                        if (target === 'all' || p === target) {
+                        var pAttr = (item.getAttribute('data-persona') || '').trim().toLowerCase();
+                        if (target === 'all') {
                             item.style.display = '';
                         } else {
-                            item.style.display = 'none';
+                            var pList = pAttr.split(',').map(function(s) { return s.trim(); });
+                            if (pList.indexOf(target) !== -1) {
+                                item.style.display = '';
+                            } else {
+                                item.style.display = 'none';
+                            }
                         }
                     });
 

@@ -129,11 +129,11 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
     presupuesto_pk = forms.IntegerField(widget=forms.HiddenInput(), required=False)
     persona = forms.CharField(
         required=False,
-        max_length=60,
+        max_length=200,
         label='Persona / Tag',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Ej: Hija, Victoria, Dario, Personal...',
+            'placeholder': 'Ej: Dario, Camila, Victoria...',
             'autocomplete': 'off'
         })
     )
@@ -191,6 +191,9 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
             self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True, user=None):
+        if self.presupuesto and not getattr(self.instance, 'presupuesto_id', None):
+            self.instance.presupuesto = self.presupuesto
+
         current_user = user or self.user
         if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
             current_user = self.instance.presupuesto.usuario
@@ -210,7 +213,11 @@ class GastoForm(CapitalizeFieldsMixin, forms.ModelForm):
 
         if 'persona' in self.cleaned_data:
             p = (self.cleaned_data.get('persona') or '').strip()
-            self.instance.persona = p.title() if p else ''
+            if p:
+                names = [name.strip().title() for name in p.split(',') if name.strip()]
+                self.instance.persona = ', '.join(names)
+            else:
+                self.instance.persona = ''
 
         if self.cleaned_data.get('fecha'):
             self.instance.fecha = self.cleaned_data['fecha']
@@ -344,6 +351,9 @@ class IngresoForm(CapitalizeFieldsMixin, forms.ModelForm):
             self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
     
     def save(self, commit=True, user=None):
+        if self.presupuesto and not getattr(self.instance, 'presupuesto_id', None):
+            self.instance.presupuesto = self.presupuesto
+
         current_user = user or self.user
         if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
             current_user = self.instance.presupuesto.usuario

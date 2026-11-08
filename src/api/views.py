@@ -134,11 +134,14 @@ def presupuestos_api(request):
         })
 
     user = request.api_user
-    personas = sorted(list({
-        p.strip()
-        for p in Gasto.objects.filter(presupuesto__usuario=user).exclude(persona='').values_list('persona', flat=True)
-        if p.strip()
-    }))
+    personas_set = set()
+    for p in Gasto.objects.filter(presupuesto__usuario=user).exclude(persona='').values_list('persona', flat=True):
+        if p:
+            for single in p.split(','):
+                clean = single.strip().title()
+                if clean:
+                    personas_set.add(clean)
+    personas = sorted(list(personas_set))
     cuentas = list(CuentaBancaria.objects.filter(usuario=user).values_list('nombre', flat=True).order_by('nombre'))
 
     return JsonResponse({

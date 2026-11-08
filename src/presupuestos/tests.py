@@ -203,3 +203,32 @@ class PrestamoTarjetasTest(TestCase):
         nombres = [s['nombre'] for s in saldos]
         self.assertIn('Mercadopago', nombres)
         self.assertNotIn('Vacia', nombres)
+
+    def test_gasto_multiples_personas_y_banco_con_tarjeta(self):
+        from .forms import GastoForm
+        from .models import CuentaBancaria
+        from .views import get_user_recent_personas
+
+        form = GastoForm(
+            data={
+                'nombre': 'Cena Familiar',
+                'monto': '12500.00',
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria_nombre': 'Patagonia',
+                'persona': 'dario, camila, victoria',
+                'fecha': '2026-11-07T20:00:00',
+            },
+            user=self.user,
+            presupuesto=self.presupuesto
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        gasto = form.save()
+        self.assertEqual(gasto.persona, 'Dario, Camila, Victoria')
+        self.assertEqual(gasto.persona_list, ['Dario', 'Camila', 'Victoria'])
+        self.assertIsNotNone(gasto.cuenta_bancaria)
+        self.assertEqual(gasto.cuenta_bancaria.nombre, 'Patagonia')
+
+        recent = get_user_recent_personas(self.user)
+        self.assertIn('Dario', recent)
+        self.assertIn('Camila', recent)
+        self.assertIn('Victoria', recent)
