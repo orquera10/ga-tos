@@ -62,14 +62,13 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.0
-          name: "Ga$tos Android APK v2.0.0"
+          tag_name: v2.0.1
+          name: "Ga$tos Android APK v2.0.1"
           body: |
-            ### App Android de Ga$tos v2.0.0 — Rediseño Moderno (Figma)
+            ### App Android de Ga$tos v2.0.1 — Rediseño Moderno (Figma) + Control de Préstamo
             - **Nueva Interfaz Moderna**: Rediseño completo fiel al prototipo de Figma con barra de navegación inferior (`Inicio`, `Movimientos`, `Análisis`, `Cuentas`) y botón flotante (`+`).
-            - **Selector de Presupuesto en Foco**: Elegí cualquier presupuesto desde el selector superior para enfocar todas las secciones y sincronizar automáticamente el Widget.
-            - **Sección Cuentas**: Visualizá tu patrimonio disponible, balances por billetera virtual, banco, tarjeta y efectivo, y agregá nuevas cuentas con `+ Agregar una cuenta`.
-            - **Transferencias entre Cuentas y Efectivo**: Mové fondos entre efectivo y billeteras/bancos directamente desde la app.
+            - **Soporte completo para Presupuestos tipo Préstamo**: Panel de ciclos/períodos, tarjetas del préstamo con semáforo de fechas de cierre (`Patagonia Rubén`, `Patagonia Palmira`, `Naranja`), carga de `+ Ingreso Tarjeta` (con cálculo automático del 4.5%), `+ Ingreso Efectivo`, `+ Diferencia Tarjeta` (resúmenes), cierre de ciclo y cronograma de proyección mes a mes en `Análisis`.
+            - **Selector de Presupuesto en Foco y Sección Cuentas**: Elegí cualquier presupuesto desde arriba y gestioná tus cuentas y transferencias.
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

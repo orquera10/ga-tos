@@ -22,6 +22,12 @@ urlpatterns = [
     path('cuentas/crear/', views.crear_cuenta_api, name='crear_cuenta'),
     path('cuentas/<int:pk>/eliminar/', views.eliminar_cuenta_api, name='eliminar_cuenta'),
 
+    # Acciones específicas para presupuestos tipo Préstamo
+    path('prestamo/ingreso/crear/', views.crear_ingreso_prestamo_api, name='crear_ingreso_prestamo'),
+    path('prestamo/diferencia/crear/', views.crear_diferencia_prestamo_api, name='crear_diferencia_prestamo'),
+    path('prestamo/tarjeta/guardar/', views.guardar_tarjeta_prestamo_api, name='guardar_tarjeta_prestamo'),
+    path('prestamo/cerrar-ciclo/', views.cerrar_ciclo_prestamo_api, name='cerrar_ciclo_prestamo'),
+
     # Vista ultra-rápida optimizada para el Widget
     path('widget/resumen/', views.widget_resumen_api, name='widget_resumen'),
 ]

@@ -1187,6 +1187,8 @@
       ingresoTipo: 'transferencia',
       ingresoCuenta: '',
       transModo: 'efectivo_a_cuenta', // 'efectivo_a_cuenta' | 'cuenta_a_efectivo' | 'entre_cuentas'
+      selectedCicloId: 0,
+      editingTarjetaPrestamo: null,
     };
 
     // Sincronizar con query params o AndroidBridge si está presente
@@ -1256,12 +1258,13 @@
       await loadBudgetDetail(state.selectedBudgetId);
     }
 
-    async function loadBudgetDetail(budgetId) {
+    async function loadBudgetDetail(budgetId, cicloId = 0) {
       state.loading = true;
       render();
-      const url = budgetId && budgetId > 0
+      const base = budgetId && budgetId > 0
         ? `/api/presupuestos/${budgetId}/detalle/`
         : `/api/presupuestos/activo/detalle/`;
+      const url = cicloId && cicloId > 0 ? `${base}?ciclo_id=${cicloId}` : base;
       const res = await apiFetch(url);
       if (res.status === 401 || res.status === 403) {
         state.needsLogin = true;
@@ -1295,13 +1298,17 @@
 
     function selectBudget(id) {
       state.selectedBudgetId = Number(id);
+      state.selectedCicloId = 0;
       localStorage.setItem('gastos_selected_budget_id', String(id));
       state.sheet = null;
       state.movFilter = 'Todos';
-      loadBudgetDetail(state.selectedBudgetId);
+      loadBudgetDetail(state.selectedBudgetId, 0);
     }
 
     function openSheet(name) {
+      if (name === 'prestamo_nueva_tarjeta') {
+        state.editingTarjetaPrestamo = null;
+      }
       state.sheet = name;
       if (name === 'gasto') {
         const cuentas = (state.data && state.data.cuentas_disponibles) || [];
@@ -1399,10 +1406,167 @@
       `;
     }
 
+    function renderInicioPrestamo(d) {
+      const p = d.presupuesto;
+      const pi = d.prestamo_info || {};
+      const c = pi.ciclo_actual || {
+        nombre: 'Período Actual',
+        deuda_base: 0,
+        total_diferencias: 0,
+        deuda_total_a_devolver: 0,
+        total_extraido_tarjetas: 0,
+        total_interes_tarjetas: 0,
+        deuda_proximo_ciclo: 0,
+        total_aportes_efectivo: 0,
+        total_devuelto: 0,
+        pendiente_devolver: 0,
+        porcentaje_cubierto: 0,
+        tarjeta_necesaria_proximo_mes: 0,
+      };
+      const tarjetas = pi.tarjetas || [];
+      const movs = (d.movimientos || []).slice(0, 5);
+      const pct = Math.min(100, Math.max(0, Math.round(c.porcentaje_cubierto || 0)));
+
+      return `
+        <section class="balance-card" style="background:linear-gradient(140deg,#263859 0%,#394f7c 55%,#536cae 100%);">
+          <div class="balance-head">
+            <div>
+              <span>Pendiente devolver · ${escapeHtml(c.nombre)}</span>
+              <div class="balance-value">
+                <h1>${state.balanceVisible ? money(c.pendiente_devolver) : '$ ••••••'}</h1>
+                <button type="button" id="btnToggleBalance" aria-label="Mostrar u ocultar">
+                  ${iconSvg(state.balanceVisible ? 'eye' : 'eyeOff', 19)}
+                </button>
+              </div>
+            </div>
+            <button type="button" class="period" data-open-sheet="ciclos_prestamo" title="Cambiar período del préstamo">
+              ${iconSvg('calendar', 14)}
+              <span>${escapeHtml(c.nombre)}</span>
+            </button>
+          </div>
+          <div class="balance-row">
+            <div>
+              <span class="metric-icon expense">${iconSvg('up', 16)}</span>
+              <p>A devolver este mes</p>
+              <strong>${money(c.deuda_total_a_devolver)}</strong>
+            </div>
+            <div>
+              <span class="metric-icon income">${iconSvg('down', 16)}</span>
+              <p>Ya devuelto (${pct}%)</p>
+              <strong>+${money(c.total_devuelto)}</strong>
+            </div>
+          </div>
+          <span class="glow one"></span>
+          <span class="glow two"></span>
+        </section>
+
+        <section class="quick-section">
+          <button type="button" data-open-sheet="prestamo_tarjeta">
+            <span class="action-icon amber">${iconSvg('card')}</span>
+            <strong>+ Tarjeta</strong>
+          </button>
+          <button type="button" data-open-sheet="prestamo_efectivo">
+            <span class="action-icon green">${iconSvg('cash')}</span>
+            <strong>+ Efectivo</strong>
+          </button>
+          <button type="button" data-open-sheet="prestamo_diferencia">
+            <span class="action-icon rose">${iconSvg('plus')}</span>
+            <strong>+ Dif. Tarjeta</strong>
+          </button>
+          <button type="button" data-open-sheet="prestamo_cerrar_ciclo">
+            <span class="action-icon blue">${iconSvg('swap')}</span>
+            <strong>Cerrar Ciclo</strong>
+          </button>
+        </section>
+
+        <section class="budget-card">
+          <div class="section-top">
+            <div>
+              <span class="overline">CONTROL DEL PERÍODO · ${escapeHtml(p.nombre)}</span>
+              <h2>${escapeHtml(c.nombre)}</h2>
+            </div>
+            <button type="button" data-open-sheet="ciclos_prestamo" title="Ver períodos">
+              ${iconSvg('chevron', 18)}
+            </button>
+          </div>
+          <div class="budget-copy">
+            <span>Cubierto ${money(c.total_devuelto)} de ${money(c.deuda_total_a_devolver)}</span>
+            <strong>${pct}%</strong>
+          </div>
+          <div class="progress">
+            <i style="width:${pct}%"></i>
+          </div>
+          <div class="budget-subpills" style="margin-top:12px;">
+            <span>📌 Deuda base: ${money(c.deuda_base)}</span>
+            ${c.total_diferencias > 0 ? `<span style="color:#ff8780;">🧾 + Dif. Resumen: ${money(c.total_diferencias)}</span>` : ''}
+            <span>💳 Sacado Tarjetas: ${money(c.total_extraido_tarjetas)}</span>
+            <span>💵 Aporte Efectivo: ${money(c.total_aportes_efectivo)}</span>
+          </div>
+          <div style="margin-top:14px;padding:12px;border-radius:13px;background:#1b1f2d;border:1px solid #2d3348;">
+            <span class="overline" style="color:#9c91ff;">PRÓXIMO PERÍODO (CON ${pi.tasa_interes || 4.5}% INTERÉS TARJETA)</span>
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:5px;">
+              <span style="font-size:11px;color:#b8b9c8;">Vence el próximo mes:</span>
+              <strong style="font:700 15px 'Manrope',sans-serif;color:#f0bd62;">${money(c.deuda_proximo_ciclo)}</strong>
+            </div>
+            <small style="margin-top:4px;color:#9294a5;">
+              Interés tarjetas: +${money(c.total_interes_tarjetas)} · Con aporte de ${money(pi.aporte_habitual)} necesitás sacar: <b style="color:#55d2ad;">${money(c.tarjeta_necesaria_proximo_mes)}</b>
+            </small>
+          </div>
+        </section>
+
+        <section class="categories-card">
+          <div class="section-top">
+            <div>
+              <span class="overline">CIERRES Y RESÚMENES</span>
+              <h2>Tarjetas del préstamo</h2>
+            </div>
+            <button type="button" data-open-sheet="prestamo_nueva_tarjeta" style="color:#9c91ff;font-size:11px;font-weight:700;">
+              + Agregar
+            </button>
+          </div>
+          <div class="account-list" style="margin-top:10px;border:0;padding:0;box-shadow:none;">
+            ${tarjetas.map(t => `
+              <article data-edit-tarjeta-prestamo="${t.id}">
+                <span class="bank-icon ${t.es_seguro_sacar ? 'cash' : 'macro'}">
+                  ${iconSvg('card')}
+                </span>
+                <div>
+                  <strong>${escapeHtml(t.nombre)}</strong>
+                  <small style="color:${t.es_seguro_sacar ? '#55d2ad' : '#f0bd62'};">
+                    ${t.es_seguro_sacar ? '🟢 ' : '🟠 '}${escapeHtml(t.mensaje)} · Vence ${escapeHtml(t.fecha_vencimiento_str)}
+                  </small>
+                  ${t.diferencias_ciclo > 0 ? `<small style="color:#ff8780;">Dif. resumen este mes: +${money(t.diferencias_ciclo)}</small>` : ''}
+                </div>
+                <div style="text-align:right;">
+                  <b style="display:block;">${money(t.extraido_ciclo)}</b>
+                  ${t.proximo_mes_ciclo > 0 ? `<small style="color:#9294a5;font-size:9px;">Próx: ${money(t.proximo_mes_ciclo)}</small>` : ''}
+                </div>
+                ${iconSvg('chevron', 16)}
+              </article>
+            `).join('')}
+          </div>
+        </section>
+
+        <section class="transactions-card">
+          <div class="section-top">
+            <div>
+              <span class="overline">REGISTROS DEL PERÍODO</span>
+              <h2>Tarjetas, efectivo y diferencias</h2>
+            </div>
+            <button type="button" class="see-all" data-switch-tab="Movimientos">Ver todos</button>
+          </div>
+          ${renderTransactionsHtml(movs)}
+        </section>
+      `;
+    }
+
     function renderInicio(d) {
       const p = d.presupuesto;
       if (!p) {
         return `<div class="empty">No hay presupuestos creados todavía.</div>`;
+      }
+      if (p.tipo === 'prestamo') {
+        return renderInicioPrestamo(d);
       }
       const movs = (d.movimientos || []).slice(0, 4);
       const pct = Math.min(100, Math.max(0, Math.round(p.porcentaje_gastado || 0)));
@@ -1498,12 +1662,16 @@
 
     function renderMovimientos(d) {
       const p = d.presupuesto;
+      const isPrestamo = p && p.tipo === 'prestamo';
       const allMovs = d.movimientos || [];
       const q = state.query.trim().toLowerCase();
       const filtered = allMovs.filter(m => {
         if (state.movFilter === 'Gastos' && m.tipo_movimiento !== 'gasto') return false;
         if (state.movFilter === 'Ingresos' && m.tipo_movimiento !== 'ingreso') return false;
         if (state.movFilter === 'Transferencias' && m.tipo_movimiento !== 'transferencia') return false;
+        if (state.movFilter === 'Tarjetas' && m.tipo_movimiento !== 'extraccion_tarjeta') return false;
+        if (state.movFilter === 'Efectivo' && m.tipo_movimiento !== 'aporte_efectivo') return false;
+        if (state.movFilter === 'Diferencias' && m.tipo_movimiento !== 'diferencia_tarjeta') return false;
         if (state.movFilter.startsWith('Cuenta:')) {
           const targetC = state.movFilter.slice(7).toLowerCase();
           if ((m.cuenta || '').toLowerCase() !== targetC && !(m.detail || '').toLowerCase().includes(targetC)) return false;
@@ -1523,32 +1691,40 @@
       });
 
       const personas = (d.personas_disponibles || []).slice(0, 6);
+      const baseFilters = isPrestamo
+        ? ['Todos', 'Tarjetas', 'Efectivo', 'Diferencias']
+        : ['Todos', 'Gastos', 'Ingresos', 'Transferencias'];
+      const tarjetasPrestamo = (isPrestamo && d.prestamo_info && d.prestamo_info.tarjetas) || [];
 
       return `
         <section class="page-section">
           <div class="page-title">
             <span class="overline">TU ACTIVIDAD · ${escapeHtml(p ? p.nombre : '')}</span>
             <h1>Movimientos</h1>
-            <p>Todos tus ingresos, gastos y transferencias en un solo lugar.</p>
+            <p>${isPrestamo ? 'Extracciones con tarjeta, aportes en efectivo y diferencias de resumen.' : 'Todos tus ingresos, gastos y transferencias en un solo lugar.'}</p>
           </div>
           <div class="search">
             ${iconSvg('search', 19)}
-            <input id="searchInput" value="${escapeHtml(state.query)}" placeholder="Buscar movimiento, cuenta o persona..." />
+            <input id="searchInput" value="${escapeHtml(state.query)}" placeholder="Buscar movimiento, tarjeta o cuenta..." />
             ${state.query ? `<button type="button" id="btnClearSearch">${iconSvg('close', 17)}</button>` : ''}
           </div>
           <div class="filter-chips">
-            ${['Todos', 'Gastos', 'Ingresos', 'Transferencias'].map(f => `
+            ${baseFilters.map(f => `
               <button type="button" class="${state.movFilter === f ? 'active' : ''}" data-mov-filter="${f}">${f}</button>
             `).join('')}
-            ${state.movFilter.startsWith('Cuenta:') ? `
+            ${tarjetasPrestamo.map(t => {
+              const key = `Cuenta:${t.nombre}`;
+              return `<button type="button" class="${state.movFilter === key ? 'active' : ''}" data-mov-filter="${escapeHtml(key)}">💳 ${escapeHtml(t.nombre)}</button>`;
+            }).join('')}
+            ${state.movFilter.startsWith('Cuenta:') && !tarjetasPrestamo.some(t => `Cuenta:${t.nombre}` === state.movFilter) ? `
               <button type="button" class="active" data-mov-filter="Todos">🏦 ${escapeHtml(state.movFilter.slice(7))} ✕</button>
             ` : ''}
-            ${personas.map(pers => {
+            ${!isPrestamo ? personas.map(pers => {
               const key = `Persona:${pers}`;
               return `<button type="button" class="${state.movFilter === key ? 'active' : ''}" data-mov-filter="${escapeHtml(key)}">👤 ${escapeHtml(pers)}</button>`;
-            }).join('')}
+            }).join('') : ''}
           </div>
-          <div class="date-label">${escapeHtml(p ? p.mes_label : '')} (${filtered.length})</div>
+          <div class="date-label">${escapeHtml(isPrestamo && d.prestamo_info && d.prestamo_info.ciclo_actual ? d.prestamo_info.ciclo_actual.nombre : (p ? p.mes_label : ''))} (${filtered.length})</div>
           ${renderTransactionsHtml(filtered)}
         </section>
       `;
@@ -1556,6 +1732,57 @@
 
     function renderAnalisis(d) {
       const p = d.presupuesto;
+      if (p && p.tipo === 'prestamo') {
+        const pi = d.prestamo_info || {};
+        const proy = pi.proyeccion || { cronograma: [], total_meses: 0, total_intereses: 0, deuda_actual: 0 };
+        const cron = proy.cronograma || [];
+        return `
+          <section class="page-section">
+            <div class="page-title">
+              <span class="overline">PROYECCIÓN DE CANCELACIÓN · ${escapeHtml(p.nombre)}</span>
+              <h1>Plan Mes a Mes</h1>
+              <p>Simulación amortizando ${money(pi.aporte_habitual)} por mes y financiando el resto al ${pi.tasa_interes || 4.5}%.</p>
+            </div>
+            <article class="analytics-card">
+              <div class="analytics-heading">
+                <div>
+                  <span>Deuda base proyectada</span>
+                  <strong>${money(proy.deuda_actual)}</strong>
+                </div>
+                <button type="button" data-open-sheet="presupuesto">
+                  ${escapeHtml(p.nombre)} ${iconSvg('chevron', 14)}
+                </button>
+              </div>
+              <div class="budget-subpills" style="margin-top:14px;">
+                <span>🗓️ Tiempo estimado: <b style="color:#fff;">${proy.total_meses} meses</b></span>
+                <span>💵 Aporte mensual: <b style="color:#55d2ad;">${money(pi.aporte_habitual)}</b></span>
+                <span>📈 Intereses totales: <b style="color:#f0bd62;">${money(proy.total_intereses)}</b></span>
+              </div>
+            </article>
+            <article class="categories-card">
+              <div class="section-top">
+                <h2>Cronograma (${cron.length} cuotas/meses)</h2>
+              </div>
+              ${cron.length ? cron.map(row => `
+                <div class="category-row" style="grid-template-columns: 52px 1fr auto; padding:10px 0;">
+                  <div>
+                    <strong style="color:#9c91ff;">Mes ${row.mes}</strong>
+                    <span>${row.es_ultimo ? '¡Cancelación!' : `+${money(row.interes)} int.`}</span>
+                  </div>
+                  <div>
+                    <strong>Deuda: ${money(row.deuda_inicio)}</strong>
+                    <span>Efectivo: ${money(row.aporte)} · Sacás Tarj.: ${money(row.saca_tarjeta)}</span>
+                  </div>
+                  <div style="text-align:right;">
+                    <b style="color:${row.es_ultimo ? '#55d2ad' : '#f0bd62'};">${money(row.vence_proximo)}</b>
+                    <span style="display:block;font-size:8.5px;color:var(--muted);">Próx. mes</span>
+                  </div>
+                </div>
+              `).join('') : `<div class="empty">No hay deuda pendiente para proyectar.</div>`}
+            </article>
+          </section>
+        `;
+      }
       const an = d.analisis || { total_gastado: 0, categorias: [], personas: [] };
       const list = state.analisisMode === 'personas' ? (an.personas || []) : (an.categorias || []);
       const topItem = list.length ? list[0] : { name: 'Sin datos', percent: 0 };
@@ -1668,6 +1895,54 @@
       const todayIso = new Date().toISOString().slice(0, 10);
 
       if (state.sheet === 'menu') {
+        if (p && p.tipo === 'prestamo') {
+          return `
+            <div class="sheet-backdrop" id="sheetBackdrop">
+              <div class="bottom-sheet action-sheet">
+                <div class="handle"></div>
+                <div class="sheet-title">
+                  <div>
+                    <span class="overline">CONTROL DE PRÉSTAMO · ${escapeHtml(p.nombre)}</span>
+                    <h2>¿Qué querés registrar?</h2>
+                  </div>
+                  <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+                </div>
+                <button type="button" data-open-sheet="prestamo_tarjeta">
+                  <span class="action-icon amber">${iconSvg('card')}</span>
+                  <div>
+                    <strong>+ Ingreso con Tarjeta</strong>
+                    <small>Extracción diferida con interés (${(d.prestamo_info && d.prestamo_info.tasa_interes) || 4.5}%)</small>
+                  </div>
+                  ${iconSvg('chevron', 18)}
+                </button>
+                <button type="button" data-open-sheet="prestamo_efectivo">
+                  <span class="action-icon green">${iconSvg('cash')}</span>
+                  <div>
+                    <strong>+ Ingreso en Efectivo</strong>
+                    <small>Aporte propio para amortizar sin interés</small>
+                  </div>
+                  ${iconSvg('chevron', 18)}
+                </button>
+                <button type="button" data-open-sheet="prestamo_diferencia">
+                  <span class="action-icon rose">${iconSvg('plus')}</span>
+                  <div>
+                    <strong>+ Diferencia de Tarjeta</strong>
+                    <small>Mantenimiento o sellos del resumen actual</small>
+                  </div>
+                  ${iconSvg('chevron', 18)}
+                </button>
+                <button type="button" data-open-sheet="prestamo_nueva_tarjeta">
+                  <span class="action-icon blue">${iconSvg('wallet')}</span>
+                  <div>
+                    <strong>+ Agregar Tarjeta al Préstamo</strong>
+                    <small>Configurar cierres y vencimientos</small>
+                  </div>
+                  ${iconSvg('chevron', 18)}
+                </button>
+              </div>
+            </div>
+          `;
+        }
         return `
           <div class="sheet-backdrop" id="sheetBackdrop">
             <div class="bottom-sheet action-sheet">
@@ -1974,6 +2249,251 @@
                   </div>
                 </label>
                 <button type="submit" class="submit purple">Guardar cuenta</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      const pi = (d && d.prestamo_info) || {};
+      const tarjetasP = pi.tarjetas || [];
+      const ciclosP = pi.ciclos || [];
+      const cicloAct = pi.ciclo_actual || {};
+      const tasaP = pi.tasa_interes || 4.5;
+
+      if (state.sheet === 'ciclos_prestamo') {
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">PERÍODOS DEL PRÉSTAMO</span>
+                  <h2>Elegí el período a consultar</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <div>
+                ${ciclosP.map(ci => `
+                  <button type="button" class="budget-option ${cicloAct.id === ci.id ? 'selected' : ''}" data-select-ciclo="${ci.id}">
+                    <div>
+                      <strong>${escapeHtml(ci.nombre)} ${!ci.esta_cerrado ? '· 🟢 Activo' : '· Cerrado'}</strong>
+                      <small>Desde ${escapeHtml(ci.fecha_inicio)} · ${ci.porcentaje_cubierto}% cubierto</small>
+                    </div>
+                    <div class="b-right">
+                      <b>${money(ci.deuda_total_a_devolver)}</b>
+                      <small>Devuelto: ${money(ci.total_devuelto)}</small>
+                    </div>
+                  </button>
+                `).join('')}
+              </div>
+              <button type="button" class="outline-add" data-open-sheet="prestamo_cerrar_ciclo" style="margin-top:8px;">
+                ⏭️ Cerrar período actual e iniciar el próximo
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'prestamo_tarjeta') {
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">${escapeHtml(cicloAct.nombre || 'PRÉSTAMO')}</span>
+                  <h2>+ Ingreso con Tarjeta</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPrestamoTarjeta">
+                <label>
+                  Tarjeta utilizada
+                  <select name="tarjeta_id" required>
+                    ${tarjetasP.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)} (${t.es_seguro_sacar ? '🟢 Habilitada' : '🟠 Cierra ' + t.fecha_cierre_str})</option>`).join('')}
+                  </select>
+                </label>
+                <div class="form-row">
+                  <label>
+                    Monto sacado (recibido)
+                    <div class="amount-input">
+                      <span>$</span>
+                      <input name="monto" id="inpMontoSacado" type="number" step="0.01" min="1" required placeholder="0" inputmode="decimal" autofocus />
+                    </div>
+                  </label>
+                  <label>
+                    Tasa interés (%)
+                    <input name="tasa_interes" id="inpTasaPrestamo" type="number" step="0.01" value="${tasaP}" required />
+                  </label>
+                </div>
+                <label>
+                  Monto a devolver el próximo mes (con interés)
+                  <div class="amount-input">
+                    <span>$</span>
+                    <input name="monto_proximo_mes" id="inpMontoProxMes" type="number" step="0.01" min="1" required placeholder="Se calcula automáticamente" inputmode="decimal" />
+                  </div>
+                </label>
+                <label>
+                  Detalle / Concepto (opcional)
+                  <input name="nombre" placeholder="Ej. Extracción Patagonia Rubén" />
+                </label>
+                <button type="submit" class="submit purple">Guardar extracción con tarjeta</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'prestamo_efectivo') {
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">${escapeHtml(cicloAct.nombre || 'PRÉSTAMO')}</span>
+                  <h2>+ Ingreso en Efectivo (Aporte)</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPrestamoEfectivo">
+                <label>
+                  Monto aportado en efectivo (sin interés)
+                  <div class="amount-input">
+                    <span>$</span>
+                    <input name="monto" type="number" step="0.01" min="1" required value="${pi.aporte_habitual || 600000}" inputmode="decimal" autofocus />
+                  </div>
+                </label>
+                <label>
+                  Concepto
+                  <input name="nombre" value="Aporte propio en efectivo" />
+                </label>
+                <button type="submit" class="submit income">Registrar aporte en efectivo</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'prestamo_diferencia') {
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">GASTOS EXTRA DE RESUMEN · ${escapeHtml(cicloAct.nombre || '')}</span>
+                  <h2>+ Diferencia de Tarjeta</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPrestamoDiferencia">
+                <label>
+                  Tarjeta del resumen
+                  <select name="tarjeta_id" required>
+                    ${tarjetasP.map(t => `<option value="${t.id}">${escapeHtml(t.nombre)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>
+                  Monto extra a sumar al período actual
+                  <div class="amount-input">
+                    <span>$</span>
+                    <input name="monto" type="number" step="0.01" min="1" required placeholder="Ej. 14500" inputmode="decimal" autofocus />
+                  </div>
+                </label>
+                <label>
+                  Concepto / Detalle
+                  <input name="concepto" value="Mantenimiento / Sellos resumen" required />
+                </label>
+                <button type="submit" class="submit expense">Sumar diferencia al período</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'prestamo_nueva_tarjeta') {
+        const editT = state.editingTarjetaPrestamo || {};
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">TARJETA DEL PRÉSTAMO</span>
+                  <h2>${editT.id ? 'Editar tarjeta' : 'Agregar tarjeta'}</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPrestamoGuardarTarjeta">
+                <input type="hidden" name="tarjeta_id" value="${editT.id || ''}" />
+                <label>
+                  Nombre de la tarjeta
+                  <input name="nombre" required value="${escapeHtml(editT.nombre || '')}" placeholder="Ej. Patagonia Rubén, Naranja" />
+                </label>
+                <div class="form-row">
+                  <label>
+                    Día cierre habitual
+                    <input name="dia_cierre_habitual" type="number" min="1" max="31" value="${editT.dia_cierre_habitual || 21}" required />
+                  </label>
+                  <label>
+                    Día vencimiento
+                    <input name="dia_vencimiento_habitual" type="number" min="1" max="31" value="${editT.dia_vencimiento_habitual || 5}" required />
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label>
+                    Próxima fecha cierre
+                    <input name="proxima_fecha_cierre" type="date" value="${editT.proxima_fecha_cierre || todayIso}" />
+                  </label>
+                  <label>
+                    Próximo vencimiento
+                    <input name="proxima_fecha_vencimiento" type="date" value="${editT.proxima_fecha_vencimiento || ''}" />
+                  </label>
+                </div>
+                <label>
+                  Nota (opcional)
+                  <input name="nota" value="${escapeHtml(editT.nota || '')}" placeholder="Ej. Vence del 1 al 5" />
+                </label>
+                <button type="submit" class="submit purple">Guardar tarjeta</button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'prestamo_cerrar_ciclo') {
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">CAMBIO DE PERÍODO</span>
+                  <h2>Cerrar ciclo e iniciar próximo</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPrestamoCerrarCiclo">
+                <label>
+                  Nombre del nuevo período
+                  <input name="nuevo_nombre" required value="Período Diciembre 2026" />
+                </label>
+                <div class="form-row">
+                  <label>
+                    Fecha de inicio
+                    <input name="nueva_fecha_inicio" type="date" value="${todayIso}" required />
+                  </label>
+                  <label>
+                    Deuda que vence en el nuevo período
+                    <div class="amount-input">
+                      <span>$</span>
+                      <input name="deuda_a_devolver" type="number" step="0.01" value="${cicloAct.deuda_proximo_ciclo || 0}" required />
+                    </div>
+                  </label>
+                </div>
+                <button type="submit" class="submit purple">Confirmar cierre e iniciar período</button>
               </form>
             </div>
           </div>
@@ -2338,9 +2858,182 @@
           if (res.ok && res.data && res.data.success) {
             state.sheet = null;
             showToast('✓ Cuenta agregada');
-            await loadBudgetDetail(state.selectedBudgetId);
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
           } else {
             showToast((res.data && res.data.error) || 'Error al agregar cuenta');
+          }
+        };
+      }
+
+      // Eventos de Préstamo
+      document.querySelectorAll('[data-select-ciclo]').forEach(btn => {
+        btn.onclick = () => {
+          const cid = Number(btn.getAttribute('data-select-ciclo'));
+          state.selectedCicloId = cid;
+          state.sheet = null;
+          loadBudgetDetail(state.selectedBudgetId, cid);
+        };
+      });
+
+      document.querySelectorAll('[data-edit-tarjeta-prestamo]').forEach(art => {
+        art.onclick = () => {
+          const tid = Number(art.getAttribute('data-edit-tarjeta-prestamo'));
+          const tarjetas = (state.data && state.data.prestamo_info && state.data.prestamo_info.tarjetas) || [];
+          const found = tarjetas.find(t => t.id === tid);
+          if (found) {
+            state.editingTarjetaPrestamo = found;
+            state.sheet = 'prestamo_nueva_tarjeta';
+            render();
+          }
+        };
+      });
+
+      const inpMontoSacado = document.getElementById('inpMontoSacado');
+      const inpTasaPrestamo = document.getElementById('inpTasaPrestamo');
+      const inpMontoProxMes = document.getElementById('inpMontoProxMes');
+      const recalcProx = () => {
+        if (!inpMontoSacado || !inpTasaPrestamo || !inpMontoProxMes) return;
+        const m = parseFloat(inpMontoSacado.value) || 0;
+        const t = parseFloat(inpTasaPrestamo.value) || 0;
+        if (m > 0) {
+          inpMontoProxMes.value = (m * (1 + t / 100)).toFixed(2);
+        }
+      };
+      if (inpMontoSacado) inpMontoSacado.oninput = recalcProx;
+      if (inpTasaPrestamo) inpTasaPrestamo.oninput = recalcProx;
+
+      const getActiveCicloId = () => {
+        if (state.selectedCicloId > 0) return state.selectedCicloId;
+        return (state.data && state.data.prestamo_info && state.data.prestamo_info.ciclo_actual && state.data.prestamo_info.ciclo_actual.id) || null;
+      };
+
+      const formPrestamoTarjeta = document.getElementById('formPrestamoTarjeta');
+      if (formPrestamoTarjeta) {
+        formPrestamoTarjeta.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPrestamoTarjeta);
+          const res = await apiFetch('/api/prestamo/ingreso/crear/', {
+            method: 'POST',
+            body: {
+              presupuesto_id: state.selectedBudgetId,
+              ciclo_id: getActiveCicloId(),
+              modo: 'tarjeta',
+              tarjeta_id: fd.get('tarjeta_id'),
+              monto: fd.get('monto'),
+              tasa_interes: fd.get('tasa_interes'),
+              monto_proximo_mes: fd.get('monto_proximo_mes'),
+              nombre: fd.get('nombre') || '',
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            showToast('✓ Extracción con tarjeta registrada');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar');
+          }
+        };
+      }
+
+      const formPrestamoEfectivo = document.getElementById('formPrestamoEfectivo');
+      if (formPrestamoEfectivo) {
+        formPrestamoEfectivo.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPrestamoEfectivo);
+          const res = await apiFetch('/api/prestamo/ingreso/crear/', {
+            method: 'POST',
+            body: {
+              presupuesto_id: state.selectedBudgetId,
+              ciclo_id: getActiveCicloId(),
+              modo: 'efectivo',
+              monto: fd.get('monto'),
+              nombre: fd.get('nombre') || 'Aporte propio en efectivo',
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            showToast('✓ Aporte en efectivo registrado');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar');
+          }
+        };
+      }
+
+      const formPrestamoDiferencia = document.getElementById('formPrestamoDiferencia');
+      if (formPrestamoDiferencia) {
+        formPrestamoDiferencia.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPrestamoDiferencia);
+          const res = await apiFetch('/api/prestamo/diferencia/crear/', {
+            method: 'POST',
+            body: {
+              presupuesto_id: state.selectedBudgetId,
+              ciclo_id: getActiveCicloId(),
+              tarjeta_id: fd.get('tarjeta_id'),
+              monto: fd.get('monto'),
+              concepto: fd.get('concepto'),
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            showToast('✓ Diferencia de tarjeta sumada al período');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar diferencia');
+          }
+        };
+      }
+
+      const formPrestamoGuardarTarjeta = document.getElementById('formPrestamoGuardarTarjeta');
+      if (formPrestamoGuardarTarjeta) {
+        formPrestamoGuardarTarjeta.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPrestamoGuardarTarjeta);
+          const res = await apiFetch('/api/prestamo/tarjeta/guardar/', {
+            method: 'POST',
+            body: {
+              presupuesto_id: state.selectedBudgetId,
+              tarjeta_id: fd.get('tarjeta_id') || null,
+              nombre: fd.get('nombre'),
+              dia_cierre_habitual: fd.get('dia_cierre_habitual'),
+              dia_vencimiento_habitual: fd.get('dia_vencimiento_habitual'),
+              proxima_fecha_cierre: fd.get('proxima_fecha_cierre'),
+              proxima_fecha_vencimiento: fd.get('proxima_fecha_vencimiento'),
+              nota: fd.get('nota') || '',
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            showToast('✓ Tarjeta del préstamo actualizada');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar tarjeta');
+          }
+        };
+      }
+
+      const formPrestamoCerrarCiclo = document.getElementById('formPrestamoCerrarCiclo');
+      if (formPrestamoCerrarCiclo) {
+        formPrestamoCerrarCiclo.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPrestamoCerrarCiclo);
+          const res = await apiFetch('/api/prestamo/cerrar-ciclo/', {
+            method: 'POST',
+            body: {
+              presupuesto_id: state.selectedBudgetId,
+              nuevo_nombre: fd.get('nuevo_nombre'),
+              nueva_fecha_inicio: fd.get('nueva_fecha_inicio'),
+              deuda_a_devolver: fd.get('deuda_a_devolver'),
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            state.selectedCicloId = res.data.ciclo_id || 0;
+            showToast('✓ Nuevo período iniciado');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al cerrar período');
           }
         };
       }

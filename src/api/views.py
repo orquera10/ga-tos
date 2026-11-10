@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -17,6 +17,9 @@ from presupuestos.models import (
     Ingreso,
     CuentaBancaria,
     TransferenciaFondos,
+    CicloPrestamo,
+    TarjetaPrestamo,
+    DiferenciaTarjeta,
 )
 from presupuestos.views import (
     presupuestos_editables,
@@ -657,6 +660,13 @@ def presupuesto_detalle_api(request, pk=None):
     presupuesto_data['mes_label'] = mes_label
     presupuesto_data['total_gastos_all'] = float(total_gastos_all)
 
+    prestamo_info = None
+    if presupuesto.tipo == 'prestamo':
+        prestamo_info, raw_movs = build_prestamo_detail_payload(
+            presupuesto,
+            ciclo_id=request.GET.get('ciclo_id')
+        )
+
     return JsonResponse({
         'success': True,
         'user': {
@@ -666,6 +676,7 @@ def presupuesto_detalle_api(request, pk=None):
             'initials': get_user_initials(user),
         },
         'presupuesto': presupuesto_data,
+        'prestamo_info': prestamo_info,
         'presupuestos': all_selector,
         'movimientos': raw_movs,
         'analisis': {
@@ -690,6 +701,232 @@ def presupuesto_detalle_api(request, pk=None):
             for c in user_cuentas
         ],
     })
+
+
+def build_prestamo_detail_payload(presupuesto, ciclo_id=None):
+    """Inicializa y serializa toda la estructura de un presupuesto tipo 'prestamo'."""
+    if not presupuesto.tarjetas_prestamo.exists():
+        TarjetaPrestamo.objects.bulk_create([
+            TarjetaPrestamo(
+                presupuesto=presupuesto,
+                nombre="Patagonia Rubén",
+                dia_cierre_habitual=21,
+                proxima_fecha_cierre=date(2026, 11, 19),
+                dia_vencimiento_habitual=5,
+                nota="Vence del 1 al 5"
+            ),
+            TarjetaPrestamo(
+                presupuesto=presupuesto,
+                nombre="Patagonia Palmira",
+                dia_cierre_habitual=22,
+                proxima_fecha_cierre=date(2026, 11, 19),
+                dia_vencimiento_habitual=5,
+                nota="Vence del 1 al 5"
+            ),
+            TarjetaPrestamo(
+                presupuesto=presupuesto,
+                nombre="Naranja",
+                dia_cierre_habitual=27,
+                proxima_fecha_cierre=date(2026, 11, 27),
+                dia_vencimiento_habitual=10,
+                nota="Vence el 10"
+            ),
+        ])
+
+    if not presupuesto.ciclos_prestamo.exists():
+        ciclo_inicial = CicloPrestamo.objects.create(
+            presupuesto=presupuesto,
+            nombre="Período Noviembre 2026",
+            fecha_inicio=date(2026, 10, 21),
+            deuda_a_devolver=presupuesto.deuda_inicial_prestamo or Decimal('10129746.00'),
+            esta_cerrado=False
+        )
+        presupuesto.ingresos.filter(ciclo_prestamo__isnull=True).update(ciclo_prestamo=ciclo_inicial)
+
+    ciclos = list(presupuesto.ciclos_prestamo.all())
+    ciclo_activo = next((c for c in ciclos if not c.esta_cerrado), None)
+    if ciclo_activo:
+        presupuesto.ingresos.filter(ciclo_prestamo__isnull=True).update(ciclo_prestamo=ciclo_activo)
+
+    ciclo_sel = None
+    if ciclo_id:
+        try:
+            cid = int(ciclo_id)
+            ciclo_sel = next((c for c in ciclos if c.id == cid), None)
+        except (ValueError, TypeError):
+            ciclo_sel = None
+    if not ciclo_sel:
+        ciclo_sel = ciclo_activo or (ciclos[0] if ciclos else None)
+
+    tasa_default = float(presupuesto.tasa_interes_prestamo or Decimal('4.50'))
+    aporte_habitual = presupuesto.aporte_mensual_prestamo or Decimal('600000.00')
+    tasa_factor = Decimal('1') + ((presupuesto.tasa_interes_prestamo or Decimal('4.50')) / Decimal('100'))
+
+    tarjetas_list = []
+    for t in presupuesto.tarjetas_prestamo.all():
+        info = t.info_cierre()
+        ext_qs = ciclo_sel.ingresos.filter(es_extraccion_tarjeta=True, tarjeta_prestamo=t) if ciclo_sel else []
+        ext_monto = sum((i.monto for i in ext_qs), Decimal('0'))
+        ext_interes = sum((Decimal(str(i.interes_monto)) for i in ext_qs), Decimal('0'))
+        ext_prox = sum(((i.monto_proximo_mes or round(i.monto * tasa_factor, 2)) for i in ext_qs), Decimal('0'))
+        diffs_qs = list(ciclo_sel.diferencias_tarjetas.filter(tarjeta=t)) if ciclo_sel else []
+        diff_total = sum((d.monto for d in diffs_qs), Decimal('0'))
+
+        tarjetas_list.append({
+            'id': t.id,
+            'nombre': t.nombre,
+            'dia_cierre_habitual': t.dia_cierre_habitual,
+            'dia_vencimiento_habitual': t.dia_vencimiento_habitual,
+            'proxima_fecha_cierre': t.proxima_fecha_cierre.strftime('%Y-%m-%d') if t.proxima_fecha_cierre else '',
+            'proxima_fecha_vencimiento': t.proxima_fecha_vencimiento.strftime('%Y-%m-%d') if t.proxima_fecha_vencimiento else '',
+            'nota': t.nota or '',
+            'ya_cerro': info['ya_cerro'],
+            'es_seguro_sacar': info['es_seguro_sacar'],
+            'fecha_cierre_str': info['fecha_cierre'].strftime('%d/%m'),
+            'fecha_vencimiento_str': info['fecha_vencimiento'].strftime('%d/%m'),
+            'dias_para_cierre': info['dias_para_cierre'],
+            'mensaje': info['mensaje'],
+            'extraido_ciclo': float(ext_monto),
+            'interes_ciclo': float(ext_interes),
+            'proximo_mes_ciclo': float(ext_prox),
+            'diferencias_ciclo': float(diff_total),
+        })
+
+    movs_prestamo = []
+    diferencias_list = []
+    ciclo_actual_data = None
+
+    if ciclo_sel:
+        deuda_prox = ciclo_sel.deuda_proximo_ciclo()
+        tarj_nec = max(Decimal('0'), deuda_prox - aporte_habitual)
+        ciclo_actual_data = {
+            'id': ciclo_sel.id,
+            'nombre': ciclo_sel.nombre,
+            'fecha_inicio': ciclo_sel.fecha_inicio.strftime('%Y-%m-%d'),
+            'fecha_fin': ciclo_sel.fecha_fin.strftime('%Y-%m-%d') if ciclo_sel.fecha_fin else '',
+            'esta_cerrado': ciclo_sel.esta_cerrado,
+            'deuda_base': float(ciclo_sel.deuda_a_devolver),
+            'total_diferencias': float(ciclo_sel.total_diferencias()),
+            'deuda_total_a_devolver': float(ciclo_sel.deuda_total_a_devolver()),
+            'total_extraido_tarjetas': float(ciclo_sel.total_tarjetas()),
+            'total_interes_tarjetas': float(ciclo_sel.total_interes_tarjetas()),
+            'deuda_proximo_ciclo': float(deuda_prox),
+            'total_aportes_efectivo': float(ciclo_sel.total_efectivo()),
+            'total_devuelto': float(ciclo_sel.total_devuelto()),
+            'pendiente_devolver': float(ciclo_sel.pendiente_devolver()),
+            'porcentaje_cubierto': int(ciclo_sel.porcentaje_cubierto()),
+            'tarjeta_necesaria_proximo_mes': float(tarj_nec),
+        }
+
+        for i in ciclo_sel.ingresos.select_related('cuenta_bancaria', 'tarjeta_prestamo').order_by('-fecha', '-id'):
+            dt_local = timezone.localtime(i.fecha) if timezone.is_aware(i.fecha) else i.fecha
+            if i.es_extraccion_tarjeta:
+                t_nom = i.tarjeta_prestamo.nombre if i.tarjeta_prestamo else i.nombre
+                prox = float(i.monto_proximo_mes or round(i.monto * tasa_factor, 2))
+                inter = float(i.interes_monto)
+                det_parts = [
+                    f"💳 {t_nom}",
+                    f"+{float(i.tasa_interes or tasa_default):.1f}% (+${inter:,.0f})",
+                    f"Vence próx.: ${prox:,.0f}",
+                    format_fecha_humana(i.fecha),
+                ]
+                movs_prestamo.append({
+                    '_sort_dt': dt_local,
+                    'uid': f"ingreso-{i.id}",
+                    'id': i.id,
+                    'tipo_movimiento': 'extraccion_tarjeta',
+                    'title': i.nombre,
+                    'detail': ' · '.join(det_parts),
+                    'categoria': 'Extracción Tarjeta',
+                    'metodo_pago': 'tarjeta',
+                    'cuenta': t_nom,
+                    'persona': '',
+                    'amount': float(i.monto),
+                    'monto_proximo_mes': prox,
+                    'interes_monto': inter,
+                    'is_transfer': False,
+                    'icon': 'card',
+                    'tone': 'amber',
+                    'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+                })
+            else:
+                det_parts = [
+                    '💵 Aporte propio en efectivo',
+                    'Sin interés (amortiza deuda)',
+                    format_fecha_humana(i.fecha),
+                ]
+                movs_prestamo.append({
+                    '_sort_dt': dt_local,
+                    'uid': f"ingreso-{i.id}",
+                    'id': i.id,
+                    'tipo_movimiento': 'aporte_efectivo',
+                    'title': i.nombre,
+                    'detail': ' · '.join(det_parts),
+                    'categoria': 'Aporte Efectivo',
+                    'metodo_pago': 'efectivo',
+                    'cuenta': 'Efectivo',
+                    'persona': '',
+                    'amount': float(i.monto),
+                    'is_transfer': False,
+                    'icon': 'cash',
+                    'tone': 'green',
+                    'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+                })
+
+        for d in ciclo_sel.diferencias_tarjetas.select_related('tarjeta').all():
+            diferencias_list.append({
+                'id': d.id,
+                'tarjeta_id': d.tarjeta_id,
+                'tarjeta_nombre': d.tarjeta.nombre,
+                'monto': float(d.monto),
+                'concepto': d.concepto,
+                'fecha': d.fecha.strftime('%d/%m/%Y'),
+            })
+            dt_d = timezone.make_aware(datetime.combine(d.fecha, datetime.min.time()), timezone.get_current_timezone())
+            movs_prestamo.append({
+                '_sort_dt': dt_d,
+                'uid': f"diff-{d.id}",
+                'id': d.id,
+                'tipo_movimiento': 'diferencia_tarjeta',
+                'title': f"Dif. Resumen · {d.tarjeta.nombre}",
+                'detail': f"{d.concepto} · Suma al monto a devolver actual · {d.fecha.strftime('%d/%m')}",
+                'categoria': 'Diferencia Tarjeta',
+                'metodo_pago': 'tarjeta',
+                'cuenta': d.tarjeta.nombre,
+                'persona': '',
+                'amount': -float(d.monto),
+                'is_transfer': False,
+                'icon': 'card',
+                'tone': 'rose',
+                'fecha_iso': d.fecha.strftime('%Y-%m-%d'),
+            })
+
+    movs_prestamo.sort(key=lambda x: x['_sort_dt'], reverse=True)
+    for m in movs_prestamo:
+        m.pop('_sort_dt', None)
+
+    prestamo_payload = {
+        'tasa_interes': tasa_default,
+        'aporte_habitual': float(aporte_habitual),
+        'ciclo_actual': ciclo_actual_data,
+        'ciclos': [
+            {
+                'id': c.id,
+                'nombre': c.nombre,
+                'fecha_inicio': c.fecha_inicio.strftime('%d/%m/%Y'),
+                'esta_cerrado': c.esta_cerrado,
+                'deuda_total_a_devolver': float(c.deuda_total_a_devolver()),
+                'total_devuelto': float(c.total_devuelto()),
+                'porcentaje_cubierto': int(c.porcentaje_cubierto()),
+            }
+            for c in ciclos
+        ],
+        'tarjetas': tarjetas_list,
+        'diferencias': diferencias_list,
+        'proyeccion': presupuesto.proyeccion_prestamo(),
+    }
+    return prestamo_payload, movs_prestamo
+
 
 
 @csrf_exempt
@@ -1224,3 +1461,262 @@ def widget_resumen_api(request):
             for g in ultimos_gastos
         ]
     })
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def crear_ingreso_prestamo_api(request):
+    """
+    Registra un Ingreso con Tarjeta (extracción al 4.5%) o Aporte en Efectivo para un presupuesto tipo 'prestamo'.
+    POST /api/prestamo/ingreso/crear/
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    monto_raw = data.get('monto')
+    modo = (data.get('modo') or 'tarjeta').strip().lower()  # 'tarjeta' | 'efectivo'
+
+    if not presupuesto_id or monto_raw is None:
+        return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+
+    try:
+        monto = Decimal(str(monto_raw).replace(',', '.'))
+        if monto <= 0:
+            return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a cero'}, status=400)
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Monto inválido'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id, tipo='prestamo').first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto de préstamo no encontrado'}, status=404)
+
+    ciclo_id = data.get('ciclo_id')
+    ciclo = None
+    if ciclo_id:
+        ciclo = presupuesto.ciclos_prestamo.filter(id=ciclo_id).first()
+    if not ciclo:
+        ciclo = presupuesto.ciclos_prestamo.filter(esta_cerrado=False).first()
+
+    if modo == 'efectivo':
+        nombre = (data.get('nombre') or 'Aporte propio en efectivo').strip()
+        ingreso = Ingreso.objects.create(
+            presupuesto=presupuesto,
+            ciclo_prestamo=ciclo,
+            nombre=nombre,
+            monto=monto,
+            tipo_ingreso='efectivo',
+            es_aporte_capital=True,
+            es_extraccion_tarjeta=False,
+        )
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'Aporte en efectivo de ${monto:,.0f} registrado',
+            'ingreso_id': ingreso.id,
+        }, status=201)
+
+    # Modo tarjeta (extracción con interés)
+    tarjeta_id = data.get('tarjeta_id')
+    tarjeta = None
+    if tarjeta_id:
+        tarjeta = presupuesto.tarjetas_prestamo.filter(id=tarjeta_id).first()
+
+    tasa_raw = data.get('tasa_interes')
+    try:
+        tasa = Decimal(str(tasa_raw).replace(',', '.')) if tasa_raw not in [None, ''] else (presupuesto.tasa_interes_prestamo or Decimal('4.50'))
+    except (InvalidOperation, TypeError):
+        tasa = presupuesto.tasa_interes_prestamo or Decimal('4.50')
+
+    prox_raw = data.get('monto_proximo_mes')
+    try:
+        monto_prox = Decimal(str(prox_raw).replace(',', '.')) if prox_raw not in [None, ''] else round(monto * (Decimal('1') + tasa / Decimal('100')), 2)
+    except (InvalidOperation, TypeError):
+        monto_prox = round(monto * (Decimal('1') + tasa / Decimal('100')), 2)
+
+    nombre_default = f"Extracción {tarjeta.nombre}" if tarjeta else "Extracción con tarjeta"
+    nombre = (data.get('nombre') or nombre_default).strip()
+
+    cuenta_bancaria = None
+    cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    if cuenta_raw:
+        cuenta_bancaria, _ = CuentaBancaria.objects.get_or_create(
+            usuario=request.api_user,
+            nombre__iexact=cuenta_raw,
+            defaults={'nombre': cuenta_raw.title(), 'tipo': 'billetera'}
+        )
+
+    ingreso = Ingreso.objects.create(
+        presupuesto=presupuesto,
+        ciclo_prestamo=ciclo,
+        tarjeta_prestamo=tarjeta,
+        cuenta_bancaria=cuenta_bancaria,
+        nombre=nombre,
+        monto=monto,
+        tipo_ingreso='transferencia',
+        tasa_interes=tasa,
+        monto_proximo_mes=monto_prox,
+        es_extraccion_tarjeta=True,
+        es_aporte_capital=False,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Extracción de ${monto:,.0f} registrada (vence próx. mes: ${monto_prox:,.0f})',
+        'ingreso_id': ingreso.id,
+    }, status=201)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def crear_diferencia_prestamo_api(request):
+    """
+    Agrega una DiferenciaTarjeta (gastos de mantenimiento / sellos de resumen) al ciclo del préstamo.
+    POST /api/prestamo/diferencia/crear/
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    tarjeta_id = data.get('tarjeta_id')
+    monto_raw = data.get('monto')
+
+    if not presupuesto_id or not tarjeta_id or monto_raw is None:
+        return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+
+    try:
+        monto = Decimal(str(monto_raw).replace(',', '.'))
+        if monto <= 0:
+            return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a cero'}, status=400)
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Monto inválido'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id, tipo='prestamo').first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    tarjeta = presupuesto.tarjetas_prestamo.filter(id=tarjeta_id).first()
+    if not tarjeta:
+        return JsonResponse({'success': False, 'error': 'Tarjeta no encontrada'}, status=404)
+
+    ciclo_id = data.get('ciclo_id')
+    ciclo = presupuesto.ciclos_prestamo.filter(id=ciclo_id).first() if ciclo_id else None
+    if not ciclo:
+        ciclo = presupuesto.ciclos_prestamo.filter(esta_cerrado=False).first()
+    if not ciclo:
+        return JsonResponse({'success': False, 'error': 'No hay un período activo'}, status=400)
+
+    concepto = (data.get('concepto') or 'Mantenimiento / Sellos resumen').strip()[:150]
+    diff = DiferenciaTarjeta.objects.create(
+        ciclo_prestamo=ciclo,
+        tarjeta=tarjeta,
+        monto=monto,
+        concepto=concepto,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Diferencia de +${monto:,.0f} sumada a {tarjeta.nombre}',
+        'diferencia_id': diff.id,
+    }, status=201)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def guardar_tarjeta_prestamo_api(request):
+    """
+    Crea o actualiza una TarjetaPrestamo (nombre y fechas de cierre/vencimiento).
+    POST /api/prestamo/tarjeta/guardar/
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    nombre = (data.get('nombre') or '').strip()
+
+    if not presupuesto_id or not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre de la tarjeta es obligatorio'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id, tipo='prestamo').first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    tarjeta_id = data.get('tarjeta_id')
+    tarjeta = presupuesto.tarjetas_prestamo.filter(id=tarjeta_id).first() if tarjeta_id else None
+
+    dia_cierre = int(data.get('dia_cierre_habitual') or 21)
+    dia_vence = int(data.get('dia_vencimiento_habitual') or 5)
+    prox_cierre = parse_date(str(data.get('proxima_fecha_cierre') or ''))
+    prox_vence = parse_date(str(data.get('proxima_fecha_vencimiento') or ''))
+    nota = (data.get('nota') or '').strip()[:200]
+
+    if tarjeta:
+        tarjeta.nombre = nombre[:100]
+        tarjeta.dia_cierre_habitual = dia_cierre
+        tarjeta.dia_vencimiento_habitual = dia_vence
+        tarjeta.proxima_fecha_cierre = prox_cierre
+        tarjeta.proxima_fecha_vencimiento = prox_vence
+        tarjeta.nota = nota
+        tarjeta.save()
+    else:
+        tarjeta = TarjetaPrestamo.objects.create(
+            presupuesto=presupuesto,
+            nombre=nombre[:100],
+            dia_cierre_habitual=dia_cierre,
+            dia_vencimiento_habitual=dia_vence,
+            proxima_fecha_cierre=prox_cierre,
+            proxima_fecha_vencimiento=prox_vence,
+            nota=nota,
+        )
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Tarjeta "{tarjeta.nombre}" guardada',
+        'tarjeta_id': tarjeta.id,
+    }, status=201)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def cerrar_ciclo_prestamo_api(request):
+    """
+    Cierra el ciclo activo del préstamo e inicia el nuevo período con la deuda del próximo mes.
+    POST /api/prestamo/cerrar-ciclo/
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    nuevo_nombre = (data.get('nuevo_nombre') or '').strip()
+    deuda_raw = data.get('deuda_a_devolver')
+
+    if not presupuesto_id or not nuevo_nombre:
+        return JsonResponse({'success': False, 'error': 'Indica el nombre del nuevo período'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id, tipo='prestamo').first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    ciclo_activo = presupuesto.ciclos_prestamo.filter(esta_cerrado=False).first()
+    try:
+        deuda_sig = Decimal(str(deuda_raw).replace(',', '.')) if deuda_raw not in [None, ''] else (ciclo_activo.deuda_proximo_ciclo() if ciclo_activo else Decimal('0'))
+    except (InvalidOperation, TypeError):
+        deuda_sig = ciclo_activo.deuda_proximo_ciclo() if ciclo_activo else Decimal('0')
+
+    nueva_fecha = parse_date(str(data.get('nueva_fecha_inicio') or '')) or timezone.localdate()
+
+    if ciclo_activo:
+        ciclo_activo.esta_cerrado = True
+        ciclo_activo.fecha_fin = nueva_fecha - timedelta(days=1)
+        ciclo_activo.fecha_cierre = timezone.now()
+        ciclo_activo.save()
+
+    nuevo_ciclo = CicloPrestamo.objects.create(
+        presupuesto=presupuesto,
+        nombre=nuevo_nombre[:100],
+        fecha_inicio=nueva_fecha,
+        deuda_a_devolver=deuda_sig,
+        esta_cerrado=False,
+    )
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Período "{nuevo_ciclo.nombre}" iniciado',
+        'ciclo_id': nuevo_ciclo.id,
+    }, status=201)
+
