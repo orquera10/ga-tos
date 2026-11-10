@@ -1189,8 +1189,14 @@
       transModo: 'efectivo_a_cuenta', // 'efectivo_a_cuenta' | 'cuenta_a_efectivo' | 'entre_cuentas'
     };
 
-    // Sincronizar con AndroidBridge si está presente
+    // Sincronizar con query params o AndroidBridge si está presente
     try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const qBudgetId = Number(urlParams.get('presupuesto_id'));
+      if (qBudgetId > 0) {
+        state.selectedBudgetId = qBudgetId;
+        localStorage.setItem('gastos_selected_budget_id', String(qBudgetId));
+      }
       if (window.AndroidBridge && typeof window.AndroidBridge.getToken === 'function') {
         const nativeToken = window.AndroidBridge.getToken();
         if (nativeToken) {
@@ -1198,7 +1204,7 @@
           localStorage.setItem('gastos_api_token', nativeToken);
         }
       }
-      if (window.AndroidBridge && typeof window.AndroidBridge.getSelectedBudgetId === 'function') {
+      if (!qBudgetId && window.AndroidBridge && typeof window.AndroidBridge.getSelectedBudgetId === 'function') {
         const nativeBId = Number(window.AndroidBridge.getSelectedBudgetId());
         if (nativeBId > 0) {
           state.selectedBudgetId = nativeBId;
@@ -2173,7 +2179,7 @@
 
       const openClassic = () => {
         const pId = state.selectedBudgetId;
-        const target = pId > 0 ? `/presupuesto/${pId}/` : '/';
+        const target = pId > 0 ? `/presupuesto/${pId}/?classic=1` : '/presupuestos/?classic=1';
         if (window.AndroidBridge && typeof window.AndroidBridge.openClassicWeb === 'function') {
           window.AndroidBridge.openClassicWeb(target);
         } else {

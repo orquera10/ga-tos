@@ -98,6 +98,14 @@ class TransferenciaFondosEditableMixin(LoginRequiredMixin):
 # Vistas de Presupuesto
 @login_required
 def presupuestos_list(request):
+    if request.GET.get('classic') == '1':
+        request.session['prefer_classic'] = True
+    elif request.GET.get('classic') == '0':
+        request.session['prefer_classic'] = False
+
+    if not request.session.get('prefer_classic', False):
+        return render(request, 'presupuestos/mobile_app.html')
+
     presupuestos = presupuestos_visibles(request.user).order_by('-fecha_creacion')
     return render(request, 'presupuestos/index.html', {'presupuestos': presupuestos})
 
@@ -105,6 +113,20 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
     model = Presupuesto
     template_name = 'presupuestos/ver_presupuesto.html'
     context_object_name = 'presupuesto'
+
+    def get(self, request, *args, **kwargs):
+        if request.GET.get('classic') == '1':
+            request.session['prefer_classic'] = True
+        elif request.GET.get('classic') == '0':
+            request.session['prefer_classic'] = False
+
+        ua = (request.META.get('HTTP_USER_AGENT') or '').lower()
+        sec_ch = (request.META.get('HTTP_SEC_CH_UA') or '').lower()
+        is_android_webview = ('; wv)' in ua or ' wv ' in ua or 'android webview' in sec_ch)
+        if is_android_webview and not request.session.get('prefer_classic', False) and request.GET.get('classic') != '1':
+            pk = kwargs.get('pk')
+            return redirect(f"/app/?presupuesto_id={pk}" if pk else "/app/")
+        return super().get(request, *args, **kwargs)
 
     def _fecha_local(self, transaccion):
         fecha = getattr(transaccion, 'fecha', None)
@@ -1170,6 +1192,8 @@ class TransferenciaFondosDeleteView(TransferenciaFondosEditableMixin, DeleteView
 
 def mobile_app_view(request):
     """Renderiza el rediseño moderno mobile de Ga$tos (basado en Figma Make)."""
+    if request.GET.get('classic') == '0' or 'classic' not in request.GET:
+        request.session['prefer_classic'] = False
     return render(request, 'presupuestos/mobile_app.html')
 
 
