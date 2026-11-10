@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta, TransferenciaFondos
 from django.utils import timezone
 
 class CapitalizeFieldsMixin:
@@ -477,3 +477,169 @@ class DiferenciaTarjetaForm(CapitalizeFieldsMixin, forms.ModelForm):
             self.initial['fecha'] = timezone.localdate()
         if not self.initial.get('concepto'):
             self.initial['concepto'] = 'Mantenimiento / Sellos resumen'
+
+
+class TransferenciaFondosForm(forms.ModelForm):
+    tipo_transferencia = forms.ChoiceField(
+        choices=[
+            ('efectivo_a_cuenta', '💵 Efectivo ➔ Banco / Billetera'),
+            ('cuenta_a_efectivo', '🏦 Banco / Billetera ➔ Efectivo'),
+            ('cuenta_a_cuenta', '🔄 Entre Bancos / Billeteras'),
+        ],
+        initial='efectivo_a_cuenta',
+        widget=forms.RadioSelect,
+        required=True
+    )
+    origen_cuenta_nombre = forms.CharField(
+        required=False,
+        max_length=60,
+        label='Banco / Billetera de Origen',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Patagonia, Brubank...',
+            'autocomplete': 'off'
+        })
+    )
+    destino_cuenta_nombre = forms.CharField(
+        required=False,
+        max_length=60,
+        label='Banco / Billetera de Destino',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ej: Mercado Pago, Ualá...',
+            'autocomplete': 'off'
+        })
+    )
+    fecha = forms.DateTimeField(
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local', 'class': 'form-control', 'step': '1'},
+            format='%Y-%m-%dT%H:%M:%S'
+        ),
+        input_formats=['%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'],
+        required=True
+    )
+
+    class Meta:
+        model = TransferenciaFondos
+        fields = ['monto', 'fecha', 'nota']
+        widgets = {
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '0.00'}),
+            'nota': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Motivo o detalle (opcional)...'}),
+        }
+
+    def __init__(self, *args, user=None, presupuesto=None, **kwargs):
+        self.user = user
+        self.presupuesto = presupuesto
+        super().__init__(*args, **kwargs)
+
+        p = self.presupuesto
+        if not p and self.instance and self.instance.pk and hasattr(self.instance, 'presupuesto'):
+            p = self.instance.presupuesto
+        self.presupuesto = p
+
+        if self.instance and self.instance.pk:
+            if self.instance.origen_tipo == 'efectivo' and self.instance.destino_tipo == 'cuenta':
+                self.initial['tipo_transferencia'] = 'efectivo_a_cuenta'
+            elif self.instance.origen_tipo == 'cuenta' and self.instance.destino_tipo == 'efectivo':
+                self.initial['tipo_transferencia'] = 'cuenta_a_efectivo'
+            else:
+                self.initial['tipo_transferencia'] = 'cuenta_a_cuenta'
+
+            if self.instance.origen_cuenta:
+                self.initial['origen_cuenta_nombre'] = self.instance.origen_cuenta.nombre
+            if self.instance.destino_cuenta:
+                self.initial['destino_cuenta_nombre'] = self.instance.destino_cuenta.nombre
+            if self.instance.fecha:
+                local_dt = timezone.localtime(self.instance.fecha) if timezone.is_aware(self.instance.fecha) else self.instance.fecha
+                self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+        else:
+            local_dt = timezone.localtime(timezone.now())
+            self.initial['fecha'] = local_dt.strftime('%Y-%m-%dT%H:%M:%S')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo = cleaned_data.get('tipo_transferencia')
+        monto = cleaned_data.get('monto')
+        origen_nom = (cleaned_data.get('origen_cuenta_nombre') or '').strip()
+        destino_nom = (cleaned_data.get('destino_cuenta_nombre') or '').strip()
+
+        if monto is not None and monto <= 0:
+            self.add_error('monto', 'El monto debe ser mayor a 0.')
+
+        if tipo == 'efectivo_a_cuenta':
+            if not destino_nom:
+                self.add_error('destino_cuenta_nombre', 'Indicá el banco o billetera de destino.')
+        elif tipo == 'cuenta_a_efectivo':
+            if not origen_nom:
+                self.add_error('origen_cuenta_nombre', 'Indicá el banco o billetera de origen.')
+        elif tipo == 'cuenta_a_cuenta':
+            if not origen_nom:
+                self.add_error('origen_cuenta_nombre', 'Indicá el banco o billetera de origen.')
+            if not destino_nom:
+                self.add_error('destino_cuenta_nombre', 'Indicá el banco o billetera de destino.')
+            if origen_nom and destino_nom and origen_nom.lower() == destino_nom.lower():
+                self.add_error('destino_cuenta_nombre', 'La cuenta de origen y de destino no pueden ser la misma.')
+
+        return cleaned_data
+
+    def save(self, commit=True, user=None):
+        if self.presupuesto and not getattr(self.instance, 'presupuesto_id', None):
+            self.instance.presupuesto = self.presupuesto
+
+        current_user = user or self.user
+        if not current_user and hasattr(self.instance, 'presupuesto') and self.instance.presupuesto:
+            current_user = self.instance.presupuesto.usuario
+
+        from .models import CuentaBancaria
+
+        tipo = self.cleaned_data.get('tipo_transferencia')
+        origen_nom = (self.cleaned_data.get('origen_cuenta_nombre') or '').strip()
+        destino_nom = (self.cleaned_data.get('destino_cuenta_nombre') or '').strip()
+
+        if tipo == 'efectivo_a_cuenta':
+            self.instance.origen_tipo = 'efectivo'
+            self.instance.origen_cuenta = None
+            self.instance.destino_tipo = 'cuenta'
+            if destino_nom and current_user:
+                cuenta, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=current_user,
+                    nombre__iexact=destino_nom,
+                    defaults={'nombre': destino_nom.title()}
+                )
+                self.instance.destino_cuenta = cuenta
+        elif tipo == 'cuenta_a_efectivo':
+            self.instance.origen_tipo = 'cuenta'
+            if origen_nom and current_user:
+                cuenta, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=current_user,
+                    nombre__iexact=origen_nom,
+                    defaults={'nombre': origen_nom.title()}
+                )
+                self.instance.origen_cuenta = cuenta
+            self.instance.destino_tipo = 'efectivo'
+            self.instance.destino_cuenta = None
+        else:  # cuenta_a_cuenta
+            self.instance.origen_tipo = 'cuenta'
+            if origen_nom and current_user:
+                cuenta_o, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=current_user,
+                    nombre__iexact=origen_nom,
+                    defaults={'nombre': origen_nom.title()}
+                )
+                self.instance.origen_cuenta = cuenta_o
+            self.instance.destino_tipo = 'cuenta'
+            if destino_nom and current_user:
+                cuenta_d, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=current_user,
+                    nombre__iexact=destino_nom,
+                    defaults={'nombre': destino_nom.title()}
+                )
+                self.instance.destino_cuenta = cuenta_d
+
+        if self.cleaned_data.get('fecha'):
+            self.instance.fecha = self.cleaned_data['fecha']
+        if 'nota' in self.cleaned_data:
+            self.instance.nota = self.cleaned_data['nota']
+
+        return super().save(commit)
+

@@ -354,6 +354,11 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
     background: rgba(25, 148, 120, 0.16);
 }
 
+.transaccion-transferencia .transaccion-icono {
+    color: #0dcaf0;
+    background: rgba(13, 202, 240, 0.16);
+}
+
 .transaccion-info {
     min-width: 0;
 }
@@ -1043,12 +1048,12 @@ body, button, input, select, textarea, h1, h2, h3, h4, h5, h6, p, a, span, div {
 }
 
 .budget-action-row.prestamo-actions .btn-diferencia {
-    grid-column: span 2 !important;
+    grid-column: span 1 !important;
 }
 
 @media (min-width: 768px) {
     .budget-action-row.prestamo-actions {
-        grid-template-columns: repeat(3, 1fr) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
     }
     .budget-action-row.prestamo-actions .btn-diferencia {
         grid-column: span 1 !important;

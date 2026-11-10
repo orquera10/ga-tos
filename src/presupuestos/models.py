@@ -86,17 +86,21 @@ class Presupuesto(models.Model):
 
     @property
     def saldo_efectivo(self):
-        """Saldo neto disponible en efectivo (Ingresos efectivo - Gastos efectivo)."""
-        ing = self.ingresos.filter(tipo_ingreso='efectivo').aggregate(total=models.Sum('monto'))['total'] or 0
-        gas = self.gastos.filter(metodo_pago='efectivo').aggregate(total=models.Sum('monto'))['total'] or 0
-        return ing - gas
+        """Saldo neto disponible en efectivo (Ingresos efectivo - Gastos efectivo + Transferencias hacia efectivo - Transferencias desde efectivo)."""
+        ing = self.ingresos.filter(tipo_ingreso='efectivo').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        gas = self.gastos.filter(metodo_pago='efectivo').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        trans_in = self.transferencias_fondos.filter(destino_tipo='efectivo').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        trans_out = self.transferencias_fondos.filter(origen_tipo='efectivo').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        return ing - gas + trans_in - trans_out
 
     @property
     def saldo_transferencia(self):
-        """Saldo neto disponible en banco/transferencia (Transferencias + Sueldos - Gastos transferencia)."""
-        ing = self.ingresos.filter(tipo_ingreso__in=['transferencia', 'sueldo']).aggregate(total=models.Sum('monto'))['total'] or 0
-        gas = self.gastos.filter(metodo_pago='transferencia').aggregate(total=models.Sum('monto'))['total'] or 0
-        return ing - gas
+        """Saldo neto disponible en banco/transferencia."""
+        ing = self.ingresos.filter(tipo_ingreso__in=['transferencia', 'sueldo']).aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        gas = self.gastos.filter(metodo_pago='transferencia').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        trans_in = self.transferencias_fondos.filter(origen_tipo='efectivo', destino_tipo='cuenta').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        trans_out = self.transferencias_fondos.filter(origen_tipo='cuenta', destino_tipo='efectivo').aggregate(total=models.Sum('monto'))['total'] or Decimal('0')
+        return ing - gas + trans_in - trans_out
 
     @property
     def total_sueldo(self):
@@ -489,3 +493,74 @@ class Ingreso(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - ${self.monto} ({self.get_tipo_ingreso_display()})"
+
+
+class TransferenciaFondos(models.Model):
+    TIPO_ORIGEN_DESTINO = [
+        ('efectivo', 'Efectivo'),
+        ('cuenta', 'Banco / Billetera'),
+    ]
+
+    presupuesto = models.ForeignKey(Presupuesto, on_delete=models.CASCADE, related_name='transferencias_fondos')
+    origen_tipo = models.CharField(max_length=20, choices=TIPO_ORIGEN_DESTINO, default='efectivo')
+    origen_cuenta = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='transferencias_salida')
+    destino_tipo = models.CharField(max_length=20, choices=TIPO_ORIGEN_DESTINO, default='cuenta')
+    destino_cuenta = models.ForeignKey(CuentaBancaria, on_delete=models.SET_NULL, null=True, blank=True, related_name='transferencias_entrada')
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    fecha = models.DateTimeField(default=timezone.now)
+    nota = models.CharField(max_length=200, blank=True, default='')
+
+    class Meta:
+        ordering = ['-fecha', '-id']
+        verbose_name = 'Transferencia de Fondos'
+        verbose_name_plural = 'Transferencias de Fondos'
+
+    @property
+    def origen_str(self):
+        if self.origen_tipo == 'efectivo':
+            return 'Efectivo'
+        return self.origen_cuenta.nombre if self.origen_cuenta else 'Banco / Billetera'
+
+    @property
+    def destino_str(self):
+        if self.destino_tipo == 'efectivo':
+            return 'Efectivo'
+        return self.destino_cuenta.nombre if self.destino_cuenta else 'Banco / Billetera'
+
+    @property
+    def nombre(self):
+        return f"Transferencia: {self.origen_str} ➔ {self.destino_str}"
+
+    @property
+    def persona(self):
+        return ''
+
+    def get_moneda_display(self):
+        return self.presupuesto.get_moneda_display() if self.presupuesto else '$'
+
+    def clean(self):
+        super().clean()
+        if self.monto is not None and self.monto <= 0:
+            raise ValidationError({'monto': 'El monto debe ser mayor a 0'})
+        if self.origen_tipo == 'efectivo' and self.destino_tipo == 'efectivo':
+            raise ValidationError('El origen y el destino no pueden ser ambos Efectivo.')
+        if self.origen_tipo == 'cuenta' and self.destino_tipo == 'cuenta':
+            if self.origen_cuenta_id and self.destino_cuenta_id and self.origen_cuenta_id == self.destino_cuenta_id:
+                raise ValidationError('La cuenta de origen y de destino no pueden ser la misma.')
+
+    def save(self, *args, **kwargs):
+        if self.origen_tipo == 'efectivo':
+            self.origen_cuenta = None
+        if self.destino_tipo == 'efectivo':
+            self.destino_cuenta = None
+
+        if not self.pk and not self.fecha:
+            self.fecha = timezone.now()
+        elif self.fecha and timezone.is_naive(self.fecha):
+            self.fecha = timezone.make_aware(self.fecha, timezone.get_current_timezone())
+            
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.nombre} (${self.monto})"
+

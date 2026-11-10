@@ -18,6 +18,9 @@ urlpatterns = [
     path('tarjeta-prestamo/<int:pk>/eliminar/', views.eliminar_tarjeta_prestamo, name='eliminar_tarjeta_prestamo'),
     path('presupuesto/<int:pk>/agregar-diferencia/', views.agregar_diferencia_tarjeta, name='agregar_diferencia_tarjeta'),
     path('diferencia-tarjeta/<int:pk>/eliminar/', views.eliminar_diferencia_tarjeta, name='eliminar_diferencia_tarjeta'),
+    path('presupuesto/<int:pk>/transferencia/guardar/', views.guardar_transferencia_fondos, name='guardar_transferencia_fondos'),
+    path('transferencia/<int:pk>/editar/', views.TransferenciaFondosUpdateView.as_view(), name='editar_transferencia_fondos'),
+    path('transferencia/<int:pk>/eliminar/', views.TransferenciaFondosDeleteView.as_view(), name='eliminar_transferencia_fondos'),
     path('presupuesto/<int:pk>/', views.PresupuestoDetailView.as_view(), name='ver_presupuesto'),
 
     # URLs de Categoría

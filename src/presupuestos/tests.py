@@ -232,3 +232,57 @@ class PrestamoTarjetasTest(TestCase):
         self.assertIn('Dario', recent)
         self.assertIn('Camila', recent)
         self.assertIn('Victoria', recent)
+
+    def test_transferencia_fondos_efectivo_a_cuenta_y_viceversa(self):
+        from .models import CuentaBancaria, TransferenciaFondos
+        from .forms import TransferenciaFondosForm
+        from django.urls import reverse
+
+        # 1. Crear ingreso en efectivo de 100.000
+        Ingreso.objects.create(
+            presupuesto=self.presupuesto,
+            nombre='Ingreso inicial efectivo',
+            monto=Decimal('100000.00'),
+            tipo_ingreso='efectivo'
+        )
+
+        self.assertEqual(self.presupuesto.saldo_efectivo, Decimal('100000.00'))
+        self.assertEqual(self.presupuesto.saldo_transferencia, Decimal('0.00'))
+
+        # 2. Registrar transferencia de 30.000 de Efectivo a Mercado Pago
+        form = TransferenciaFondosForm(
+            data={
+                'tipo_transferencia': 'efectivo_a_cuenta',
+                'destino_cuenta_nombre': 'Mercado Pago',
+                'monto': '30000.00',
+                'fecha': '2026-11-10T12:00:00',
+                'nota': 'Depósito efectivo en Rapipago'
+            },
+            user=self.user,
+            presupuesto=self.presupuesto
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        trans = form.save()
+        self.assertEqual(trans.origen_tipo, 'efectivo')
+        self.assertEqual(trans.destino_tipo, 'cuenta')
+        self.assertEqual(trans.destino_cuenta.nombre, 'Mercado Pago')
+
+        # 3. Verificar que los saldos se actualicen correctamente
+        self.client.force_login(self.user)
+        url = reverse('presupuestos:ver_presupuesto', kwargs={'pk': self.presupuesto.pk})
+        res = self.client.get(url)
+        self.assertEqual(res.context['saldo_efectivo'], Decimal('70000.00'))
+        self.assertEqual(res.context['saldo_transferencia'], Decimal('30000.00'))
+
+        saldos_cuentas = res.context['saldos_por_cuenta']
+        mp_saldo = next((c['saldo'] for c in saldos_cuentas if c['nombre'] == 'Mercado Pago'), None)
+        self.assertEqual(mp_saldo, Decimal('30000.00'))
+
+        # 4. Verificar eliminación de la transferencia
+        url_del = reverse('presupuestos:eliminar_transferencia_fondos', kwargs={'pk': trans.pk})
+        res_del = self.client.post(url_del)
+        self.assertEqual(res_del.status_code, 302)
+
+        res_after = self.client.get(url)
+        self.assertEqual(res_after.context['saldo_efectivo'], Decimal('100000.00'))
+        self.assertEqual(res_after.context['saldo_transferencia'], Decimal('0.00'))

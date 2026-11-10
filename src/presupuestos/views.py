@@ -14,8 +14,8 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime, date, time, timedelta
 import re
 from core.auth import asignar_presupuestos_sin_usuario
-from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta
-from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm, TarjetaPrestamoForm, CerrarCicloPrestamoForm, DiferenciaTarjetaForm
+from .models import Presupuesto, PresupuestoCompartido, Categoria, Gasto, Ingreso, CuentaBancaria, CicloPrestamo, TarjetaPrestamo, DiferenciaTarjeta, TransferenciaFondos
+from .forms import PresupuestoForm, CompartirPresupuestoForm, CategoriaForm, GastoForm, IngresoForm, TarjetaPrestamoForm, CerrarCicloPrestamoForm, DiferenciaTarjetaForm, TransferenciaFondosForm
 
 
 def presupuestos_visibles(user):
@@ -85,6 +85,16 @@ class IngresoEditableMixin(LoginRequiredMixin):
         return Ingreso.objects.filter(presupuesto__in=presupuestos_editables(self.request.user))
 
 
+class TransferenciaFondosUsuarioMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        return TransferenciaFondos.objects.filter(presupuesto__in=presupuestos_visibles(self.request.user))
+
+
+class TransferenciaFondosEditableMixin(LoginRequiredMixin):
+    def get_queryset(self):
+        return TransferenciaFondos.objects.filter(presupuesto__in=presupuestos_editables(self.request.user))
+
+
 # Vistas de Presupuesto
 @login_required
 def presupuestos_list(request):
@@ -107,9 +117,10 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Obtener gastos e ingresos ordenados
+        # Obtener gastos, ingresos y transferencias ordenados
         gastos = list(self.object.gastos.select_related('categoria', 'cuenta_bancaria').order_by('-fecha'))
         ingresos = list(self.object.ingresos.select_related('cuenta_bancaria').order_by('-fecha'))
+        transferencias = list(self.object.transferencias_fondos.select_related('origen_cuenta', 'destino_cuenta').order_by('-fecha'))
         
         # Calcular totales
         total_gastos = sum(gasto.monto for gasto in gastos)
@@ -120,11 +131,15 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         # Desglose de saldos por medio de pago
         ingresos_efectivo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'efectivo')
         gastos_efectivo = sum(g.monto for g in gastos if g.metodo_pago == 'efectivo')
-        saldo_efectivo = ingresos_efectivo - gastos_efectivo
+        trans_hacia_efectivo = sum(t.monto for t in transferencias if t.destino_tipo == 'efectivo')
+        trans_desde_efectivo = sum(t.monto for t in transferencias if t.origen_tipo == 'efectivo')
+        saldo_efectivo = ingresos_efectivo - gastos_efectivo + trans_hacia_efectivo - trans_desde_efectivo
 
         ingresos_transferencia = sum(i.monto for i in ingresos if i.tipo_ingreso in ['transferencia', 'sueldo'])
         gastos_transferencia = sum(g.monto for g in gastos if g.metodo_pago == 'transferencia')
-        saldo_transferencia = ingresos_transferencia - gastos_transferencia
+        trans_hacia_banco = sum(t.monto for t in transferencias if t.origen_tipo == 'efectivo' and t.destino_tipo == 'cuenta')
+        trans_desde_banco = sum(t.monto for t in transferencias if t.origen_tipo == 'cuenta' and t.destino_tipo == 'efectivo')
+        saldo_transferencia = ingresos_transferencia - gastos_transferencia + trans_hacia_banco - trans_desde_banco
         total_sueldo = sum(i.monto for i in ingresos if i.tipo_ingreso == 'sueldo')
 
         owner = self.object.usuario
@@ -144,6 +159,17 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
                 if c_nom not in cuentas_map:
                     cuentas_map[c_nom] = {'nombre': c_nom, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
                 cuentas_map[c_nom]['gastos'] += g.monto
+        for t in transferencias:
+            if t.origen_cuenta:
+                c_nom = t.origen_cuenta.nombre
+                if c_nom not in cuentas_map:
+                    cuentas_map[c_nom] = {'nombre': c_nom, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
+                cuentas_map[c_nom]['gastos'] += t.monto
+            if t.destino_cuenta:
+                c_nom = t.destino_cuenta.nombre
+                if c_nom not in cuentas_map:
+                    cuentas_map[c_nom] = {'nombre': c_nom, 'ingresos': Decimal('0'), 'gastos': Decimal('0'), 'saldo': Decimal('0')}
+                cuentas_map[c_nom]['ingresos'] += t.monto
 
         for c in cuentas_map.values():
             c['saldo'] = c['ingresos'] - c['gastos']
@@ -202,7 +228,7 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         for item in resumen_gastos_por_tipo:
             item['porcentaje'] = round((item['total'] / total_gastos) * 100) if total_gastos else 0
 
-        transacciones = ingresos + gastos
+        transacciones = ingresos + gastos + transferencias
         for transaccion in transacciones:
             transaccion.fecha_local = self._fecha_local(transaccion)
         transacciones.sort(key=lambda transaccion: transaccion.fecha_local, reverse=True)
@@ -219,6 +245,9 @@ class PresupuestoDetailView(PresupuestoUsuarioMixin, DetailView):
         # Agregar al contexto
         context['gastos'] = gastos
         context['ingresos'] = ingresos
+        context['transferencias'] = transferencias
+        context['form_transferencia'] = TransferenciaFondosForm(user=self.request.user, presupuesto=self.object)
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
         context['transacciones_por_dia'] = transacciones_por_dia
         context['total_gastos'] = total_gastos
         context['total_gastos_computables'] = total_gastos_computables
@@ -1085,3 +1114,56 @@ def eliminar_diferencia_tarjeta(request, pk):
         diferencia.delete()
         messages.success(request, f"Diferencia de ${monto:,.2f} de '{tarjeta_nom}' eliminada.")
     return redirect('presupuestos:ver_presupuesto', pk=presupuesto_pk)
+
+
+@login_required
+def guardar_transferencia_fondos(request, pk):
+    presupuesto = get_object_or_404(presupuestos_editables(request.user), pk=pk)
+    if request.method == 'POST':
+        form = TransferenciaFondosForm(request.POST, user=request.user, presupuesto=presupuesto)
+        if form.is_valid():
+            trans = form.save()
+            messages.success(request, f"Transferencia de ${trans.monto:,.2f} ({trans.origen_str} ➔ {trans.destino_str}) registrada exitosamente.")
+        else:
+            first_err = next(iter(form.errors.values()))[0] if form.errors else 'Error al registrar la transferencia.'
+            messages.error(request, f"No se pudo registrar la transferencia: {first_err}")
+    return redirect('presupuestos:ver_presupuesto', pk=presupuesto.pk)
+
+
+class TransferenciaFondosUpdateView(TransferenciaFondosEditableMixin, UpdateView):
+    model = TransferenciaFondos
+    form_class = TransferenciaFondosForm
+    template_name = 'presupuestos/transferencia_fondos_form.html'
+
+    def get_success_url(self):
+        return reverse_lazy('presupuestos:ver_presupuesto', kwargs={'pk': self.object.presupuesto.pk})
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['presupuesto'] = self.object.presupuesto
+        return kwargs
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, 'Transferencia actualizada exitosamente.')
+        return response
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['presupuesto'] = self.object.presupuesto
+        context['cuentas_list'] = get_user_recent_cuentas(self.request.user)
+        return context
+
+
+class TransferenciaFondosDeleteView(TransferenciaFondosEditableMixin, DeleteView):
+    model = TransferenciaFondos
+    template_name = 'presupuestos/gasto_confirm_delete.html'
+
+    def get_success_url(self):
+        return reverse_lazy('presupuestos:ver_presupuesto', kwargs={'pk': self.object.presupuesto.pk})
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(self.request, 'Transferencia eliminada exitosamente.')
+        return super().delete(request, *args, **kwargs)
+
