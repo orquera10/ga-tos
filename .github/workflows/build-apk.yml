@@ -62,8 +62,8 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1.0
-          name: "Ga$tos Android APK v2.1.0"
+          tag_name: v2.1.1
+          name: "Ga$tos Android APK v2.1.1"
           body: |
             ### App Android de Ga$tos v2.1.0 — Edición/Eliminación en Modal + Nuevo Widget Estética Figma
             - **Editar y Eliminar Movimientos desde Modal Inferior**: Tocá cualquier gasto, ingreso o transferencia en `Inicio` o `Movimientos` para abrir el modal animado que sube desde abajo y modificar sus datos o eliminarlo.

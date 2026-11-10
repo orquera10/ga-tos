@@ -51,12 +51,12 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 val budgetName = Prefs.getLastBudgetName(context)
                 val remaining = Prefs.getLastRemaining(context)
 
-                views.setTextViewText(R.id.widgetBudgetName, "📅 $budgetName ▾")
+                views.setTextViewText(R.id.widgetBudgetName, "$budgetName ▾")
                 views.setTextViewText(
                     R.id.widgetTxtRestante,
                     String.format(Locale.getDefault(), "$ %,.0f", remaining)
                 )
-                val remainingColor = if (remaining < 0) Color.parseColor("#FF8780") else Color.parseColor("#F4F3FA")
+                val remainingColor = if (remaining < 0) Color.parseColor("#FF8780") else Color.parseColor("#FFFFFF")
                 views.setTextColor(R.id.widgetTxtRestante, remainingColor)
             }
 

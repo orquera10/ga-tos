@@ -64,7 +64,9 @@ class QuickExpenseActivity : AppCompatActivity() {
                 budgets = bList
                 if (budgets.isNotEmpty()) {
                     val bNames = budgets.map { "${it.nombre} (${it.moneda})" }
-                    val bAdapter = ArrayAdapter(this@QuickExpenseActivity, android.R.layout.simple_spinner_dropdown_item, bNames)
+                    val bAdapter = ArrayAdapter(this@QuickExpenseActivity, R.layout.spinner_item_dark, bNames).apply {
+                        setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
+                    }
                     spPresupuesto.adapter = bAdapter
 
                     val lastBudgetId = Prefs.getLastBudgetId(this@QuickExpenseActivity)

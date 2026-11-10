@@ -7,56 +7,115 @@
     android:background="@drawable/bg_dialog"
     android:padding="22dp">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Top Handle Bar like Figma Bottom Sheet -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="#3A3D49" />
+
+    <!-- Header with Figma Rose Icon Badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="CARGA RÁPIDA WIDGET"
-        android:textColor="@color/text_secondary"
-        android:textSize="10sp"
-        android:textStyle="bold"
-        android:letterSpacing="0.12" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="12dp">
+
+        <FrameLayout
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@drawable/widget_icon_rose_bg"
+            android:layout_marginEnd="12dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_up"
+                android:contentDescription="Gasto" />
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CARGA RÁPIDA · WIDGET"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Registrar gasto"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Registrar gasto"
-        android:textColor="@color/text_primary"
-        android:textSize="21sp"
-        android:textStyle="bold"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="4dp" />
-
-    <TextView
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="⚡ Quedará marcado en la app para que completes categoría, cuenta o etiqueta luego."
-        android:textColor="@color/warning"
+        android:textColor="#F0BD62"
         android:textSize="11sp"
         android:layout_marginBottom="16dp" />
 
-    <!-- Monto Input -->
+    <!-- Monto Input styled like Figma .amount-input -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Monto ($)"
+        android:text="Monto"
         android:textColor="#D5D6E2"
         android:textStyle="bold"
         android:textSize="12sp" />
 
-    <EditText
-        android:id="@+id/etMonto"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:inputType="numberDecimal"
-        android:hint="0"
-        android:textColor="@color/text_primary"
-        android:textColorHint="@color/text_muted"
-        android:textSize="24sp"
-        android:textStyle="bold"
+        android:layout_height="50dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:background="@drawable/input_bg"
-        android:paddingHorizontal="14dp"
         android:layout_marginTop="6dp"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="13dp">
+
+        <TextView
+            android:layout_width="44dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:background="@drawable/amount_prefix_bg"
+            android:text="$"
+            android:textColor="#A99FFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/etMonto"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:inputType="numberDecimal"
+            android:hint="0"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:background="@android:color/transparent"
+            android:paddingHorizontal="14dp" />
+
+    </LinearLayout>
 
     <!-- Concepto Opcional -->
     <TextView
@@ -72,20 +131,20 @@
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:inputType="textCapSentences"
-        android:hint="Vacío = ⚡ Gasto rápido automático"
+        android:hint="Ej. Supermercado (vacío = ⚡ Gasto rápido)"
         android:textColor="@color/text_primary"
         android:textColorHint="@color/text_muted"
-        android:textSize="14sp"
+        android:textSize="13.5sp"
         android:background="@drawable/input_bg"
         android:paddingHorizontal="14dp"
         android:layout_marginTop="6dp"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="13dp" />
 
     <!-- Presupuesto Selector -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Presupuesto"
+        android:text="Presupuesto en foco"
         android:textColor="#D5D6E2"
         android:textStyle="bold"
         android:textSize="12sp" />
@@ -95,6 +154,7 @@
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:background="@drawable/input_bg"
+        android:popupBackground="#151821"
         android:layout_marginTop="6dp"
         android:layout_marginBottom="20dp" />
 
@@ -123,7 +183,7 @@
             android:id="@+id/btnSave"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_weight="1.3"
+            android:layout_weight="1.35"
             android:text="Guardar gasto"
             android:textAllCaps="false"
             android:textColor="#FFFFFF"

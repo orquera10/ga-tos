@@ -7,6 +7,14 @@
     android:padding="22dp"
     android:background="@drawable/bg_dialog">
 
+    <!-- Top Handle Bar like Figma Bottom Sheet -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="#3A3D49" />
+
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -19,7 +27,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Elegir presupuesto en foco"
+        android:text="Elegí el presupuesto en foco"
         android:textColor="@color/text_primary"
         android:textSize="20sp"
         android:textStyle="bold"
@@ -39,6 +47,7 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:background="@drawable/input_bg"
+        android:popupBackground="#151821"
         android:layout_marginBottom="20dp" />
 
     <LinearLayout
@@ -66,7 +75,7 @@
             android:id="@+id/btnApplySelect"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_weight="1.2"
+            android:layout_weight="1.25"
             android:text="Aplicar"
             android:textAllCaps="false"
             android:textColor="#FFFFFF"

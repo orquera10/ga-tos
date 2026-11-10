@@ -53,10 +53,12 @@ class SelectBudgetActivity : AppCompatActivity() {
                 budgets = list
                 if (budgets.isNotEmpty()) {
                     val names = budgets.map {
-                        val restanteFormatted = String.format(Locale.getDefault(), "%.2f", it.montoRestante)
-                        "${it.nombre} (${it.moneda}) - Restante: $ $restanteFormatted"
+                        val restanteFormatted = String.format(Locale.getDefault(), "%,.0f", it.montoRestante)
+                        "${it.nombre} · $ $restanteFormatted"
                     }
-                    val adapter = ArrayAdapter(this@SelectBudgetActivity, android.R.layout.simple_spinner_dropdown_item, names)
+                    val adapter = ArrayAdapter(this@SelectBudgetActivity, R.layout.spinner_item_dark, names).apply {
+                        setDropDownViewResource(R.layout.spinner_dropdown_item_dark)
+                    }
                     spBudgetList.adapter = adapter
 
                     val currentSelectedId = Prefs.getSelectedBudgetId(this@SelectBudgetActivity)
