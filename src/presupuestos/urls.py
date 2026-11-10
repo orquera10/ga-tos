@@ -5,6 +5,9 @@ from django.views.generic import RedirectView
 app_name = 'presupuestos'
 
 urlpatterns = [
+    # App móvil rediseñada (Figma Make)
+    path('app/', views.mobile_app_view, name='mobile_app'),
+
     # URLs de Presupuesto
     path('presupuestos/', views.presupuestos_list, name='index'),
     path('presupuesto/nuevo/', views.PresupuestoCreateView.as_view(), name='crear_presupuesto'),

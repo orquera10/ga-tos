@@ -228,3 +228,66 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(resp_gasto.status_code, 201)
         self.assertEqual(resp_gasto.json()['gasto']['persona'], 'Victoria')
         self.assertEqual(resp_gasto.json()['gasto']['cuenta_bancaria'], 'Brubank')
+
+    def test_crear_cuenta_y_transferencia_y_detalle_app(self):
+        # 1. Crear una cuenta nueva desde la pestaña Cuentas
+        resp_cta = self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Mercado Pago',
+                'tipo': 'billetera',
+                'saldo_inicial': 40000,
+                'presupuesto_id': self.presupuesto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_cta.status_code, 201)
+        self.assertTrue(resp_cta.json()['success'])
+        self.assertEqual(resp_cta.json()['cuenta']['nombre'], 'Mercado Pago')
+
+        # 2. Ingresar efectivo y transferir 30000 de Efectivo a Mercado Pago
+        self.client.post(
+            '/api/ingresos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Efectivo inicial',
+                'monto': 50000,
+                'tipo_ingreso': 'efectivo',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        resp_trans = self.client.post(
+            '/api/transferencias/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'origen_tipo': 'efectivo',
+                'destino_tipo': 'cuenta',
+                'destino_cuenta': 'Mercado Pago',
+                'monto': 30000,
+                'nota': 'Depósito en efectivo',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_trans.status_code, 201)
+
+        # 3. Consultar detalle del presupuesto para las 4 pestañas de la App
+        resp_det = self.client.get(
+            f'/api/presupuestos/{self.presupuesto.id}/detalle/',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_det.status_code, 200)
+        det = resp_det.json()
+        self.assertTrue(det['success'])
+        self.assertEqual(det['presupuesto']['id'], self.presupuesto.id)
+        self.assertEqual(det['cuentas']['saldo_efectivo'], 20000.0)
+        mp_item = next((c for c in det['cuentas']['items'] if c['name'] == 'Mercado Pago'), None)
+        self.assertIsNotNone(mp_item)
+        self.assertEqual(mp_item['balance'], 70000.0)
+
+        # 4. Verificar que la vista /app/ responde 200
+        resp_app = self.client.get('/app/')
+        self.assertEqual(resp_app.status_code, 200)
+

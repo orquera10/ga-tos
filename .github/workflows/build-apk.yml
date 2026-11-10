@@ -62,12 +62,14 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.6.4
-          name: "Ga$tos Android APK v1.6.4"
+          tag_name: v2.0.0
+          name: "Ga$tos Android APK v2.0.0"
           body: |
-            ### App Android de Ga$tos v1.6.4
-            - **Carga Ultra Rápida desde Widgets**: El diálogo solo pide el Monto. Si no pones concepto, se guarda automáticamente como "⚡ Gasto rápido 01" o "⚡ Ingreso rápido 01".
-            - **Marca visual "Completar" en el presupuesto**: Los movimientos rápidos aparecen con una insignia dorada para que los completes cuando tengas tiempo libre.
+            ### App Android de Ga$tos v2.0.0 — Rediseño Moderno (Figma)
+            - **Nueva Interfaz Moderna**: Rediseño completo fiel al prototipo de Figma con barra de navegación inferior (`Inicio`, `Movimientos`, `Análisis`, `Cuentas`) y botón flotante (`+`).
+            - **Selector de Presupuesto en Foco**: Elegí cualquier presupuesto desde el selector superior para enfocar todas las secciones y sincronizar automáticamente el Widget.
+            - **Sección Cuentas**: Visualizá tu patrimonio disponible, balances por billetera virtual, banco, tarjeta y efectivo, y agregá nuevas cuentas con `+ Agregar una cuenta`.
+            - **Transferencias entre Cuentas y Efectivo**: Mové fondos entre efectivo y billeteras/bancos directamente desde la app.
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

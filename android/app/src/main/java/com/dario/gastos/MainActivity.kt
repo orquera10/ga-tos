@@ -19,36 +19,93 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private var isInClassicWeb: Boolean = false
 
     inner class AndroidBridge {
+        @JavascriptInterface
+        fun getToken(): String {
+            return Prefs.getToken(this@MainActivity) ?: ""
+        }
+
+        @JavascriptInterface
+        fun getSelectedBudgetId(): Int {
+            return Prefs.getLastBudgetId(this@MainActivity)
+        }
+
         @JavascriptInterface
         fun onTokenReceived(token: String, username: String) {
             runOnUiThread {
                 if (token.isNotEmpty()) {
                     val current = Prefs.getToken(this@MainActivity)
+                    Prefs.saveToken(this@MainActivity, token, username)
+                    GastosWidgetProvider.notifyUpdate(this@MainActivity)
                     if (current != token) {
-                        Prefs.saveToken(this@MainActivity, token, username)
-                        GastosWidgetProvider.notifyUpdate(this@MainActivity)
-                        Toast.makeText(this@MainActivity, "✓ Widget sincronizado automáticamente", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "✓ Cuenta y Widget sincronizados", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
+        }
+
+        @JavascriptInterface
+        fun onBudgetSelected(id: Int, name: String, remaining: Double, available: Double, percent: Double) {
+            runOnUiThread {
+                if (id > 0) {
+                    Prefs.setSelectedBudgetId(this@MainActivity, id)
+                    Prefs.saveWidgetData(this@MainActivity, id, name, remaining, available, percent)
+                    GastosWidgetProvider.notifyUpdate(this@MainActivity)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun openClassicWeb(path: String) {
+            runOnUiThread {
+                isInClassicWeb = true
+                val base = Prefs.getBaseUrl(this@MainActivity).trimEnd('/')
+                val cleanPath = if (path.startsWith("/")) path else "/$path"
+                webView.loadUrl("$base$cleanPath")
+            }
+        }
+    }
+
+    private fun loadRedesignedApp() {
+        isInClassicWeb = false
+        val baseUrl = Prefs.getBaseUrl(this).trimEnd('/')
+        try {
+            val html = assets.open("app.html").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            webView.loadDataWithBaseURL(
+                "$baseUrl/",
+                html,
+                "text/html",
+                "UTF-8",
+                "$baseUrl/app/"
+            )
+        } catch (e: Exception) {
+            webView.loadUrl("$baseUrl/app/")
         }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.parseColor("#0D0F16")
+        window.navigationBarColor = Color.parseColor("#12141D")
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+        webView.setBackgroundColor(Color.parseColor("#0D0F16"))
 
         // Setup SwipeRefresh
-        swipeRefresh.setColorSchemeColors(Color.parseColor("#00D09C"))
-        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#1E1E1E"))
+        swipeRefresh.setColorSchemeColors(Color.parseColor("#6758E8"), Color.parseColor("#55D2AD"))
+        swipeRefresh.setProgressBackgroundColorSchemeColor(Color.parseColor("#151821"))
         swipeRefresh.setOnRefreshListener {
-            webView.reload()
+            if (isInClassicWeb) {
+                webView.reload()
+            } else {
+                webView.evaluateJavascript("if(window.reloadAppData) window.reloadAppData();", null)
+                swipeRefresh.postDelayed({ swipeRefresh.isRefreshing = false }, 600)
+            }
         }
 
         // Configure WebView
@@ -76,22 +133,23 @@ class MainActivity : AppCompatActivity() {
                 swipeRefresh.isRefreshing = false
                 cookieManager.flush()
 
-                // Sincronización automática silenciosa del token para el Widget con la sesión activa
-                val jsAutoSync = """
-                    (function() {
-                        try {
-                            fetch('/api/auth/token/', { credentials: 'include' })
-                                .then(function(r) { return r.json(); })
-                                .then(function(d) {
-                                    if (d && d.success && d.token && window.AndroidBridge) {
-                                        window.AndroidBridge.onTokenReceived(d.token, d.username || '');
-                                    }
-                                })
-                                .catch(function(e) {});
-                        } catch(err) {}
-                    })();
-                """.trimIndent()
-                webView.evaluateJavascript(jsAutoSync, null)
+                if (isInClassicWeb) {
+                    val jsAutoSync = """
+                        (function() {
+                            try {
+                                fetch('/api/auth/token/', { credentials: 'include' })
+                                    .then(function(r) { return r.json(); })
+                                    .then(function(d) {
+                                        if (d && d.success && d.token && window.AndroidBridge) {
+                                            window.AndroidBridge.onTokenReceived(d.token, d.username || '');
+                                        }
+                                    })
+                                    .catch(function(e) {});
+                            } catch(err) {}
+                        })();
+                    """.trimIndent()
+                    webView.evaluateJavascript(jsAutoSync, null)
+                }
 
                 if (!Prefs.getToken(this@MainActivity).isNullOrEmpty()) {
                     GastosWidgetProvider.notifyUpdate(this@MainActivity)
@@ -107,12 +165,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val targetUrl = Prefs.getBaseUrl(this)
-        webView.loadUrl(targetUrl)
+        loadRedesignedApp()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
+                if (isInClassicWeb) {
+                    if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        loadRedesignedApp()
+                    }
+                } else if (webView.canGoBack()) {
                     webView.goBack()
                 } else {
                     isEnabled = false
@@ -120,5 +183,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isInClassicWeb && ::webView.isInitialized) {
+            webView.evaluateJavascript("if(window.reloadAppData) window.reloadAppData();", null)
+        }
     }
 }

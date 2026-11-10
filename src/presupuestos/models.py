@@ -233,8 +233,15 @@ class PresupuestoCompartido(models.Model):
 
 
 class CuentaBancaria(models.Model):
+    TIPOS_CUENTA = [
+        ('billetera', 'Billetera virtual'),
+        ('banco', 'Cuenta bancaria'),
+        ('tarjeta', 'Tarjeta de crédito'),
+        ('efectivo', 'Dinero disponible'),
+    ]
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cuentas_bancarias')
     nombre = models.CharField(max_length=60)
+    tipo = models.CharField(max_length=20, choices=TIPOS_CUENTA, default='billetera')
     fecha_creacion = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -242,6 +249,17 @@ class CuentaBancaria(models.Model):
         verbose_name = 'Cuenta Bancaria / Billetera'
         verbose_name_plural = 'Cuentas Bancarias / Billeteras'
         ordering = ['nombre']
+
+    @property
+    def subtitulo_display(self):
+        if self.tipo and self.tipo != 'billetera':
+            return self.get_tipo_display()
+        n = (self.nombre or '').lower()
+        if any(k in n for k in ['visa', 'master', 'tarjeta', 'amex', 'credito', 'crédito']):
+            return 'Tarjeta de crédito'
+        if any(k in n for k in ['banco', 'patagonia', 'macro', 'galicia', 'santander', 'bbva', 'nacion', 'nación', 'provincia', 'brubank']):
+            return 'Cuenta bancaria'
+        return 'Billetera virtual'
 
     def __str__(self):
         return self.nombre

@@ -1167,3 +1167,9 @@ class TransferenciaFondosDeleteView(TransferenciaFondosEditableMixin, DeleteView
         messages.success(self.request, 'Transferencia eliminada exitosamente.')
         return super().delete(request, *args, **kwargs)
 
+
+def mobile_app_view(request):
+    """Renderiza el rediseño moderno mobile de Ga$tos (basado en Figma Make)."""
+    return render(request, 'presupuestos/mobile_app.html')
+
+

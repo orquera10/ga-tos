@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -9,7 +10,14 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime, parse_date
 from django.db.models import Q
 
-from presupuestos.models import Presupuesto, Categoria, Gasto, Ingreso, CuentaBancaria
+from presupuestos.models import (
+    Presupuesto,
+    Categoria,
+    Gasto,
+    Ingreso,
+    CuentaBancaria,
+    TransferenciaFondos,
+)
 from presupuestos.views import (
     presupuestos_editables,
     presupuestos_visibles,
@@ -20,6 +28,19 @@ from .models import ApiToken
 from .auth import api_auth_required, get_user_from_request
 
 
+MESES_ES = [
+    '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
+MESES_CORTOS_ES = [
+    '', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+    'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+]
+CATEGORY_COLORS = [
+    '#6657e8', '#f2766d', '#2baad5', '#e9ad47', '#55d2ad', '#a99fff', '#ec4899', '#38bdf8'
+]
+
+
 def parse_request_data(request):
     """Obtiene los datos tanto si vienen en JSON como en form-data."""
     if request.content_type and 'application/json' in request.content_type:
@@ -28,6 +49,67 @@ def parse_request_data(request):
         except (ValueError, UnicodeDecodeError):
             return {}
     return request.POST.dict()
+
+
+def format_fecha_humana(dt):
+    """Formatea una fecha como 'Hoy, 11:24', 'Ayer, 18:40' o '8 Nov'."""
+    if not dt:
+        return ''
+    if isinstance(dt, datetime):
+        if timezone.is_aware(dt):
+            local_dt = timezone.localtime(dt)
+        else:
+            local_dt = dt
+        fecha_d = local_dt.date()
+        hora_str = local_dt.strftime('%H:%M')
+    else:
+        fecha_d = dt
+        hora_str = ''
+
+    hoy = timezone.localdate()
+    ayer = hoy - timezone.timedelta(days=1)
+    if fecha_d == hoy:
+        return f"Hoy, {hora_str}" if hora_str else "Hoy"
+    if fecha_d == ayer:
+        return f"Ayer, {hora_str}" if hora_str else "Ayer"
+    mes_corto = MESES_CORTOS_ES[fecha_d.month] if 1 <= fecha_d.month <= 12 else ''
+    return f"{fecha_d.day} {mes_corto}"
+
+
+def resolve_gasto_icon_tone(gasto):
+    """Determina ícono y color según categoría o medio de pago (estilo Figma)."""
+    cat_name = (gasto.categoria.nombre if gasto.categoria else '').lower()
+    nombre_low = (gasto.nombre or '').lower()
+    combined = f"{cat_name} {nombre_low}"
+
+    if any(k in combined for k in ['super', 'compra', 'ropa', 'tienda', 'mercado', 'coto', 'carrefour', 'regalo']):
+        return 'bag', 'rose'
+    if any(k in combined for k in ['comida', 'almuerzo', 'cena', 'desayuno', 'restaurante', 'cafe', 'café', 'delivery', 'pedidos', 'alimento']):
+        return 'food', 'amber'
+    if any(k in combined for k in ['transporte', 'auto', 'nafta', 'ypf', 'shell', 'uber', 'cabify', 'sube', 'peaje', 'viaje', 'colectivo']):
+        return 'car', 'blue'
+    if any(k in combined for k in ['suscrip', 'netflix', 'spotify', 'servicio', 'luz', 'gas', 'internet', 'alquiler', 'impuesto', 'salud']):
+        return 'card', 'violet'
+    if gasto.metodo_pago == 'tarjeta':
+        return 'card', 'violet'
+    return 'bag', 'rose'
+
+
+def get_user_initials(user):
+    first = (user.first_name or '').strip()
+    last = (user.last_name or '').strip()
+    if first and last:
+        return f"{first[0]}{last[0]}".upper()
+    if first:
+        return first[:2].upper()
+    uname = (user.username or 'US').strip()
+    return uname[:2].upper()
+
+
+def get_user_display_name(user):
+    if user.first_name:
+        return user.first_name.strip().title()
+    return (user.username or 'Usuario').strip().title()
 
 
 @csrf_exempt
@@ -71,12 +153,15 @@ def login_api(request):
     return JsonResponse({
         'success': True,
         'token': token_obj.token,
+        'username': user.username,
         'user': {
             'id': user.id,
             'username': user.username,
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            'display_name': get_user_display_name(user),
+            'initials': get_user_initials(user),
         }
     })
 
@@ -98,40 +183,60 @@ def mi_token_api(request):
     return JsonResponse({
         'success': True,
         'token': token_obj.token,
-        'username': user.username
+        'username': user.username,
+        'display_name': get_user_display_name(user),
+        'initials': get_user_initials(user),
     })
+
+
+def serialize_presupuesto_item(p, user, hoy=None):
+    if hoy is None:
+        hoy = timezone.localdate()
+    es_activo = (p.fecha_inicio <= hoy <= p.fecha_fin)
+    total_ing = float(p.total_ingresos)
+    total_gas_comp = float(p.total_gastos_computables)
+    disponible = float(p.monto_total_con_ingresos())
+    return {
+        'id': p.id,
+        'nombre': p.nombre,
+        'tipo': p.tipo,
+        'tipo_display': p.get_tipo_display(),
+        'descripcion': p.descripcion or '',
+        'moneda': p.moneda,
+        'moneda_display': p.get_moneda_display(),
+        'fecha_inicio': p.fecha_inicio.strftime('%Y-%m-%d'),
+        'fecha_fin': p.fecha_fin.strftime('%Y-%m-%d'),
+        'monto_total': float(p.monto_total),
+        'monto_restante': float(p.monto_restante),
+        'total_ingresos': total_ing,
+        'total_gastos_computables': total_gas_comp,
+        'total_tarjeta': float(p.total_tarjeta),
+        'saldo_efectivo': float(p.saldo_efectivo),
+        'saldo_transferencia': float(p.saldo_transferencia),
+        'disponible': disponible,
+        'porcentaje_gastado': round(float(p.porcentaje_gastado()), 1),
+        'gastos_count': p.gastos.count(),
+        'es_activo': es_activo,
+        'es_propio': p.usuario_id == user.id,
+        'puede_editar': p.puede_editar(user),
+    }
 
 
 @api_auth_required
 @require_http_methods(["GET"])
 def presupuestos_api(request):
     """
-    Lista todos los presupuestos en los que el usuario puede cargar gastos.
+    Lista todos los presupuestos en los que el usuario puede cargar gastos o visualizar.
     GET /api/presupuestos/
     """
-    presupuestos = presupuestos_editables(request.api_user).exclude(tipo='prestamo').order_by('-fecha_inicio')
+    incluir_prestamos = request.GET.get('incluir_prestamos', '0') == '1'
+    qs = presupuestos_editables(request.api_user)
+    if not incluir_prestamos:
+        qs = qs.exclude(tipo='prestamo')
+    presupuestos = qs.order_by('-fecha_inicio', '-id')
     hoy = timezone.localdate()
 
-    items = []
-    for p in presupuestos:
-        es_activo = (p.fecha_inicio <= hoy <= p.fecha_fin)
-        items.append({
-            'id': p.id,
-            'nombre': p.nombre,
-            'descripcion': p.descripcion or '',
-            'moneda': p.moneda,
-            'moneda_display': p.get_moneda_display(),
-            'fecha_inicio': p.fecha_inicio.strftime('%Y-%m-%d'),
-            'fecha_fin': p.fecha_fin.strftime('%Y-%m-%d'),
-            'monto_total': float(p.monto_total),
-            'monto_restante': float(p.monto_restante),
-            'total_ingresos': float(p.total_ingresos),
-            'disponible': float(p.monto_total + p.total_ingresos),
-            'porcentaje_gastado': round(float(p.porcentaje_gastado()), 1),
-            'gastos_count': p.gastos.count(),
-            'es_activo': es_activo,
-            'es_propio': p.usuario_id == request.api_user.id,
-        })
+    items = [serialize_presupuesto_item(p, request.api_user, hoy) for p in presupuestos]
 
     user = request.api_user
     personas_set = set()
@@ -142,14 +247,639 @@ def presupuestos_api(request):
                 if clean:
                     personas_set.add(clean)
     personas = sorted(list(personas_set))
-    cuentas = list(CuentaBancaria.objects.filter(usuario=user).values_list('nombre', flat=True).order_by('nombre'))
+    cuentas_qs = CuentaBancaria.objects.filter(usuario=user).order_by('nombre')
+    cuentas = list(cuentas_qs.values_list('nombre', flat=True))
 
     return JsonResponse({
         'success': True,
         'presupuestos': items,
         'personas': personas,
-        'cuentas': cuentas
+        'cuentas': cuentas,
     })
+
+
+@api_auth_required
+@require_http_methods(["GET"])
+def presupuesto_detalle_api(request, pk=None):
+    """
+    Devuelve todos los datos completos de un presupuesto para las 4 pestañas de la App Android
+    (Inicio, Movimientos, Análisis, Cuentas), además del listado de presupuestos para el selector.
+    GET /api/presupuestos/<int:pk>/detalle/
+    GET /api/presupuestos/activo/detalle/?presupuesto_id=...
+    """
+    user = request.api_user
+    hoy = timezone.localdate()
+
+    todos_qs = presupuestos_visibles(user).order_by('-fecha_inicio', '-id')
+    presupuestos_sin_prestamo = todos_qs.exclude(tipo='prestamo')
+
+    target_id = pk or request.GET.get('presupuesto_id')
+    presupuesto = None
+    if target_id:
+        try:
+            presupuesto = todos_qs.filter(id=int(target_id)).first()
+        except (ValueError, TypeError):
+            presupuesto = None
+
+    if not presupuesto:
+        presupuesto = presupuestos_sin_prestamo.filter(fecha_inicio__lte=hoy, fecha_fin__gte=hoy).first()
+    if not presupuesto:
+        presupuesto = presupuestos_sin_prestamo.first() or todos_qs.first()
+
+    # Lista de presupuestos para el selector superior
+    presupuestos_selector = [
+        serialize_presupuesto_item(p, user, hoy)
+        for p in presupuestos_sin_prestamo
+    ]
+    # Si el usuario tiene préstamos o eligió uno, también los incluimos al final del selector
+    prestamos_selector = [
+        serialize_presupuesto_item(p, user, hoy)
+        for p in todos_qs.filter(tipo='prestamo')
+    ]
+    all_selector = presupuestos_selector + prestamos_selector
+
+    categorias_disponibles = [
+        {'id': c.id, 'nombre': c.nombre}
+        for c in Categoria.objects.all().order_by('nombre')
+    ]
+    personas_disponibles = get_user_recent_personas(user)
+
+    if not presupuesto:
+        user_cuentas = list(CuentaBancaria.objects.filter(usuario=user).order_by('nombre'))
+        return JsonResponse({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'display_name': get_user_display_name(user),
+                'initials': get_user_initials(user),
+            },
+            'presupuesto': None,
+            'presupuestos': all_selector,
+            'movimientos': [],
+            'analisis': {
+                'total_gastado': 0,
+                'total_computable': 0,
+                'total_tarjeta': 0,
+                'mayor_categoria': None,
+                'categorias': [],
+                'personas': [],
+            },
+            'cuentas': {
+                'patrimonio_total': 0,
+                'saldo_efectivo': 0,
+                'saldo_transferencia': 0,
+                'total_tarjeta': 0,
+                'items': [
+                    {
+                        'id': c.id,
+                        'name': c.nombre,
+                        'subtitle': c.subtitulo_display,
+                        'tipo': c.tipo,
+                        'balance': 0.0,
+                        'icon': 'card' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'wallet'),
+                        'icon_class': 'macro' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'mp'),
+                        'is_system': False,
+                    }
+                    for c in user_cuentas
+                ],
+            },
+            'categorias_disponibles': categorias_disponibles,
+            'personas_disponibles': personas_disponibles,
+            'cuentas_disponibles': [
+                {'id': c.id, 'nombre': c.nombre, 'tipo': c.tipo, 'subtitle': c.subtitulo_display}
+                for c in user_cuentas
+            ],
+        })
+
+    # Recopilar movimientos del presupuesto seleccionado
+    gastos = list(presupuesto.gastos.select_related('categoria', 'cuenta_bancaria').order_by('-fecha', '-id'))
+    ingresos = list(presupuesto.ingresos.select_related('cuenta_bancaria').order_by('-fecha', '-id'))
+    transferencias = list(
+        presupuesto.transferencias_fondos.select_related('origen_cuenta', 'destino_cuenta').order_by('-fecha', '-id')
+    )
+
+    total_gastos_all = sum((g.monto for g in gastos), Decimal('0'))
+    total_gastos_comp = sum((g.monto for g in gastos if g.metodo_pago != 'tarjeta'), Decimal('0'))
+    total_tarjeta = sum((g.monto for g in gastos if g.metodo_pago == 'tarjeta'), Decimal('0'))
+    total_ingresos = sum((i.monto for i in ingresos), Decimal('0'))
+    saldo_efectivo = presupuesto.saldo_efectivo
+    saldo_transferencia = presupuesto.saldo_transferencia
+    disponible = presupuesto.monto_total_con_ingresos()
+
+    # Armar lista unificada de movimientos
+    raw_movs = []
+    for g in gastos:
+        icon, tone = resolve_gasto_icon_tone(g)
+        cat_label = g.categoria.nombre if g.categoria else 'Sin categoría'
+        parts_detail = [cat_label]
+        if g.cuenta_bancaria:
+            parts_detail.append(g.cuenta_bancaria.nombre)
+        elif g.metodo_pago == 'tarjeta':
+            parts_detail.append('Tarjeta')
+        elif g.metodo_pago == 'efectivo':
+            parts_detail.append('Efectivo')
+        if g.persona:
+            parts_detail.append(f"👤 {g.persona}")
+        parts_detail.append(format_fecha_humana(g.fecha))
+
+        dt_local = timezone.localtime(g.fecha) if timezone.is_aware(g.fecha) else g.fecha
+        raw_movs.append({
+            '_sort_dt': dt_local,
+            'uid': f"gasto-{g.id}",
+            'id': g.id,
+            'tipo_movimiento': 'gasto',
+            'title': g.nombre,
+            'detail': ' · '.join([p for p in parts_detail if p]),
+            'categoria': cat_label,
+            'metodo_pago': g.metodo_pago,
+            'cuenta': g.cuenta_bancaria.nombre if g.cuenta_bancaria else ('Efectivo' if g.metodo_pago == 'efectivo' else ''),
+            'persona': g.persona or '',
+            'amount': -float(g.monto),
+            'is_transfer': False,
+            'icon': icon,
+            'tone': tone,
+            'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+        })
+
+    for i in ingresos:
+        parts_detail = ['Ingreso']
+        if i.cuenta_bancaria:
+            parts_detail.append(i.cuenta_bancaria.nombre)
+        else:
+            parts_detail.append(i.get_tipo_ingreso_display())
+        parts_detail.append(format_fecha_humana(i.fecha))
+
+        dt_local = timezone.localtime(i.fecha) if timezone.is_aware(i.fecha) else i.fecha
+        raw_movs.append({
+            '_sort_dt': dt_local,
+            'uid': f"ingreso-{i.id}",
+            'id': i.id,
+            'tipo_movimiento': 'ingreso',
+            'title': i.nombre,
+            'detail': ' · '.join([p for p in parts_detail if p]),
+            'categoria': 'Ingreso',
+            'metodo_pago': i.tipo_ingreso,
+            'cuenta': i.cuenta_bancaria.nombre if i.cuenta_bancaria else ('Efectivo' if i.tipo_ingreso == 'efectivo' else ''),
+            'persona': '',
+            'amount': float(i.monto),
+            'is_transfer': False,
+            'icon': 'cash' if i.tipo_ingreso == 'efectivo' else 'swap',
+            'tone': 'green',
+            'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+        })
+
+    for t in transferencias:
+        parts_detail = ['Transferencia', f"{t.origen_str} ➔ {t.destino_str}"]
+        if t.nota:
+            parts_detail.append(t.nota)
+        parts_detail.append(format_fecha_humana(t.fecha))
+
+        dt_local = timezone.localtime(t.fecha) if timezone.is_aware(t.fecha) else t.fecha
+        raw_movs.append({
+            '_sort_dt': dt_local,
+            'uid': f"trans-{t.id}",
+            'id': t.id,
+            'tipo_movimiento': 'transferencia',
+            'title': f"{t.origen_str} ➔ {t.destino_str}",
+            'detail': ' · '.join([p for p in parts_detail if p]),
+            'categoria': 'Transferencia',
+            'metodo_pago': 'transferencia',
+            'cuenta': t.destino_str,
+            'persona': '',
+            'amount': float(t.monto),
+            'is_transfer': True,
+            'icon': 'swap',
+            'tone': 'blue',
+            'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+        })
+
+    raw_movs.sort(key=lambda x: x['_sort_dt'], reverse=True)
+    for m in raw_movs:
+        m.pop('_sort_dt', None)
+
+    # Análisis por categoría
+    cat_map = {}
+    for g in gastos:
+        c_name = g.categoria.nombre if g.categoria else 'Sin categoría'
+        if c_name not in cat_map:
+            cat_map[c_name] = {'name': c_name, 'amount': Decimal('0'), 'count': 0}
+        cat_map[c_name]['amount'] += g.monto
+        cat_map[c_name]['count'] += 1
+
+    sorted_cats = sorted(cat_map.values(), key=lambda x: (-x['amount'], x['name'].lower()))
+    categorias_resumen = []
+    for idx, item in enumerate(sorted_cats):
+        pct = round(float((item['amount'] / total_gastos_all) * 100)) if total_gastos_all > 0 else 0
+        categorias_resumen.append({
+            'name': item['name'],
+            'amount': float(item['amount']),
+            'percent': pct,
+            'color': CATEGORY_COLORS[idx % len(CATEGORY_COLORS)],
+            'count': item['count'],
+        })
+
+    mayor_categoria = categorias_resumen[0] if categorias_resumen else {
+        'name': 'Sin gastos',
+        'amount': 0.0,
+        'percent': 0,
+        'color': '#6657e8',
+    }
+
+    # Análisis por persona / tag
+    pers_map = {}
+    for g in gastos:
+        if g.persona and g.persona.strip():
+            p_parts = [p.strip().title() for p in g.persona.split(',') if p.strip()]
+        else:
+            p_parts = ['Sin etiqueta']
+        for p_nom in p_parts:
+            if p_nom not in pers_map:
+                pers_map[p_nom] = {'name': p_nom, 'amount': Decimal('0'), 'count': 0}
+            pers_map[p_nom]['amount'] += g.monto
+            pers_map[p_nom]['count'] += 1
+
+    sorted_pers = sorted(pers_map.values(), key=lambda x: (-x['amount'], x['name'].lower()))
+    personas_resumen = []
+    for idx, item in enumerate(sorted_pers):
+        pct = round(float((item['amount'] / total_gastos_all) * 100)) if total_gastos_all > 0 else 0
+        personas_resumen.append({
+            'name': item['name'],
+            'amount': float(item['amount']),
+            'percent': pct,
+            'color': CATEGORY_COLORS[idx % len(CATEGORY_COLORS)],
+            'count': item['count'],
+        })
+
+    # Cuentas y billeteras
+    owner = presupuesto.usuario or user
+    user_cuentas = list(CuentaBancaria.objects.filter(usuario=owner).order_by('nombre'))
+    if user.id != owner.id:
+        existing_names = {c.nombre.lower() for c in user_cuentas}
+        for c in CuentaBancaria.objects.filter(usuario=user).order_by('nombre'):
+            if c.nombre.lower() not in existing_names:
+                user_cuentas.append(c)
+
+    # Calcular saldos por CuentaBancaria en este presupuesto
+    cuentas_stats = {}
+    for c in user_cuentas:
+        cuentas_stats[c.nombre.lower()] = {
+            'obj': c,
+            'nombre': c.nombre,
+            'ingresos': Decimal('0'),
+            'gastos_liquidos': Decimal('0'),
+            'gastos_tarjeta': Decimal('0'),
+        }
+
+    for i in ingresos:
+        if i.cuenta_bancaria:
+            key = i.cuenta_bancaria.nombre.lower()
+            if key not in cuentas_stats:
+                cuentas_stats[key] = {
+                    'obj': i.cuenta_bancaria,
+                    'nombre': i.cuenta_bancaria.nombre,
+                    'ingresos': Decimal('0'),
+                    'gastos_liquidos': Decimal('0'),
+                    'gastos_tarjeta': Decimal('0'),
+                }
+            cuentas_stats[key]['ingresos'] += i.monto
+
+    tarjeta_sin_cuenta = Decimal('0')
+    for g in gastos:
+        if g.cuenta_bancaria:
+            key = g.cuenta_bancaria.nombre.lower()
+            if key not in cuentas_stats:
+                cuentas_stats[key] = {
+                    'obj': g.cuenta_bancaria,
+                    'nombre': g.cuenta_bancaria.nombre,
+                    'ingresos': Decimal('0'),
+                    'gastos_liquidos': Decimal('0'),
+                    'gastos_tarjeta': Decimal('0'),
+                }
+            if g.metodo_pago == 'tarjeta':
+                cuentas_stats[key]['gastos_tarjeta'] += g.monto
+            else:
+                cuentas_stats[key]['gastos_liquidos'] += g.monto
+        elif g.metodo_pago == 'tarjeta':
+            tarjeta_sin_cuenta += g.monto
+
+    for t in transferencias:
+        if t.origen_cuenta:
+            key = t.origen_cuenta.nombre.lower()
+            if key not in cuentas_stats:
+                cuentas_stats[key] = {
+                    'obj': t.origen_cuenta,
+                    'nombre': t.origen_cuenta.nombre,
+                    'ingresos': Decimal('0'),
+                    'gastos_liquidos': Decimal('0'),
+                    'gastos_tarjeta': Decimal('0'),
+                }
+            cuentas_stats[key]['gastos_liquidos'] += t.monto
+        if t.destino_cuenta:
+            key = t.destino_cuenta.nombre.lower()
+            if key not in cuentas_stats:
+                cuentas_stats[key] = {
+                    'obj': t.destino_cuenta,
+                    'nombre': t.destino_cuenta.nombre,
+                    'ingresos': Decimal('0'),
+                    'gastos_liquidos': Decimal('0'),
+                    'gastos_tarjeta': Decimal('0'),
+                }
+            cuentas_stats[key]['ingresos'] += t.monto
+
+    cuentas_items = []
+    for key, st in cuentas_stats.items():
+        c_obj = st['obj']
+        saldo_liq = st['ingresos'] - st['gastos_liquidos']
+        gas_tarj = st['gastos_tarjeta']
+        sub = c_obj.subtitulo_display if c_obj else 'Billetera virtual'
+        c_tipo = c_obj.tipo if c_obj else 'billetera'
+
+        if c_tipo == 'tarjeta' or (sub == 'Tarjeta de crédito' and saldo_liq == 0 and gas_tarj > 0):
+            bal = -float(gas_tarj) if gas_tarj > 0 else float(saldo_liq)
+            icon_name = 'card'
+            icon_cls = 'macro'
+        elif c_tipo == 'efectivo':
+            bal = float(saldo_liq)
+            icon_name = 'cash'
+            icon_cls = 'cash'
+        else:
+            bal = float(saldo_liq)
+            icon_name = 'wallet'
+            icon_cls = 'mp'
+
+        cuentas_items.append({
+            'id': c_obj.id if c_obj else 0,
+            'name': st['nombre'],
+            'subtitle': sub,
+            'tipo': c_tipo,
+            'balance': bal,
+            'gastos_tarjeta': float(gas_tarj),
+            'icon': icon_name,
+            'icon_class': icon_cls,
+            'is_system': False,
+        })
+
+    # Ordenar cuentas: primero las que tienen movimiento o saldo != 0, luego alfabético
+    cuentas_items.sort(key=lambda x: (0 if (x['balance'] != 0 or x['gastos_tarjeta'] != 0) else 1, -abs(x['balance']), x['name'].lower()))
+
+    # Agregar Efectivo disponible como cuenta del presupuesto
+    cuentas_items.append({
+        'id': -1,
+        'name': 'Efectivo',
+        'subtitle': 'Dinero disponible',
+        'tipo': 'efectivo',
+        'balance': float(saldo_efectivo),
+        'gastos_tarjeta': 0.0,
+        'icon': 'cash',
+        'icon_class': 'cash',
+        'is_system': True,
+    })
+
+    # Si hay consumos con tarjeta en este presupuesto, mostrar también el resumen de Tarjeta próximo mes
+    if total_tarjeta > 0:
+        cuentas_items.append({
+            'id': -2,
+            'name': 'Tarjetas (Próx. mes)',
+            'subtitle': 'Tarjeta de crédito',
+            'tipo': 'tarjeta',
+            'balance': -float(total_tarjeta),
+            'gastos_tarjeta': float(total_tarjeta),
+            'icon': 'card',
+            'icon_class': 'macro',
+            'is_system': True,
+        })
+
+    mes_nombre = MESES_ES[presupuesto.fecha_inicio.month].upper() if 1 <= presupuesto.fecha_inicio.month <= 12 else ''
+    mes_label = f"{mes_nombre} {presupuesto.fecha_inicio.year}".strip()
+
+    presupuesto_data = serialize_presupuesto_item(presupuesto, user, hoy)
+    presupuesto_data['mes_label'] = mes_label
+    presupuesto_data['total_gastos_all'] = float(total_gastos_all)
+
+    return JsonResponse({
+        'success': True,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'display_name': get_user_display_name(user),
+            'initials': get_user_initials(user),
+        },
+        'presupuesto': presupuesto_data,
+        'presupuestos': all_selector,
+        'movimientos': raw_movs,
+        'analisis': {
+            'total_gastado': float(total_gastos_all),
+            'total_computable': float(total_gastos_comp),
+            'total_tarjeta': float(total_tarjeta),
+            'mayor_categoria': mayor_categoria,
+            'categorias': categorias_resumen,
+            'personas': personas_resumen,
+        },
+        'cuentas': {
+            'patrimonio_total': float(presupuesto.monto_restante),
+            'saldo_efectivo': float(saldo_efectivo),
+            'saldo_transferencia': float(saldo_transferencia),
+            'total_tarjeta': float(total_tarjeta),
+            'items': cuentas_items,
+        },
+        'categorias_disponibles': categorias_disponibles,
+        'personas_disponibles': personas_disponibles,
+        'cuentas_disponibles': [
+            {'id': c.id, 'nombre': c.nombre, 'tipo': c.tipo, 'subtitle': c.subtitulo_display}
+            for c in user_cuentas
+        ],
+    })
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def crear_cuenta_api(request):
+    """
+    Crea o actualiza una CuentaBancaria del usuario desde la pestaña Cuentas de la App.
+    Opcionalmente registra un saldo inicial en el presupuesto activo.
+    POST /api/cuentas/crear/
+    Body:
+    {
+        "nombre": "Mercado Pago",
+        "tipo": "billetera", // billetera | banco | tarjeta
+        "saldo_inicial": 50000, // opcional
+        "presupuesto_id": 1 // opcional para acreditar saldo_inicial
+    }
+    """
+    data = parse_request_data(request)
+    nombre_raw = (data.get('nombre') or '').strip()
+    if not nombre_raw:
+        return JsonResponse({'success': False, 'error': 'El nombre de la cuenta es obligatorio'}, status=400)
+
+    tipo = (data.get('tipo') or 'billetera').strip().lower()
+    if tipo not in ['billetera', 'banco', 'tarjeta', 'efectivo']:
+        tipo = 'billetera'
+
+    nombre_clean = nombre_raw[:60]
+    cuenta = CuentaBancaria.objects.filter(usuario=request.api_user, nombre__iexact=nombre_clean).first()
+    created = False
+    if cuenta:
+        cuenta.nombre = nombre_clean
+        cuenta.tipo = tipo
+        cuenta.save()
+    else:
+        cuenta = CuentaBancaria.objects.create(
+            usuario=request.api_user,
+            nombre=nombre_clean,
+            tipo=tipo,
+        )
+        created = True
+
+    # Si se indicó un saldo inicial positivo y un presupuesto editable, crear ingreso inicial
+    saldo_inicial_raw = data.get('saldo_inicial')
+    presupuesto_id = data.get('presupuesto_id')
+    if saldo_inicial_raw not in [None, '', '0', 0]:
+        try:
+            monto_ini = Decimal(str(saldo_inicial_raw).replace(',', '.'))
+            if monto_ini > 0 and presupuesto_id:
+                presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id).first()
+                if presupuesto:
+                    Ingreso.objects.create(
+                        presupuesto=presupuesto,
+                        nombre=f"Saldo inicial · {cuenta.nombre}",
+                        monto=monto_ini,
+                        tipo_ingreso='transferencia',
+                        cuenta_bancaria=cuenta,
+                        es_rapido=False,
+                    )
+        except (InvalidOperation, TypeError):
+            pass
+
+    return JsonResponse({
+        'success': True,
+        'created': created,
+        'mensaje': f'Cuenta "{cuenta.nombre}" guardada correctamente',
+        'cuenta': {
+            'id': cuenta.id,
+            'nombre': cuenta.nombre,
+            'tipo': cuenta.tipo,
+            'subtitle': cuenta.subtitulo_display,
+        }
+    }, status=201 if created else 200)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def eliminar_cuenta_api(request, pk):
+    """
+    Elimina una CuentaBancaria del usuario.
+    POST /api/cuentas/<int:pk>/eliminar/
+    """
+    cuenta = CuentaBancaria.objects.filter(id=pk, usuario=request.api_user).first()
+    if not cuenta:
+        return JsonResponse({'success': False, 'error': 'Cuenta no encontrada'}, status=404)
+    nombre = cuenta.nombre
+    cuenta.delete()
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Cuenta "{nombre}" eliminada'
+    })
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def crear_transferencia_api(request):
+    """
+    Registra una transferencia de fondos entre Efectivo y Cuentas Bancarias / Billeteras.
+    POST /api/transferencias/crear/
+    Body:
+    {
+        "presupuesto_id": 1,
+        "origen_tipo": "efectivo" | "cuenta",
+        "origen_cuenta": "Patagonia", // si origen_tipo == "cuenta"
+        "destino_tipo": "cuenta" | "efectivo",
+        "destino_cuenta": "Mercadopago", // si destino_tipo == "cuenta"
+        "monto": 30000,
+        "nota": "Depósito en efectivo"
+    }
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    monto_raw = data.get('monto')
+
+    if not presupuesto_id or monto_raw is None:
+        return JsonResponse({'success': False, 'error': 'Faltan datos obligatorios'}, status=400)
+
+    try:
+        monto = Decimal(str(monto_raw).replace(',', '.'))
+        if monto <= 0:
+            return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a cero'}, status=400)
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Monto inválido'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id).first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    origen_tipo = (data.get('origen_tipo') or 'efectivo').strip().lower()
+    destino_tipo = (data.get('destino_tipo') or 'cuenta').strip().lower()
+    if origen_tipo not in ['efectivo', 'cuenta']:
+        origen_tipo = 'efectivo'
+    if destino_tipo not in ['efectivo', 'cuenta']:
+        destino_tipo = 'cuenta'
+
+    if origen_tipo == 'efectivo' and destino_tipo == 'efectivo':
+        return JsonResponse({'success': False, 'error': 'Origen y destino no pueden ser ambos Efectivo'}, status=400)
+
+    origen_cuenta = None
+    if origen_tipo == 'cuenta':
+        orig_raw = (data.get('origen_cuenta') or '').strip()
+        if not orig_raw:
+            return JsonResponse({'success': False, 'error': 'Selecciona la cuenta de origen'}, status=400)
+        origen_cuenta, _ = CuentaBancaria.objects.get_or_create(
+            usuario=request.api_user,
+            nombre__iexact=orig_raw,
+            defaults={'nombre': orig_raw}
+        )
+
+    destino_cuenta = None
+    if destino_tipo == 'cuenta':
+        dest_raw = (data.get('destino_cuenta') or '').strip()
+        if not dest_raw:
+            return JsonResponse({'success': False, 'error': 'Selecciona la cuenta de destino'}, status=400)
+        destino_cuenta, _ = CuentaBancaria.objects.get_or_create(
+            usuario=request.api_user,
+            nombre__iexact=dest_raw,
+            defaults={'nombre': dest_raw}
+        )
+
+    if origen_tipo == 'cuenta' and destino_tipo == 'cuenta' and origen_cuenta and destino_cuenta:
+        if origen_cuenta.id == destino_cuenta.id:
+            return JsonResponse({'success': False, 'error': 'La cuenta de origen y destino no pueden ser la misma'}, status=400)
+
+    nota = (data.get('nota') or '').strip()[:200]
+    trans = TransferenciaFondos(
+        presupuesto=presupuesto,
+        origen_tipo=origen_tipo,
+        origen_cuenta=origen_cuenta,
+        destino_tipo=destino_tipo,
+        destino_cuenta=destino_cuenta,
+        monto=monto,
+        nota=nota,
+    )
+    trans.full_clean()
+    trans.save()
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Transferencia de {presupuesto.get_moneda_display()}{monto} registrada',
+        'transferencia': {
+            'id': trans.id,
+            'nombre': trans.nombre,
+            'monto': float(trans.monto),
+            'origen': trans.origen_str,
+            'destino': trans.destino_str,
+        }
+    }, status=201)
 
 
 @api_auth_required
@@ -198,15 +928,6 @@ def crear_gasto_api(request):
     """
     Registra un nuevo gasto desde la app o widget.
     POST /api/gastos/crear/
-    Body:
-    {
-        "presupuesto_id": 1,
-        "nombre": "Almuerzo",
-        "monto": 2500.50,
-        "categoria_id": 2, // opcional
-        "descripcion": "", // opcional
-        "fecha": "2026-11-05 10:30:00" // opcional
-    }
     """
     data = parse_request_data(request)
     presupuesto_id = data.get('presupuesto_id')
@@ -233,8 +954,10 @@ def crear_gasto_api(request):
             'error': 'Presupuesto no encontrado o no tienes permiso para cargar gastos en él'
         }, status=404)
 
+    es_rapido = False
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
+        es_rapido = True
         count_rapidos = Gasto.objects.filter(
             presupuesto=presupuesto
         ).filter(
@@ -242,17 +965,30 @@ def crear_gasto_api(request):
         ).count()
         nombre = f"⚡ Gasto rápido {count_rapidos + 1:02d}"
 
-    # Categoría opcional
+    # Categoría opcional (por ID o por nombre)
     categoria = None
     categoria_id = data.get('categoria_id')
+    categoria_nombre = (data.get('categoria_nombre') or '').strip()
     if categoria_id:
         categoria = Categoria.objects.filter(id=categoria_id).first()
+    elif categoria_nombre:
+        categoria = Categoria.objects.filter(nombre__iexact=categoria_nombre).first()
 
     # Fecha opcional
     fecha = None
-    fecha_raw = data.get('fecha')
+    fecha_raw = (data.get('fecha') or '').strip()
     if fecha_raw:
-        fecha = parse_datetime(fecha_raw) or parse_date(fecha_raw)
+        parsed_dt = parse_datetime(fecha_raw)
+        if parsed_dt:
+            fecha = parsed_dt
+        else:
+            parsed_d = parse_date(fecha_raw)
+            if parsed_d:
+                now_local = timezone.localtime(timezone.now())
+                fecha = timezone.make_aware(
+                    datetime.combine(parsed_d, now_local.time()),
+                    timezone.get_current_timezone()
+                )
 
     descripcion = (data.get('descripcion') or '').strip()
     metodo_pago = (data.get('metodo_pago') or 'efectivo').lower().strip()
@@ -260,16 +996,29 @@ def crear_gasto_api(request):
         metodo_pago = 'efectivo'
 
     persona_raw = (data.get('persona') or '').strip()
-    persona = persona_raw.title() if persona_raw else ''
+    if persona_raw:
+        parts = [p.strip().title() for p in persona_raw.split(',') if p.strip()]
+        seen = []
+        for p in parts:
+            if p not in seen:
+                seen.append(p)
+        persona = ', '.join(seen)
+    else:
+        persona = ''
 
     cuenta_bancaria = None
     cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
-    if cuenta_raw:
-        cuenta_bancaria, _ = CuentaBancaria.objects.get_or_create(
+    if cuenta_raw and metodo_pago != 'efectivo' and cuenta_raw.lower() != 'efectivo':
+        cuenta_bancaria = CuentaBancaria.objects.filter(
             usuario=request.api_user,
-            nombre__iexact=cuenta_raw,
-            defaults={'nombre': cuenta_raw.title()}
-        )
+            nombre__iexact=cuenta_raw
+        ).first()
+        if not cuenta_bancaria:
+            cuenta_bancaria = CuentaBancaria.objects.create(
+                usuario=request.api_user,
+                nombre=cuenta_raw.title(),
+                tipo='tarjeta' if metodo_pago == 'tarjeta' else 'billetera'
+            )
 
     gasto = Gasto(
         presupuesto=presupuesto,
@@ -281,7 +1030,7 @@ def crear_gasto_api(request):
         metodo_pago=metodo_pago,
         descripcion=descripcion or None,
         fecha=fecha or timezone.localtime(timezone.now()),
-        es_rapido=True
+        es_rapido=es_rapido
     )
     gasto.full_clean()
     gasto.save()
@@ -318,13 +1067,6 @@ def crear_ingreso_api(request):
     """
     Registra un nuevo ingreso.
     POST /api/ingresos/crear/
-    Body:
-    {
-        "presupuesto_id": 1,
-        "nombre": "Sueldo",
-        "monto": 50000.00,
-        "descripcion": "" // opcional
-    }
     """
     data = parse_request_data(request)
     presupuesto_id = data.get('presupuesto_id')
@@ -345,8 +1087,10 @@ def crear_ingreso_api(request):
     if not presupuesto:
         return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
 
+    es_rapido = False
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
+        es_rapido = True
         count_rapidos = Ingreso.objects.filter(
             presupuesto=presupuesto
         ).filter(
@@ -360,12 +1104,32 @@ def crear_ingreso_api(request):
 
     cuenta_bancaria = None
     cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
-    if cuenta_raw:
-        cuenta_bancaria, _ = CuentaBancaria.objects.get_or_create(
+    if cuenta_raw and tipo_ingreso != 'efectivo' and cuenta_raw.lower() != 'efectivo':
+        cuenta_bancaria = CuentaBancaria.objects.filter(
             usuario=request.api_user,
-            nombre__iexact=cuenta_raw,
-            defaults={'nombre': cuenta_raw.title()}
-        )
+            nombre__iexact=cuenta_raw
+        ).first()
+        if not cuenta_bancaria:
+            cuenta_bancaria = CuentaBancaria.objects.create(
+                usuario=request.api_user,
+                nombre=cuenta_raw.title(),
+                tipo='billetera'
+            )
+
+    fecha = None
+    fecha_raw = (data.get('fecha') or '').strip()
+    if fecha_raw:
+        parsed_dt = parse_datetime(fecha_raw)
+        if parsed_dt:
+            fecha = parsed_dt
+        else:
+            parsed_d = parse_date(fecha_raw)
+            if parsed_d:
+                now_local = timezone.localtime(timezone.now())
+                fecha = timezone.make_aware(
+                    datetime.combine(parsed_d, now_local.time()),
+                    timezone.get_current_timezone()
+                )
 
     ingreso = Ingreso(
         presupuesto=presupuesto,
@@ -374,7 +1138,8 @@ def crear_ingreso_api(request):
         tipo_ingreso=tipo_ingreso,
         cuenta_bancaria=cuenta_bancaria,
         descripcion=data.get('descripcion') or None,
-        es_rapido=True
+        fecha=fecha or timezone.localtime(timezone.now()),
+        es_rapido=es_rapido
     )
     ingreso.full_clean()
     ingreso.save()
