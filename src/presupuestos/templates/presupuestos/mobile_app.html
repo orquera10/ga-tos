@@ -468,6 +468,58 @@
     .transaction b.transfer-amt {
       color: #5dc6ef;
     }
+    .transaction {
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .transaction:active {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .transaction.rapido-row {
+      background: rgba(240, 189, 98, 0.07);
+      margin: 0 -10px;
+      padding: 0 10px;
+      border-radius: 13px;
+    }
+    .badge-rapido {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(240, 189, 98, 0.2);
+      border: 1px solid rgba(240, 189, 98, 0.45);
+      color: #f0bd62;
+      font-size: 9px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .rapido-banner {
+      margin: 12px 0 4px;
+      padding: 11px 14px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(61, 47, 24, 0.85), rgba(40, 32, 22, 0.92));
+      border: 1px solid rgba(240, 189, 98, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #f6d38b;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-delete-mov {
+      height: 44px;
+      margin-top: 4px;
+      border: 1px solid rgba(238, 110, 104, 0.4);
+      border-radius: 13px;
+      background: rgba(56, 35, 38, 0.65);
+      color: #ff8780;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
     .bottom-nav {
       position: fixed;
       z-index: 20;
@@ -1189,6 +1241,10 @@
       transModo: 'efectivo_a_cuenta', // 'efectivo_a_cuenta' | 'cuenta_a_efectivo' | 'entre_cuentas'
       selectedCicloId: 0,
       editingTarjetaPrestamo: null,
+      editingMov: null,
+      editMetodo: 'efectivo',
+      editPersonas: [],
+      confirmDeleteMov: false,
     };
 
     // Sincronizar con query params o AndroidBridge si está presente
@@ -1357,13 +1413,14 @@
           const isPos = item.amount > 0 && !item.is_transfer;
           const sign = item.is_transfer ? '⇄ ' : (item.amount > 0 ? '+' : '−');
           const cls = item.is_transfer ? 'transfer-amt' : (isPos ? 'positive' : '');
-          return `<article class="transaction">
+          const cleanTitle = (item.title || '').replace(/^⚡\s*/, '');
+          return `<article class="transaction ${item.es_rapido ? 'rapido-row' : ''}" data-edit-mov="${escapeHtml(item.uid)}" title="Toca para editar o eliminar">
             <span class="transaction-icon ${escapeHtml(item.tone)}">
               ${iconSvg(item.icon, 20)}
             </span>
             <div>
-              <strong>${escapeHtml(item.title)}</strong>
-              <small>${escapeHtml(item.detail)}</small>
+              <strong>${escapeHtml(cleanTitle)}${item.es_rapido ? `<span class="badge-rapido">⚡ Completar</span>` : ''}</strong>
+              <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Toca para editar' : ''}</small>
             </div>
             <b class="${cls}">${sign}${money(Math.abs(item.amount))}</b>
           </article>`;
@@ -1568,7 +1625,9 @@
       if (p.tipo === 'prestamo') {
         return renderInicioPrestamo(d);
       }
-      const movs = (d.movimientos || []).slice(0, 4);
+      const allMovs = d.movimientos || [];
+      const rapidosCount = allMovs.filter(m => m.es_rapido).length;
+      const movs = allMovs.slice(0, 5);
       const pct = Math.min(100, Math.max(0, Math.round(p.porcentaje_gastado || 0)));
       return `
         <section class="balance-card">
@@ -1650,11 +1709,17 @@
         <section class="transactions-card">
           <div class="section-top">
             <div>
-              <span class="overline">ACTIVIDAD RECIENTE</span>
+              <span class="overline">ACTIVIDAD RECIENTE · TOCÁ PARA EDITAR</span>
               <h2>Últimos movimientos</h2>
             </div>
             <button type="button" class="see-all" data-switch-tab="Movimientos">Ver todos</button>
           </div>
+          ${rapidosCount > 0 ? `
+            <div class="rapido-banner" data-go-rapidos>
+              <span>⚡ Tenés ${rapidosCount} movimiento${rapidosCount > 1 ? 's' : ''} del widget para completar</span>
+              <span style="color:#f0bd62;font-weight:700;">Ver →</span>
+            </div>
+          ` : ''}
           ${renderTransactionsHtml(movs)}
         </section>
       `;
@@ -1664,8 +1729,10 @@
       const p = d.presupuesto;
       const isPrestamo = p && p.tipo === 'prestamo';
       const allMovs = d.movimientos || [];
+      const rapidosCount = allMovs.filter(m => m.es_rapido).length;
       const q = state.query.trim().toLowerCase();
       const filtered = allMovs.filter(m => {
+        if (state.movFilter === 'Rapidos' && !m.es_rapido) return false;
         if (state.movFilter === 'Gastos' && m.tipo_movimiento !== 'gasto') return false;
         if (state.movFilter === 'Ingresos' && m.tipo_movimiento !== 'ingreso') return false;
         if (state.movFilter === 'Transferencias' && m.tipo_movimiento !== 'transferencia') return false;
@@ -1701,7 +1768,7 @@
           <div class="page-title">
             <span class="overline">TU ACTIVIDAD · ${escapeHtml(p ? p.nombre : '')}</span>
             <h1>Movimientos</h1>
-            <p>${isPrestamo ? 'Extracciones con tarjeta, aportes en efectivo y diferencias de resumen.' : 'Todos tus ingresos, gastos y transferencias en un solo lugar.'}</p>
+            <p>Tocá cualquier movimiento para editarlo, completarlo o eliminarlo.</p>
           </div>
           <div class="search">
             ${iconSvg('search', 19)}
@@ -1712,6 +1779,9 @@
             ${baseFilters.map(f => `
               <button type="button" class="${state.movFilter === f ? 'active' : ''}" data-mov-filter="${f}">${f}</button>
             `).join('')}
+            ${rapidosCount > 0 ? `
+              <button type="button" class="${state.movFilter === 'Rapidos' ? 'active' : ''}" data-mov-filter="Rapidos" style="${state.movFilter === 'Rapidos' ? '' : 'border-color:rgba(240,189,98,0.45);color:#f0bd62;'}">⚡ Para completar (${rapidosCount})</button>
+            ` : ''}
             ${tarjetasPrestamo.map(t => {
               const key = `Cuenta:${t.nombre}`;
               return `<button type="button" class="${state.movFilter === key ? 'active' : ''}" data-mov-filter="${escapeHtml(key)}">💳 ${escapeHtml(t.nombre)}</button>`;
@@ -2500,6 +2570,202 @@
         `;
       }
 
+      if (state.sheet === 'editar_mov' && state.editingMov) {
+        const m = state.editingMov;
+        const tm = m.tipo_movimiento;
+        const rawMonto = m.raw_monto !== undefined ? m.raw_monto : Math.abs(m.amount || 0);
+        const cleanName = (m.title || '').replace(/^⚡\s*/, '');
+        const isRapido = Boolean(m.es_rapido);
+
+        let fieldsHtml = '';
+        if (tm === 'gasto') {
+          fieldsHtml = `
+            <label>
+              Monto
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto" type="number" step="0.01" min="0.01" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Concepto / Detalle
+              <input name="nombre" required value="${escapeHtml(cleanName)}" placeholder="Nombre del gasto" />
+            </label>
+            <label>
+              Categoría
+              <select name="categoria_id">
+                <option value="">Sin categoría</option>
+                ${categorias.map(c => `<option value="${c.id}" ${String(m.categoria_id) === String(c.id) ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('')}
+              </select>
+            </label>
+            <label>
+              Medio de pago
+              <div class="chips-selector">
+                ${[
+                  { k: 'efectivo', l: '💵 Efectivo' },
+                  { k: 'transferencia', l: '🏦 Transferencia' },
+                  { k: 'tarjeta', l: '💳 Tarjeta' }
+                ].map(opt => `
+                  <button type="button" class="chip-btn ${state.editMetodo === opt.k ? 'selected' : ''}" data-edit-metodo="${opt.k}">${opt.l}</button>
+                `).join('')}
+              </div>
+            </label>
+            ${state.editMetodo !== 'efectivo' ? `
+              <label>
+                Cuenta / Billetera / Tarjeta
+                <select name="cuenta_bancaria">
+                  <option value="">Sin cuenta específica</option>
+                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(m.cuenta_bancaria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                </select>
+              </label>
+            ` : ''}
+            <label>
+              Personas / Tags
+              <div class="chips-selector">
+                ${personas.map(pers => `
+                  <button type="button" class="chip-btn ${state.editPersonas.includes(pers) ? 'selected' : ''}" data-edit-toggle-persona="${escapeHtml(pers)}">👤 ${escapeHtml(pers)}</button>
+                `).join('')}
+              </div>
+              <input name="persona" placeholder="Separados por coma (ej. Dario, Camila)" value="${escapeHtml(state.editPersonas.join(', '))}" />
+            </label>
+          `;
+        } else if (tm === 'ingreso') {
+          fieldsHtml = `
+            <label>
+              Monto
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto" type="number" step="0.01" min="0.01" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Concepto
+              <input name="nombre" required value="${escapeHtml(cleanName)}" placeholder="Nombre del ingreso" />
+            </label>
+            <label>
+              Tipo de ingreso
+              <select name="tipo_ingreso" id="selectEditTipoIngreso">
+                <option value="transferencia" ${state.editMetodo === 'transferencia' ? 'selected' : ''}>🏦 Transferencia</option>
+                <option value="sueldo" ${state.editMetodo === 'sueldo' ? 'selected' : ''}>💼 Sueldo</option>
+                <option value="efectivo" ${state.editMetodo === 'efectivo' ? 'selected' : ''}>💵 Efectivo</option>
+              </select>
+            </label>
+            ${state.editMetodo !== 'efectivo' ? `
+              <label>
+                Cuenta / Billetera destino
+                <select name="cuenta_bancaria">
+                  <option value="">Sin cuenta específica</option>
+                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(m.cuenta_bancaria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                </select>
+              </label>
+            ` : ''}
+          `;
+        } else if (tm === 'transferencia') {
+          fieldsHtml = `
+            <label>
+              Monto transferido
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto" type="number" step="0.01" min="0.01" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Nota
+              <input name="nota" value="${escapeHtml(m.nota || '')}" placeholder="Nota de la transferencia" />
+            </label>
+          `;
+        } else if (tm === 'extraccion_tarjeta') {
+          fieldsHtml = `
+            <label>
+              Tarjeta utilizada
+              <select name="tarjeta_id">
+                ${tarjetasP.map(t => `<option value="${t.id}" ${String(m.tarjeta_id) === String(t.id) ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`).join('')}
+              </select>
+            </label>
+            <div class="form-row">
+              <label>
+                Monto sacado
+                <div class="amount-input">
+                  <span>$</span>
+                  <input name="monto" id="inpMontoSacado" type="number" step="0.01" min="1" required value="${rawMonto}" inputmode="decimal" />
+                </div>
+              </label>
+              <label>
+                Tasa interés (%)
+                <input name="tasa_interes" id="inpTasaPrestamo" type="number" step="0.01" value="${m.tasa_interes || tasaP}" required />
+              </label>
+            </div>
+            <label>
+              Monto próximo mes (con interés)
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto_proximo_mes" id="inpMontoProxMes" type="number" step="0.01" min="1" required value="${m.monto_proximo_mes || rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Concepto
+              <input name="nombre" value="${escapeHtml(cleanName)}" required />
+            </label>
+          `;
+        } else if (tm === 'aporte_efectivo') {
+          fieldsHtml = `
+            <label>
+              Monto aportado en efectivo
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto" type="number" step="0.01" min="1" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Concepto
+              <input name="nombre" value="${escapeHtml(cleanName)}" required />
+            </label>
+          `;
+        } else if (tm === 'diferencia_tarjeta') {
+          fieldsHtml = `
+            <label>
+              Tarjeta
+              <select name="tarjeta_id">
+                ${tarjetasP.map(t => `<option value="${t.id}" ${String(m.tarjeta_id) === String(t.id) ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`).join('')}
+              </select>
+            </label>
+            <label>
+              Monto diferencia de resumen
+              <div class="amount-input">
+                <span>$</span>
+                <input name="monto" type="number" step="0.01" min="1" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Concepto
+              <input name="concepto" value="${escapeHtml(m.concepto || cleanName)}" required />
+            </label>
+          `;
+        }
+
+        return `
+          <div class="sheet-backdrop" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline" style="${isRapido ? 'color:#f0bd62;' : ''}">${isRapido ? '⚡ CARGA RÁPIDA DEL WIDGET · COMPLETAR DATOS' : 'EDITAR O ELIMINAR MOVIMIENTO'}</span>
+                  <h2>${isRapido ? 'Completar movimiento' : 'Modificar movimiento'}</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formEditarMov">
+                ${fieldsHtml}
+                <button type="submit" class="submit purple">Guardar cambios</button>
+                <button type="button" class="btn-delete-mov" id="btnDeleteMov">
+                  ${state.confirmDeleteMov ? '⚠️ Tocá de nuevo para confirmar eliminación' : '🗑️ Eliminar movimiento'}
+                </button>
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
       return '';
     }
 
@@ -2655,6 +2921,121 @@
           render();
         };
       });
+
+      document.querySelectorAll('[data-go-rapidos]').forEach(el => {
+        el.onclick = () => {
+          state.tab = 'Movimientos';
+          state.movFilter = 'Rapidos';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-edit-mov]').forEach(art => {
+        art.onclick = () => {
+          const uid = art.getAttribute('data-edit-mov');
+          const allMovs = (state.data && state.data.movimientos) || [];
+          const found = allMovs.find(m => m.uid === uid);
+          if (found) {
+            state.editingMov = found;
+            state.editMetodo = found.metodo_pago || found.tipo_ingreso || 'efectivo';
+            state.editPersonas = (found.persona || '').split(',').map(s => s.trim()).filter(Boolean);
+            state.confirmDeleteMov = false;
+            state.sheet = 'editar_mov';
+            render();
+          }
+        };
+      });
+
+      document.querySelectorAll('[data-edit-metodo]').forEach(btn => {
+        btn.onclick = () => {
+          state.editMetodo = btn.getAttribute('data-edit-metodo');
+          render();
+        };
+      });
+
+      const selectEditTipoIngreso = document.getElementById('selectEditTipoIngreso');
+      if (selectEditTipoIngreso) {
+        selectEditTipoIngreso.onchange = (e) => {
+          state.editMetodo = e.target.value;
+          render();
+        };
+      }
+
+      document.querySelectorAll('[data-edit-toggle-persona]').forEach(btn => {
+        btn.onclick = () => {
+          const p = btn.getAttribute('data-edit-toggle-persona');
+          const idx = state.editPersonas.indexOf(p);
+          if (idx >= 0) state.editPersonas.splice(idx, 1);
+          else state.editPersonas.push(p);
+          render();
+        };
+      });
+
+      const formEditarMov = document.getElementById('formEditarMov');
+      if (formEditarMov && state.editingMov) {
+        formEditarMov.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formEditarMov);
+          const m = state.editingMov;
+          const payload = {
+            id: m.id,
+            tipo_movimiento: m.tipo_movimiento,
+            monto: fd.get('monto'),
+            nombre: fd.get('nombre') || '',
+            categoria_id: fd.get('categoria_id') || null,
+            metodo_pago: state.editMetodo,
+            tipo_ingreso: fd.get('tipo_ingreso') || state.editMetodo,
+            cuenta_bancaria: state.editMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || ''),
+            persona: fd.get('persona') !== null ? fd.get('persona') : state.editPersonas.join(', '),
+            nota: fd.get('nota') || '',
+            concepto: fd.get('concepto') || '',
+            tarjeta_id: fd.get('tarjeta_id') || null,
+            tasa_interes: fd.get('tasa_interes') || null,
+            monto_proximo_mes: fd.get('monto_proximo_mes') || null,
+          };
+          const res = await apiFetch('/api/movimientos/editar/', {
+            method: 'POST',
+            body: payload,
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            state.editingMov = null;
+            showToast('✓ Movimiento actualizado');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al actualizar movimiento');
+          }
+        };
+      }
+
+      const btnDeleteMov = document.getElementById('btnDeleteMov');
+      if (btnDeleteMov && state.editingMov) {
+        btnDeleteMov.onclick = async () => {
+          if (!state.confirmDeleteMov) {
+            state.confirmDeleteMov = true;
+            render();
+            return;
+          }
+          const m = state.editingMov;
+          const res = await apiFetch('/api/movimientos/eliminar/', {
+            method: 'POST',
+            body: {
+              id: m.id,
+              tipo_movimiento: m.tipo_movimiento,
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            state.editingMov = null;
+            state.confirmDeleteMov = false;
+            showToast('🗑️ Movimiento eliminado');
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al eliminar');
+          }
+        };
+      }
 
       document.querySelectorAll('[data-account-filter]').forEach(art => {
         art.onclick = () => {

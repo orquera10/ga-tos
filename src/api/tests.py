@@ -291,3 +291,59 @@ class ApiEndpointsTestCase(TestCase):
         resp_app = self.client.get('/app/')
         self.assertEqual(resp_app.status_code, 200)
 
+    def test_widget_es_rapido_y_editar_eliminar_movimiento(self):
+        # 1. Crear gasto desde el widget con es_rapido=True
+        resp_create = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Kiosco',
+                'monto': 2500,
+                'metodo_pago': 'efectivo',
+                'es_rapido': True,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_create.status_code, 201)
+        gasto_id = resp_create.json()['gasto']['id']
+        gasto_obj = Gasto.objects.get(id=gasto_id)
+        self.assertTrue(gasto_obj.es_rapido)
+
+        # 2. Editar el gasto desde el modal bottom-sheet y verificar que limpia es_rapido
+        resp_edit = self.client.post(
+            '/api/movimientos/editar/',
+            data=json.dumps({
+                'id': gasto_id,
+                'tipo_movimiento': 'gasto',
+                'nombre': 'Kiosco bebidas',
+                'monto': 3200,
+                'categoria_id': self.categoria.id,
+                'metodo_pago': 'transferencia',
+                'cuenta_bancaria': 'Mercado Pago',
+                'persona': 'Dario, Camila',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_edit.status_code, 200)
+        gasto_obj.refresh_from_db()
+        self.assertFalse(gasto_obj.es_rapido)
+        self.assertEqual(gasto_obj.nombre, 'Kiosco bebidas')
+        self.assertEqual(gasto_obj.monto, Decimal('3200.00'))
+        self.assertEqual(gasto_obj.persona, 'Dario, Camila')
+
+        # 3. Eliminar el gasto desde el modal bottom-sheet
+        resp_del = self.client.post(
+            '/api/movimientos/eliminar/',
+            data=json.dumps({
+                'id': gasto_id,
+                'tipo_movimiento': 'gasto',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_del.status_code, 200)
+        self.assertFalse(Gasto.objects.filter(id=gasto_id).exists())
+
+

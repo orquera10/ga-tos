@@ -45,18 +45,18 @@ class GastosWidgetProvider : AppWidgetProvider() {
             val token = Prefs.getToken(context)
             if (token.isNullOrEmpty()) {
                 views.setTextViewText(R.id.widgetBudgetName, "Sin vincular")
-                views.setTextViewText(R.id.widgetTxtRestante, "Toca aquí")
-                views.setTextColor(R.id.widgetTxtRestante, Color.parseColor("#FFB74D"))
+                views.setTextViewText(R.id.widgetTxtRestante, "Tocá para entrar")
+                views.setTextColor(R.id.widgetTxtRestante, Color.parseColor("#F0BD62"))
             } else {
                 val budgetName = Prefs.getLastBudgetName(context)
                 val remaining = Prefs.getLastRemaining(context)
 
-                views.setTextViewText(R.id.widgetBudgetName, "$budgetName ▾")
+                views.setTextViewText(R.id.widgetBudgetName, "📅 $budgetName ▾")
                 views.setTextViewText(
                     R.id.widgetTxtRestante,
-                    String.format(Locale.getDefault(), "$ %.2f", remaining)
+                    String.format(Locale.getDefault(), "$ %,.0f", remaining)
                 )
-                val remainingColor = if (remaining < 0) Color.parseColor("#FF5252") else Color.parseColor("#00E676")
+                val remainingColor = if (remaining < 0) Color.parseColor("#FF8780") else Color.parseColor("#F4F3FA")
                 views.setTextColor(R.id.widgetTxtRestante, remainingColor)
             }
 

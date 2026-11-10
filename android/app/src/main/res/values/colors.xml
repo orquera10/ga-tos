@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#00D09C</color>
-    <color name="primary_dark">#00A87D</color>
-    <color name="accent">#2ee59d</color>
-    <color name="background_dark">#121212</color>
-    <color name="card_dark">#1E1E1E</color>
-    <color name="surface_dark">#2A2A2A</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#AAAAAA</color>
-    <color name="text_muted">#777777</color>
-    <color name="danger">#FF5252</color>
-    <color name="warning">#FFB74D</color>
-    <color name="success">#00E676</color>
+    <color name="primary">#6758E8</color>
+    <color name="primary_dark">#3E328F</color>
+    <color name="accent">#A99FFF</color>
+    <color name="background_dark">#0D0F16</color>
+    <color name="card_dark">#151821</color>
+    <color name="surface_dark">#1C1F29</color>
+    <color name="text_primary">#F4F3FA</color>
+    <color name="text_secondary">#9999A9</color>
+    <color name="text_muted">#727584</color>
+    <color name="danger">#EE6E68</color>
+    <color name="warning">#F0BD62</color>
+    <color name="success">#159C79</color>
 </resources>

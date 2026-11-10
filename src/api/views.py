@@ -395,10 +395,15 @@ def presupuesto_detalle_api(request, pk=None):
             'title': g.nombre,
             'detail': ' · '.join([p for p in parts_detail if p]),
             'categoria': cat_label,
+            'categoria_id': g.categoria_id or '',
             'metodo_pago': g.metodo_pago,
             'cuenta': g.cuenta_bancaria.nombre if g.cuenta_bancaria else ('Efectivo' if g.metodo_pago == 'efectivo' else ''),
+            'cuenta_bancaria': g.cuenta_bancaria.nombre if g.cuenta_bancaria else '',
             'persona': g.persona or '',
+            'descripcion': g.descripcion or '',
             'amount': -float(g.monto),
+            'raw_monto': float(g.monto),
+            'es_rapido': bool(g.es_rapido),
             'is_transfer': False,
             'icon': icon,
             'tone': tone,
@@ -423,9 +428,14 @@ def presupuesto_detalle_api(request, pk=None):
             'detail': ' · '.join([p for p in parts_detail if p]),
             'categoria': 'Ingreso',
             'metodo_pago': i.tipo_ingreso,
+            'tipo_ingreso': i.tipo_ingreso,
             'cuenta': i.cuenta_bancaria.nombre if i.cuenta_bancaria else ('Efectivo' if i.tipo_ingreso == 'efectivo' else ''),
+            'cuenta_bancaria': i.cuenta_bancaria.nombre if i.cuenta_bancaria else '',
             'persona': '',
+            'descripcion': i.descripcion or '',
             'amount': float(i.monto),
+            'raw_monto': float(i.monto),
+            'es_rapido': bool(i.es_rapido),
             'is_transfer': False,
             'icon': 'cash' if i.tipo_ingreso == 'efectivo' else 'swap',
             'tone': 'green',
@@ -449,8 +459,15 @@ def presupuesto_detalle_api(request, pk=None):
             'categoria': 'Transferencia',
             'metodo_pago': 'transferencia',
             'cuenta': t.destino_str,
+            'origen_tipo': t.origen_tipo,
+            'origen_cuenta': t.origen_cuenta.nombre if t.origen_cuenta else '',
+            'destino_tipo': t.destino_tipo,
+            'destino_cuenta': t.destino_cuenta.nombre if t.destino_cuenta else '',
+            'nota': t.nota or '',
             'persona': '',
             'amount': float(t.monto),
+            'raw_monto': float(t.monto),
+            'es_rapido': False,
             'is_transfer': True,
             'icon': 'swap',
             'tone': 'blue',
@@ -840,10 +857,15 @@ def build_prestamo_detail_payload(presupuesto, ciclo_id=None):
                     'categoria': 'Extracción Tarjeta',
                     'metodo_pago': 'tarjeta',
                     'cuenta': t_nom,
+                    'cuenta_bancaria': i.cuenta_bancaria.nombre if i.cuenta_bancaria else '',
+                    'tarjeta_id': i.tarjeta_prestamo_id or '',
+                    'tasa_interes': float(i.tasa_interes or tasa_default),
                     'persona': '',
                     'amount': float(i.monto),
+                    'raw_monto': float(i.monto),
                     'monto_proximo_mes': prox,
                     'interes_monto': inter,
+                    'es_rapido': bool(i.es_rapido),
                     'is_transfer': False,
                     'icon': 'card',
                     'tone': 'amber',
@@ -867,6 +889,8 @@ def build_prestamo_detail_payload(presupuesto, ciclo_id=None):
                     'cuenta': 'Efectivo',
                     'persona': '',
                     'amount': float(i.monto),
+                    'raw_monto': float(i.monto),
+                    'es_rapido': bool(i.es_rapido),
                     'is_transfer': False,
                     'icon': 'cash',
                     'tone': 'green',
@@ -893,8 +917,12 @@ def build_prestamo_detail_payload(presupuesto, ciclo_id=None):
                 'categoria': 'Diferencia Tarjeta',
                 'metodo_pago': 'tarjeta',
                 'cuenta': d.tarjeta.nombre,
+                'tarjeta_id': d.tarjeta_id,
+                'concepto': d.concepto,
                 'persona': '',
                 'amount': -float(d.monto),
+                'raw_monto': float(d.monto),
+                'es_rapido': False,
                 'is_transfer': False,
                 'icon': 'card',
                 'tone': 'rose',
@@ -1191,7 +1219,7 @@ def crear_gasto_api(request):
             'error': 'Presupuesto no encontrado o no tienes permiso para cargar gastos en él'
         }, status=404)
 
-    es_rapido = False
+    es_rapido = bool(data.get('es_rapido', False))
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         es_rapido = True
@@ -1201,6 +1229,8 @@ def crear_gasto_api(request):
             Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Gasto rápido {count_rapidos + 1:02d}"
+    elif es_rapido and not nombre.startswith('⚡'):
+        nombre = f"⚡ {nombre}"
 
     # Categoría opcional (por ID o por nombre)
     categoria = None
@@ -1324,7 +1354,7 @@ def crear_ingreso_api(request):
     if not presupuesto:
         return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
 
-    es_rapido = False
+    es_rapido = bool(data.get('es_rapido', False))
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         es_rapido = True
@@ -1334,6 +1364,8 @@ def crear_ingreso_api(request):
             Q(nombre__icontains='rápido') | Q(nombre__icontains='rapido') | Q(nombre__startswith='⚡')
         ).count()
         nombre = f"⚡ Ingreso rápido {count_rapidos + 1:02d}"
+    elif es_rapido and not nombre.startswith('⚡'):
+        nombre = f"⚡ {nombre}"
 
     tipo_ingreso = (data.get('tipo_ingreso') or 'transferencia').lower().strip()
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:
@@ -1719,4 +1751,292 @@ def cerrar_ciclo_prestamo_api(request):
         'mensaje': f'Período "{nuevo_ciclo.nombre}" iniciado',
         'ciclo_id': nuevo_ciclo.id,
     }, status=201)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def editar_movimiento_api(request):
+    """
+    Edita cualquier movimiento del presupuesto (gasto, ingreso, transferencia,
+    extraccion_tarjeta, aporte_efectivo, diferencia_tarjeta) y limpia el flag es_rapido.
+    POST /api/movimientos/editar/
+    """
+    data = parse_request_data(request)
+    tipo_mov = (data.get('tipo_movimiento') or '').strip().lower()
+    mov_id = data.get('id')
+
+    if not tipo_mov or not mov_id:
+        return JsonResponse({'success': False, 'error': 'Faltan identificadores del movimiento'}, status=400)
+
+    editables_ids = set(presupuestos_editables(request.api_user).values_list('id', flat=True))
+
+    monto_raw = data.get('monto')
+    monto = None
+    if monto_raw is not None and str(monto_raw).strip() != '':
+        try:
+            monto = Decimal(str(monto_raw).replace(',', '.'))
+            if monto <= 0:
+                return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a cero'}, status=400)
+        except (InvalidOperation, TypeError):
+            return JsonResponse({'success': False, 'error': 'Monto inválido'}, status=400)
+
+    if tipo_mov == 'gasto':
+        gasto = Gasto.objects.select_related('presupuesto').filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not gasto:
+            return JsonResponse({'success': False, 'error': 'Gasto no encontrado'}, status=404)
+
+        if monto is not None:
+            gasto.monto = monto
+
+        nombre = (data.get('nombre') or '').strip()
+        if nombre:
+            if nombre.startswith('⚡'):
+                stripped = nombre.lstrip('⚡').strip()
+                if stripped and not stripped.lower().startswith('gasto rápido') and not stripped.lower().startswith('gasto rapido'):
+                    nombre = stripped
+            gasto.nombre = nombre[:120]
+
+        metodo_pago = (data.get('metodo_pago') or gasto.metodo_pago).strip().lower()
+        if metodo_pago in ['efectivo', 'transferencia', 'tarjeta']:
+            gasto.metodo_pago = metodo_pago
+
+        if 'categoria_id' in data:
+            cat_id = data.get('categoria_id')
+            gasto.categoria = Categoria.objects.filter(id=cat_id).first() if cat_id else None
+
+        if 'persona' in data:
+            persona_raw = (data.get('persona') or '').strip()
+            if persona_raw:
+                parts = [p.strip().title() for p in persona_raw.split(',') if p.strip()]
+                seen = []
+                for p in parts:
+                    if p not in seen:
+                        seen.append(p)
+                gasto.persona = ', '.join(seen)
+            else:
+                gasto.persona = ''
+
+        if 'cuenta_bancaria' in data or gasto.metodo_pago == 'efectivo':
+            cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+            if gasto.metodo_pago == 'efectivo' or not cuenta_raw or cuenta_raw.lower() == 'efectivo':
+                gasto.cuenta_bancaria = None
+            else:
+                cuenta_obj = CuentaBancaria.objects.filter(
+                    usuario=request.api_user,
+                    nombre__iexact=cuenta_raw
+                ).first()
+                if not cuenta_obj:
+                    cuenta_obj = CuentaBancaria.objects.create(
+                        usuario=request.api_user,
+                        nombre=cuenta_raw.title(),
+                        tipo='tarjeta' if gasto.metodo_pago == 'tarjeta' else 'billetera'
+                    )
+                gasto.cuenta_bancaria = cuenta_obj
+
+        if 'descripcion' in data:
+            gasto.descripcion = (data.get('descripcion') or '').strip() or None
+
+        gasto.es_rapido = False
+        gasto.full_clean()
+        gasto.save()
+        gasto.presupuesto.actualizar_monto_restante()
+        return JsonResponse({'success': True, 'mensaje': 'Gasto actualizado correctamente'})
+
+    elif tipo_mov in ['ingreso', 'extraccion_tarjeta', 'aporte_efectivo']:
+        ingreso = Ingreso.objects.select_related('presupuesto').filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not ingreso:
+            return JsonResponse({'success': False, 'error': 'Ingreso no encontrado'}, status=404)
+
+        if monto is not None:
+            ingreso.monto = monto
+
+        nombre = (data.get('nombre') or '').strip()
+        if nombre:
+            if nombre.startswith('⚡'):
+                stripped = nombre.lstrip('⚡').strip()
+                if stripped and not stripped.lower().startswith('ingreso rápido') and not stripped.lower().startswith('ingreso rapido'):
+                    nombre = stripped
+            ingreso.nombre = nombre[:120]
+
+        if tipo_mov == 'extraccion_tarjeta':
+            tarjeta_id = data.get('tarjeta_id')
+            if tarjeta_id:
+                tarjeta = ingreso.presupuesto.tarjetas_prestamo.filter(id=tarjeta_id).first()
+                if tarjeta:
+                    ingreso.tarjeta_prestamo = tarjeta
+            tasa_raw = data.get('tasa_interes')
+            if tasa_raw not in [None, '']:
+                try:
+                    ingreso.tasa_interes = Decimal(str(tasa_raw).replace(',', '.'))
+                except (InvalidOperation, TypeError):
+                    pass
+            prox_raw = data.get('monto_proximo_mes')
+            if prox_raw not in [None, '']:
+                try:
+                    ingreso.monto_proximo_mes = Decimal(str(prox_raw).replace(',', '.'))
+                except (InvalidOperation, TypeError):
+                    pass
+            else:
+                tasa_val = ingreso.tasa_interes or Decimal('4.50')
+                ingreso.monto_proximo_mes = round(ingreso.monto * (Decimal('1') + tasa_val / Decimal('100')), 2)
+        elif tipo_mov == 'aporte_efectivo':
+            ingreso.tipo_ingreso = 'efectivo'
+            ingreso.cuenta_bancaria = None
+        else:
+            tipo_ing = (data.get('tipo_ingreso') or ingreso.tipo_ingreso).strip().lower()
+            if tipo_ing in ['transferencia', 'efectivo', 'sueldo']:
+                ingreso.tipo_ingreso = tipo_ing
+
+            if 'cuenta_bancaria' in data or ingreso.tipo_ingreso == 'efectivo':
+                cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+                if ingreso.tipo_ingreso == 'efectivo' or not cuenta_raw or cuenta_raw.lower() == 'efectivo':
+                    ingreso.cuenta_bancaria = None
+                else:
+                    cuenta_obj = CuentaBancaria.objects.filter(
+                        usuario=request.api_user,
+                        nombre__iexact=cuenta_raw
+                    ).first()
+                    if not cuenta_obj:
+                        cuenta_obj = CuentaBancaria.objects.create(
+                            usuario=request.api_user,
+                            nombre=cuenta_raw.title(),
+                            tipo='billetera'
+                        )
+                    ingreso.cuenta_bancaria = cuenta_obj
+
+        if 'descripcion' in data:
+            ingreso.descripcion = (data.get('descripcion') or '').strip() or None
+
+        ingreso.es_rapido = False
+        ingreso.full_clean()
+        ingreso.save()
+        ingreso.presupuesto.actualizar_monto_restante()
+        return JsonResponse({'success': True, 'mensaje': 'Ingreso actualizado correctamente'})
+
+    elif tipo_mov == 'transferencia':
+        trans = TransferenciaFondos.objects.select_related('presupuesto').filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not trans:
+            return JsonResponse({'success': False, 'error': 'Transferencia no encontrada'}, status=404)
+
+        if monto is not None:
+            trans.monto = monto
+
+        origen_tipo = (data.get('origen_tipo') or trans.origen_tipo).strip().lower()
+        destino_tipo = (data.get('destino_tipo') or trans.destino_tipo).strip().lower()
+        if origen_tipo == 'efectivo' and destino_tipo == 'efectivo':
+            return JsonResponse({'success': False, 'error': 'Origen y destino no pueden ser ambos Efectivo'}, status=400)
+
+        trans.origen_tipo = origen_tipo if origen_tipo in ['efectivo', 'cuenta'] else 'efectivo'
+        trans.destino_tipo = destino_tipo if destino_tipo in ['efectivo', 'cuenta'] else 'cuenta'
+
+        if trans.origen_tipo == 'efectivo':
+            trans.origen_cuenta = None
+        elif 'origen_cuenta' in data:
+            orig_raw = (data.get('origen_cuenta') or '').strip()
+            if orig_raw:
+                trans.origen_cuenta, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=request.api_user,
+                    nombre__iexact=orig_raw,
+                    defaults={'nombre': orig_raw.title()}
+                )
+
+        if trans.destino_tipo == 'efectivo':
+            trans.destino_cuenta = None
+        elif 'destino_cuenta' in data:
+            dest_raw = (data.get('destino_cuenta') or '').strip()
+            if dest_raw:
+                trans.destino_cuenta, _ = CuentaBancaria.objects.get_or_create(
+                    usuario=request.api_user,
+                    nombre__iexact=dest_raw,
+                    defaults={'nombre': dest_raw.title()}
+                )
+
+        if 'nota' in data:
+            trans.nota = (data.get('nota') or '').strip()[:200]
+
+        trans.full_clean()
+        trans.save()
+        return JsonResponse({'success': True, 'mensaje': 'Transferencia actualizada correctamente'})
+
+    elif tipo_mov == 'diferencia_tarjeta':
+        diff = DiferenciaTarjeta.objects.select_related('ciclo_prestamo__presupuesto').filter(
+            id=mov_id,
+            ciclo_prestamo__presupuesto_id__in=editables_ids
+        ).first()
+        if not diff:
+            return JsonResponse({'success': False, 'error': 'Diferencia no encontrada'}, status=404)
+
+        if monto is not None:
+            diff.monto = monto
+        if 'concepto' in data:
+            concepto = (data.get('concepto') or '').strip()
+            if concepto:
+                diff.concepto = concepto[:150]
+        tarjeta_id = data.get('tarjeta_id')
+        if tarjeta_id:
+            tarjeta = diff.ciclo_prestamo.presupuesto.tarjetas_prestamo.filter(id=tarjeta_id).first()
+            if tarjeta:
+                diff.tarjeta = tarjeta
+        diff.save()
+        return JsonResponse({'success': True, 'mensaje': 'Diferencia actualizada correctamente'})
+
+    return JsonResponse({'success': False, 'error': 'Tipo de movimiento no soportado'}, status=400)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def eliminar_movimiento_api(request):
+    """
+    Elimina un movimiento del presupuesto (gasto, ingreso, transferencia,
+    extraccion_tarjeta, aporte_efectivo, diferencia_tarjeta).
+    POST /api/movimientos/eliminar/
+    """
+    data = parse_request_data(request)
+    tipo_mov = (data.get('tipo_movimiento') or '').strip().lower()
+    mov_id = data.get('id')
+
+    if not tipo_mov or not mov_id:
+        return JsonResponse({'success': False, 'error': 'Faltan identificadores del movimiento'}, status=400)
+
+    editables_ids = set(presupuestos_editables(request.api_user).values_list('id', flat=True))
+
+    if tipo_mov == 'gasto':
+        gasto = Gasto.objects.select_related('presupuesto').filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not gasto:
+            return JsonResponse({'success': False, 'error': 'Gasto no encontrado'}, status=404)
+        pres = gasto.presupuesto
+        gasto.delete()
+        pres.actualizar_monto_restante()
+        return JsonResponse({'success': True, 'mensaje': 'Gasto eliminado'})
+
+    elif tipo_mov in ['ingreso', 'extraccion_tarjeta', 'aporte_efectivo']:
+        ingreso = Ingreso.objects.select_related('presupuesto').filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not ingreso:
+            return JsonResponse({'success': False, 'error': 'Ingreso no encontrado'}, status=404)
+        pres = ingreso.presupuesto
+        ingreso.delete()
+        pres.actualizar_monto_restante()
+        return JsonResponse({'success': True, 'mensaje': 'Ingreso eliminado'})
+
+    elif tipo_mov == 'transferencia':
+        trans = TransferenciaFondos.objects.filter(id=mov_id, presupuesto_id__in=editables_ids).first()
+        if not trans:
+            return JsonResponse({'success': False, 'error': 'Transferencia no encontrada'}, status=404)
+        trans.delete()
+        return JsonResponse({'success': True, 'mensaje': 'Transferencia eliminada'})
+
+    elif tipo_mov == 'diferencia_tarjeta':
+        diff = DiferenciaTarjeta.objects.filter(
+            id=mov_id,
+            ciclo_prestamo__presupuesto_id__in=editables_ids
+        ).first()
+        if not diff:
+            return JsonResponse({'success': False, 'error': 'Diferencia no encontrada'}, status=404)
+        diff.delete()
+        return JsonResponse({'success': True, 'mensaje': 'Diferencia eliminada'})
+
+    return JsonResponse({'success': False, 'error': 'Tipo de movimiento no soportado'}, status=400)
+
 

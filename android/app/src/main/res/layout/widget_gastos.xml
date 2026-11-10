@@ -5,20 +5,17 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:background="@drawable/widget_bg"
-    android:paddingStart="12dp"
-    android:paddingEnd="10dp"
-    android:paddingTop="6dp"
-    android:paddingBottom="6dp">
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="10dp"
+    android:background="@drawable/widget_bg">
 
-    <!-- Sección de Presupuesto y Saldo Restante -->
+    <!-- Left: Presupuesto & Saldo -->
     <LinearLayout
         android:id="@+id/widgetBudgetInfo"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:gravity="center_vertical"
         android:paddingEnd="8dp">
 
         <TextView
@@ -26,66 +23,74 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Presupuesto ▾"
-            android:textColor="@color/primary"
+            android:textColor="#A99FFF"
             android:textSize="11sp"
             android:textStyle="bold"
-            android:maxLines="1"
+            android:background="@drawable/widget_pill_purple"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="3dp"
+            android:singleLine="true"
             android:ellipsize="end" />
 
         <TextView
             android:id="@+id/widgetTxtRestante"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="$ 0.00"
-            android:textColor="@color/success"
-            android:textSize="16sp"
+            android:text="$ 0"
+            android:textColor="#F4F3FA"
+            android:textSize="17sp"
             android:textStyle="bold"
-            android:maxLines="1"
+            android:layout_marginTop="4dp"
+            android:singleLine="true"
             android:ellipsize="end" />
 
     </LinearLayout>
 
-    <!-- Botón + Gasto -->
-    <Button
-        android:id="@+id/widgetBtnAddExpense"
+    <!-- Right: Action Buttons -->
+    <LinearLayout
         android:layout_width="wrap_content"
-        android:layout_height="32dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:text="+ Gasto"
-        android:textColor="#FFFFFF"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:background="@drawable/btn_expense"
-        android:paddingHorizontal="10dp"
-        android:layout_marginEnd="6dp" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <!-- Botón + Ingreso -->
-    <Button
-        android:id="@+id/widgetBtnAddIncome"
-        android:layout_width="wrap_content"
-        android:layout_height="32dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:text="+ Ingreso"
-        android:textColor="#000000"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:background="@drawable/btn_primary"
-        android:paddingHorizontal="10dp"
-        android:layout_marginEnd="6dp" />
+        <Button
+            android:id="@+id/widgetBtnAddExpense"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="80dp"
+            android:paddingHorizontal="12dp"
+            android:text="↑ Gasto"
+            android:textAllCaps="false"
+            android:textColor="#FF8780"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_expense"
+            android:layout_marginEnd="6dp" />
 
-    <!-- Botón Refrescar -->
-    <Button
-        android:id="@+id/widgetBtnRefresh"
-        android:layout_width="30dp"
-        android:layout_height="32dp"
-        android:minHeight="0dp"
-        android:minWidth="0dp"
-        android:text="↻"
-        android:textColor="@color/text_secondary"
-        android:textSize="13sp"
-        android:background="@drawable/btn_secondary"
-        android:padding="0dp" />
+        <Button
+            android:id="@+id/widgetBtnAddIncome"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="82dp"
+            android:paddingHorizontal="12dp"
+            android:text="↓ Ingreso"
+            android:textAllCaps="false"
+            android:textColor="#55D2AD"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_primary"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/widgetBtnRefresh"
+            android:layout_width="38dp"
+            android:layout_height="40dp"
+            android:text="↻"
+            android:textColor="#B1B2C0"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_secondary" />
+
+    </LinearLayout>
 
 </LinearLayout>

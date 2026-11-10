@@ -62,13 +62,13 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.1
-          name: "Ga$tos Android APK v2.0.1"
+          tag_name: v2.1.0
+          name: "Ga$tos Android APK v2.1.0"
           body: |
-            ### App Android de Ga$tos v2.0.1 — Rediseño Moderno (Figma) + Control de Préstamo
-            - **Nueva Interfaz Moderna**: Rediseño completo fiel al prototipo de Figma con barra de navegación inferior (`Inicio`, `Movimientos`, `Análisis`, `Cuentas`) y botón flotante (`+`).
-            - **Soporte completo para Presupuestos tipo Préstamo**: Panel de ciclos/períodos, tarjetas del préstamo con semáforo de fechas de cierre (`Patagonia Rubén`, `Patagonia Palmira`, `Naranja`), carga de `+ Ingreso Tarjeta` (con cálculo automático del 4.5%), `+ Ingreso Efectivo`, `+ Diferencia Tarjeta` (resúmenes), cierre de ciclo y cronograma de proyección mes a mes en `Análisis`.
-            - **Selector de Presupuesto en Foco y Sección Cuentas**: Elegí cualquier presupuesto desde arriba y gestioná tus cuentas y transferencias.
+            ### App Android de Ga$tos v2.1.0 — Edición/Eliminación en Modal + Nuevo Widget Estética Figma
+            - **Editar y Eliminar Movimientos desde Modal Inferior**: Tocá cualquier gasto, ingreso o transferencia en `Inicio` o `Movimientos` para abrir el modal animado que sube desde abajo y modificar sus datos o eliminarlo.
+            - **Marcado Automático de Movimientos del Widget (`⚡ Completar`)**: Todos los gastos e ingresos cargados desde el Widget quedan marcados con el badge `⚡ Completar` y filtro rápido para que puedas completarlos con categoría, cuenta y etiquetas cuando entres a la app.
+            - **Widget Rediseñado con la Nueva Estética Figma**: Nuevo diseño oscuro (`#151821`) con píldora violeta para el selector de presupuesto, botón coral (`↑ Gasto`) y botón esmeralda (`↓ Ingreso`).
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

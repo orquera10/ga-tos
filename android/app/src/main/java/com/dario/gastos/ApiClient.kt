@@ -207,6 +207,7 @@ object ApiClient {
             put("nombre", nombre)
             put("monto", monto)
             put("metodo_pago", metodoPago)
+            put("es_rapido", true)
             if (persona.isNotEmpty()) put("persona", persona)
             if (cuentaBancaria.isNotEmpty()) put("cuenta_bancaria", cuentaBancaria)
             if (categoryId != null && categoryId > 0) put("categoria_id", categoryId)
@@ -239,6 +240,7 @@ object ApiClient {
             put("nombre", nombre)
             put("monto", monto)
             put("tipo_ingreso", tipoIngreso)
+            put("es_rapido", true)
             if (cuentaBancaria.isNotEmpty()) put("cuenta_bancaria", cuentaBancaria)
             if (desc.isNotEmpty()) put("descripcion", desc)
         }

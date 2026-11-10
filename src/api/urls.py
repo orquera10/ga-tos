@@ -19,6 +19,8 @@ urlpatterns = [
     path('gastos/crear/', views.crear_gasto_api, name='crear_gasto'),
     path('ingresos/crear/', views.crear_ingreso_api, name='crear_ingreso'),
     path('transferencias/crear/', views.crear_transferencia_api, name='crear_transferencia'),
+    path('movimientos/editar/', views.editar_movimiento_api, name='editar_movimiento'),
+    path('movimientos/eliminar/', views.eliminar_movimiento_api, name='eliminar_movimiento'),
     path('cuentas/crear/', views.crear_cuenta_api, name='crear_cuenta'),
     path('cuentas/<int:pk>/eliminar/', views.eliminar_cuenta_api, name='eliminar_cuenta'),
 

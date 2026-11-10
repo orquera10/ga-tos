@@ -4,24 +4,34 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp"
+    android:padding="22dp"
     android:background="@drawable/bg_dialog">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Elegir Presupuesto"
-        android:textColor="@color/primary"
-        android:textSize="18sp"
+        android:text="SELECTOR DEL WIDGET"
+        android:textColor="@color/text_secondary"
+        android:textSize="10sp"
         android:textStyle="bold"
+        android:letterSpacing="0.12" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Elegir presupuesto en foco"
+        android:textColor="@color/text_primary"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginTop="2dp"
         android:layout_marginBottom="6dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Selecciona el presupuesto que quieres mostrar en el Widget de la pantalla de inicio:"
+        android:text="Seleccioná el presupuesto que querés mostrar y cargar desde el Widget:"
         android:textColor="@color/text_secondary"
-        android:textSize="13sp"
+        android:textSize="12sp"
         android:layout_marginBottom="16dp" />
 
     <Spinner
@@ -35,7 +45,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="8dp">
+        android:layout_marginTop="4dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCancelSelect"
@@ -43,10 +53,11 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:text="Cancelar"
-            android:textColor="#FFFFFF"
+            android:textAllCaps="false"
+            android:textColor="#D5D6E2"
             android:textStyle="bold"
-            app:backgroundTint="@color/danger"
-            app:cornerRadius="8dp"
+            app:backgroundTint="#242731"
+            app:cornerRadius="13dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:layout_marginEnd="8dp" />
@@ -55,12 +66,13 @@
             android:id="@+id/btnApplySelect"
             android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_weight="1"
+            android:layout_weight="1.2"
             android:text="Aplicar"
-            android:textColor="#000000"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
             app:backgroundTint="@color/primary"
-            app:cornerRadius="8dp"
+            app:cornerRadius="13dp"
             android:insetTop="0dp"
             android:insetBottom="0dp" />
 
