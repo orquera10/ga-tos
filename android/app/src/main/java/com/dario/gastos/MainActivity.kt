@@ -1,6 +1,7 @@
 package com.dario.gastos
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.webkit.CookieManager
@@ -20,6 +21,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private var isInClassicWeb: Boolean = false
+
+    companion object {
+        const val EXTRA_BUDGET_ID = "extra_budget_id"
+    }
+
+    private fun handleBudgetIntent(intent: Intent?) {
+        val bId = intent?.getIntExtra(EXTRA_BUDGET_ID, -1) ?: -1
+        if (bId > 0) {
+            Prefs.setSelectedBudgetId(this, bId)
+        }
+    }
 
     inner class AndroidBridge {
         @JavascriptInterface
@@ -165,6 +177,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        handleBudgetIntent(intent)
         loadRedesignedApp()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -185,10 +198,25 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleBudgetIntent(intent)
+        if (::webView.isInitialized) {
+            val targetId = Prefs.getLastBudgetId(this)
+            if (isInClassicWeb) {
+                loadRedesignedApp()
+            } else {
+                webView.evaluateJavascript("if(window.openBudgetFromWidget) window.openBudgetFromWidget($targetId); else if(window.reloadAppData) window.reloadAppData($targetId);", null)
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         if (!isInClassicWeb && ::webView.isInitialized) {
-            webView.evaluateJavascript("if(window.reloadAppData) window.reloadAppData();", null)
+            val targetId = Prefs.getLastBudgetId(this)
+            webView.evaluateJavascript("if(window.reloadAppData) window.reloadAppData($targetId);", null)
         }
     }
 }

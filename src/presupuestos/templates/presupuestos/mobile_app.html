@@ -3689,9 +3689,27 @@
       }
     }
 
-    // Exponer función global para refrescar desde SwipeRefresh de Android
-    window.reloadAppData = function() {
+    // Exponer funciones globales para refrescar o abrir presupuesto directo desde Android / Widget
+    window.openBudgetFromWidget = function(budgetId) {
+      const bId = Number(budgetId) || (window.AndroidBridge && typeof window.AndroidBridge.getSelectedBudgetId === 'function' ? Number(window.AndroidBridge.getSelectedBudgetId()) : 0);
+      if (bId > 0) {
+        state.selectedBudgetId = bId;
+        state.selectedCicloId = 0;
+        state.sheet = null;
+        state.tab = 'Inicio';
+        localStorage.setItem('gastos_selected_budget_id', String(bId));
+      }
       loadBudgetDetail(state.selectedBudgetId);
+    };
+
+    window.reloadAppData = function(budgetId) {
+      const bId = Number(budgetId) || (window.AndroidBridge && typeof window.AndroidBridge.getSelectedBudgetId === 'function' ? Number(window.AndroidBridge.getSelectedBudgetId()) : 0);
+      if (bId > 0 && bId !== state.selectedBudgetId) {
+        state.selectedBudgetId = bId;
+        state.selectedCicloId = 0;
+        localStorage.setItem('gastos_selected_budget_id', String(bId));
+      }
+      loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
     };
 
     ensureTokenOrLoad();

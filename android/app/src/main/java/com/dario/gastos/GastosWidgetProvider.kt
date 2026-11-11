@@ -60,17 +60,22 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 views.setTextColor(R.id.widgetTxtRestante, remainingColor)
             }
 
-            // Click en el cuerpo del widget -> Abrir MainActivity
+            // Click en el botón "Ver ↗" o cuerpo del widget -> Abrir MainActivity en el presupuesto seleccionado
+            val currentBudgetId = Prefs.getLastBudgetId(context)
             val mainIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                if (currentBudgetId > 0) {
+                    putExtra(MainActivity.EXTRA_BUDGET_ID, currentBudgetId)
+                }
             }
             val mainPending = PendingIntent.getActivity(
                 context, 0, mainIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widgetContainer, mainPending)
+            views.setOnClickPendingIntent(R.id.widgetBtnOpenBudget, mainPending)
 
-            // Click en el nombre o saldo del presupuesto -> Abrir diálogo para cambiar de presupuesto
+            // Click en el selector de presupuesto o saldo -> Abrir diálogo para cambiar de presupuesto
             val selectIntent = Intent(context, SelectBudgetActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
