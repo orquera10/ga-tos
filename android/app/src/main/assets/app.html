@@ -661,6 +661,119 @@
       background: #151821;
       box-shadow: 0 7px 22px rgba(0, 0, 0, 0.13);
     }
+    .day-group {
+      margin-bottom: 14px;
+      border: 1px solid #252834;
+      border-radius: 18px;
+      background: #151821;
+      box-shadow: 0 7px 22px rgba(0, 0, 0, 0.14);
+      overflow: hidden;
+    }
+    .day-group-header {
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: linear-gradient(90deg, rgba(102, 87, 232, 0.14), rgba(26, 29, 41, 0.65));
+      border-bottom: 1px solid #232634;
+    }
+    .day-group-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+    .day-group-title strong {
+      font: 700 12px "Manrope", sans-serif;
+      color: #f4f3fa;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .day-group-title small {
+      color: var(--muted);
+      font-size: 9.5px;
+      font-weight: 600;
+    }
+    .day-badge-rel {
+      padding: 2px 7px;
+      border-radius: 7px;
+      background: rgba(102, 87, 232, 0.28);
+      border: 1px solid rgba(156, 145, 255, 0.45);
+      color: #d9d2ff;
+      font-size: 8.5px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .day-group > .transaction-list {
+      padding: 2px 16px;
+    }
+    .day-subtotal-bar {
+      padding: 10px 14px;
+      background: #11131b;
+      border-top: 1px solid #232634;
+    }
+    .day-subtotal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      text-align: center;
+    }
+    .day-subtotal-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 4px 6px;
+      border-radius: 10px;
+      background: #171a24;
+      border: 1px solid #232736;
+    }
+    .day-subtotal-col span {
+      color: #8f91a2;
+      font-size: 8.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .day-subtotal-col strong {
+      font: 700 11px "Manrope", sans-serif;
+      color: #e2e3ef;
+      white-space: nowrap;
+    }
+    .day-subtotal-col strong.neg {
+      color: #ff8780;
+    }
+    .day-subtotal-col strong.pos {
+      color: #55d2ad;
+    }
+    .day-card-note {
+      margin-top: 6px;
+      padding-top: 5px;
+      border-top: 1px dashed #252938;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 9.5px;
+      color: #d6a95a;
+    }
+    .transaction b.card-amt {
+      color: #f0bd62;
+    }
+    .badge-tarjeta-info {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: 5px;
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: rgba(240, 189, 98, 0.14);
+      border: 1px solid rgba(240, 189, 98, 0.35);
+      color: #f0bd62;
+      font-size: 8.5px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
     .empty {
       padding: 35px 10px;
       color: #858898;
@@ -1525,28 +1638,140 @@
       return `conic-gradient(${stops.join(', ')})`;
     }
 
+    function renderSingleTransactionArticle(item) {
+      const isCardExpense = item.tipo_movimiento === 'gasto' && item.metodo_pago === 'tarjeta';
+      const isPos = item.amount > 0 && !item.is_transfer;
+      const sign = item.is_transfer ? '⇄ ' : (item.amount > 0 ? '+' : '−');
+      const cls = item.is_transfer ? 'transfer-amt' : (isCardExpense ? 'card-amt' : (isPos ? 'positive' : ''));
+      const cleanTitle = (item.title || '').replace(/^⚡\s*/, '');
+      return `<article class="transaction ${item.es_rapido ? 'rapido-row' : ''}" data-edit-mov="${escapeHtml(item.uid)}" title="Toca para editar o eliminar">
+        <span class="transaction-icon ${escapeHtml(item.tone)}">
+          ${iconSvg(item.icon, 20)}
+        </span>
+        <div>
+          <strong>${escapeHtml(cleanTitle)}${item.es_rapido ? `<span class="badge-rapido">⚡ Completar</span>` : ''}${isCardExpense ? `<span class="badge-tarjeta-info">💳 Tarjeta</span>` : ''}</strong>
+          <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Toca para editar' : ''}</small>
+        </div>
+        <div style="text-align:right;">
+          <b class="${cls}">${sign}${money(Math.abs(item.amount))}</b>
+          ${isCardExpense ? `<small style="display:block;font-size:8px;color:#c99c4e;margin-top:2px;">No suma al día</small>` : ''}
+        </div>
+      </article>`;
+    }
+
     function renderTransactionsHtml(items) {
       if (!items || !items.length) {
         return `<div class="empty">No encontramos movimientos en este presupuesto.</div>`;
       }
       return `<div class="transaction-list">
-        ${items.map(item => {
-          const isPos = item.amount > 0 && !item.is_transfer;
-          const sign = item.is_transfer ? '⇄ ' : (item.amount > 0 ? '+' : '−');
-          const cls = item.is_transfer ? 'transfer-amt' : (isPos ? 'positive' : '');
-          const cleanTitle = (item.title || '').replace(/^⚡\s*/, '');
-          return `<article class="transaction ${item.es_rapido ? 'rapido-row' : ''}" data-edit-mov="${escapeHtml(item.uid)}" title="Toca para editar o eliminar">
-            <span class="transaction-icon ${escapeHtml(item.tone)}">
-              ${iconSvg(item.icon, 20)}
-            </span>
-            <div>
-              <strong>${escapeHtml(cleanTitle)}${item.es_rapido ? `<span class="badge-rapido">⚡ Completar</span>` : ''}</strong>
-              <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Toca para editar' : ''}</small>
-            </div>
-            <b class="${cls}">${sign}${money(Math.abs(item.amount))}</b>
-          </article>`;
-        }).join('')}
+        ${items.map(item => renderSingleTransactionArticle(item)).join('')}
       </div>`;
+    }
+
+    function formatFechaDiaHeader(fechaIso) {
+      if (!fechaIso || !/^\d{4}-\d{2}-\d{2}$/.test(fechaIso)) {
+        return { prefix: '', label: fechaIso || 'Sin fecha' };
+      }
+      const [y, m, d] = fechaIso.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      const now = new Date();
+      const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const yesterdayIso = `${yest.getFullYear()}-${String(yest.getMonth() + 1).padStart(2, '0')}-${String(yest.getDate()).padStart(2, '0')}`;
+
+      const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+      const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const diaNombre = dias[dt.getDay()] || '';
+      const mesNombre = meses[dt.getMonth()] || '';
+      const label = `${diaNombre} ${d} de ${mesNombre}`;
+
+      if (fechaIso === todayIso) return { prefix: 'HOY', label };
+      if (fechaIso === yesterdayIso) return { prefix: 'AYER', label };
+      return { prefix: '', label };
+    }
+
+    function renderTransactionsByDayHtml(items, isPrestamo = false) {
+      if (!items || !items.length) {
+        return `<div class="empty">No encontramos movimientos en este presupuesto.</div>`;
+      }
+      const groups = [];
+      const groupMap = {};
+      items.forEach(item => {
+        const key = item.fecha_iso || 'sin-fecha';
+        if (!groupMap[key]) {
+          groupMap[key] = { fechaIso: key, list: [] };
+          groups.push(groupMap[key]);
+        }
+        groupMap[key].list.push(item);
+      });
+
+      return groups.map(group => {
+        const hdr = formatFechaDiaHeader(group.fechaIso);
+        let gastosDiaSinTarjeta = 0;
+        let gastosTarjetaDia = 0;
+        let ingresosDia = 0;
+
+        group.list.forEach(m => {
+          const val = Math.abs(Number(m.amount) || 0);
+          if (m.tipo_movimiento === 'gasto') {
+            if (m.metodo_pago === 'tarjeta') {
+              gastosTarjetaDia += val;
+            } else {
+              gastosDiaSinTarjeta += val;
+            }
+          } else if (m.tipo_movimiento === 'ingreso' || m.tipo_movimiento === 'aporte_efectivo') {
+            ingresosDia += val;
+          }
+        });
+
+        const saldoDia = ingresosDia - gastosDiaSinTarjeta;
+        const saldoSign = saldoDia > 0 ? '+' : (saldoDia < 0 ? '−' : '');
+        const saldoCls = saldoDia > 0 ? 'pos' : (saldoDia < 0 ? 'neg' : '');
+
+        return `
+          <div class="day-group">
+            <div class="day-group-header">
+              <div class="day-group-title">
+                ${hdr.prefix ? `<span class="day-badge-rel">${hdr.prefix}</span>` : ''}
+                <strong>${escapeHtml(hdr.label)}</strong>
+                <small>(${group.list.length})</small>
+              </div>
+              ${!isPrestamo ? `
+                <span style="font:700 10.5px 'Manrope',sans-serif;color:${saldoDia > 0 ? '#55d2ad' : (saldoDia < 0 ? '#ff8780' : '#9b9baa')};">
+                  ${saldoSign}${money(Math.abs(saldoDia))}
+                </span>
+              ` : ''}
+            </div>
+            <div class="transaction-list">
+              ${group.list.map(item => renderSingleTransactionArticle(item)).join('')}
+            </div>
+            ${!isPrestamo ? `
+              <div class="day-subtotal-bar">
+                <div class="day-subtotal-grid">
+                  <div class="day-subtotal-col">
+                    <span>Gastos (sin tarj.)</span>
+                    <strong class="${gastosDiaSinTarjeta > 0 ? 'neg' : ''}">−${money(gastosDiaSinTarjeta)}</strong>
+                  </div>
+                  <div class="day-subtotal-col">
+                    <span>Ingresos</span>
+                    <strong class="${ingresosDia > 0 ? 'pos' : ''}">+${money(ingresosDia)}</strong>
+                  </div>
+                  <div class="day-subtotal-col">
+                    <span>Subtotal día</span>
+                    <strong class="${saldoCls}">${saldoSign}${money(Math.abs(saldoDia))}</strong>
+                  </div>
+                </div>
+                ${gastosTarjetaDia > 0 ? `
+                  <div class="day-card-note">
+                    <span>💳 Gastos con tarjeta del día (no incluidos en subtotal)</span>
+                    <b>−${money(gastosTarjetaDia)}</b>
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
     }
 
     function renderLogin() {
@@ -1916,7 +2141,7 @@
             }).join('') : ''}
           </div>
           <div class="date-label">${escapeHtml(isPrestamo && d.prestamo_info && d.prestamo_info.ciclo_actual ? d.prestamo_info.ciclo_actual.nombre : (p ? p.mes_label : ''))} (${filtered.length})</div>
-          ${renderTransactionsHtml(filtered)}
+          ${renderTransactionsByDayHtml(filtered, isPrestamo)}
         </section>
       `;
     }

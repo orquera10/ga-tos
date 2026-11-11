@@ -62,8 +62,8 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.2.2
-          name: "Ga$tos Android APK v2.2.2"
+          tag_name: v2.2.3
+          name: "Ga$tos Android APK v2.2.3"
           body: |
             ### App Android de Ga$tos v2.2.0 — Categorías Dinámicas, Billetera Favorita ⭐ y Detección Automática en Widget
             - **Conservación de Datos en Formularios**: Al elegir tags de persona o medio de pago en gastos/edición ya no se borra la categoría ni el resto de los campos.
