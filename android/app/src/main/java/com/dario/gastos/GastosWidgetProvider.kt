@@ -107,16 +107,6 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetBtnAddIncome, incomePending)
 
-            // Click ↻ -> Refrescar datos
-            val refreshIntent = Intent(context, GastosWidgetProvider::class.java).apply {
-                action = ACTION_REFRESH_WIDGET
-            }
-            val refreshPending = PendingIntent.getBroadcast(
-                context, 3, refreshIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widgetBtnRefresh, refreshPending)
-
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 

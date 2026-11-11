@@ -54,63 +54,25 @@
 
         </LinearLayout>
 
-        <!-- Bottom row: Main Balance Amount + Small Button to Open Selected Budget -->
-        <LinearLayout
+        <!-- Bottom row: Main Balance Amount -->
+        <TextView
+            android:id="@+id/widgetTxtRestante"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="3dp">
-
-            <TextView
-                android:id="@+id/widgetTxtRestante"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="$ 0"
-                android:textColor="#FFFFFF"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:autoSizeTextType="uniform"
-                android:autoSizeMinTextSize="12sp"
-                android:autoSizeMaxTextSize="18sp" />
-
-            <LinearLayout
-                android:id="@+id/widgetBtnOpenBudget"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/widget_open_pill_bg"
-                android:paddingHorizontal="7dp"
-                android:paddingVertical="3dp"
-                android:layout_marginStart="6dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Ver"
-                    android:textColor="#FFFFFF"
-                    android:textSize="9.5sp"
-                    android:textStyle="bold"
-                    android:singleLine="true" />
-
-                <ImageView
-                    android:layout_width="11dp"
-                    android:layout_height="11dp"
-                    android:layout_marginStart="2dp"
-                    android:src="@drawable/ic_widget_open"
-                    android:contentDescription="Entrar al presupuesto" />
-
-            </LinearLayout>
-
-        </LinearLayout>
+            android:text="$ 0"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="13sp"
+            android:autoSizeMaxTextSize="19sp" />
 
     </LinearLayout>
 
-    <!-- Right: Figma Quick Action Cards (Gasto / Ingreso / Refresh) -->
+    <!-- Right: Figma Quick Action Cards (Gasto / Ingreso / Entrar al Presupuesto) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
@@ -193,21 +155,33 @@
 
         </LinearLayout>
 
-        <!-- Card Button: Refresh -->
-        <FrameLayout
-            android:id="@+id/widgetBtnRefresh"
-            android:layout_width="34dp"
+        <!-- Card Button: Abrir Presupuesto Seleccionado en la App -->
+        <LinearLayout
+            android:id="@+id/widgetBtnOpenBudget"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingVertical="4dp"
             android:background="@drawable/widget_action_card_bg">
 
             <ImageView
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_widget_refresh"
-                android:contentDescription="Actualizar" />
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:src="@drawable/ic_widget_open"
+                android:contentDescription="Entrar al presupuesto" />
 
-        </FrameLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Ver"
+                android:textColor="#D9D2FF"
+                android:textSize="9.5sp"
+                android:textStyle="bold"
+                android:singleLine="true" />
+
+        </LinearLayout>
 
     </LinearLayout>
 
