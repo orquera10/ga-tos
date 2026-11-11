@@ -346,4 +346,119 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(resp_del.status_code, 200)
         self.assertFalse(Gasto.objects.filter(id=gasto_id).exists())
 
+    def test_categoria_dinamica_billetera_favorita_orden_y_deteccion_widget(self):
+        # 1. Crear 3 billeteras: Ualá (saldo 0), Naranja X (saldo 50000), Mercado Pago (saldo 10000, favorita)
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Ualá',
+                'tipo': 'billetera',
+                'saldo_inicial': 0,
+                'presupuesto_id': self.presupuesto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Naranja X',
+                'tipo': 'billetera',
+                'saldo_inicial': 50000,
+                'presupuesto_id': self.presupuesto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Mercado Pago',
+                'tipo': 'billetera',
+                'saldo_inicial': 10000,
+                'presupuesto_id': self.presupuesto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+
+        # Marcar Mercado Pago como favorita via endpoint /api/cuentas/favorita/
+        resp_fav = self.client.post(
+            '/api/cuentas/favorita/',
+            data=json.dumps({'nombre': 'Mercado Pago'}),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_fav.status_code, 200)
+        self.assertTrue(resp_fav.json()['es_favorita'])
+
+        # 2. Verificar el orden en detalle: 1° Favorita (Mercado Pago), 2° Con saldo (Naranja X), luego sin saldo (Ualá)
+        resp_det = self.client.get(
+            f'/api/presupuestos/{self.presupuesto.id}/detalle/',
+            **self.auth_headers
+        )
+        det = resp_det.json()
+        disponibles = [c['nombre'] for c in det['cuentas_disponibles']]
+        self.assertEqual(disponibles[0], 'Mercado Pago')
+        self.assertEqual(disponibles[1], 'Naranja X')
+        self.assertIn('Ualá', disponibles[2:])
+
+        # En cuentas['items'], las billeteras de usuario siguen el mismo orden (Efectivo es fijo pero entre las cuentas de usuario Mercado Pago va primero, luego Naranja X, luego Ualá)
+        user_wallet_items = [c['name'] for c in det['cuentas']['items'] if c['name'] in ('Mercado Pago', 'Naranja X', 'Ualá')]
+        self.assertEqual(user_wallet_items, ['Mercado Pago', 'Naranja X', 'Ualá'])
+
+        # 3. Crear gasto con nueva categoría escrita ("Mascotas") y transferencia sin especificar cuenta -> usa la favorita (Mercado Pago)
+        resp_gasto_cat = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Veterinaria',
+                'monto': 4000,
+                'categoria_nombre': 'Mascotas',
+                'metodo_pago': 'transferencia',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_gasto_cat.status_code, 201)
+        g_data = resp_gasto_cat.json()['gasto']
+        self.assertEqual(g_data['categoria'], 'Mascotas')
+        self.assertEqual(g_data['cuenta_bancaria'], 'Mercado Pago')
+
+        # 4. Widget gasto rápido: detectar 'transferencia' y 'efectivo' desde el concepto
+        resp_w_transf = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Carniceria transferencia',
+                'monto': 8500,
+                'metodo_pago': 'efectivo',  # El widget manda 'efectivo' por defecto
+                'es_rapido': True,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_w_transf.status_code, 201)
+        gw1 = Gasto.objects.get(id=resp_w_transf.json()['gasto']['id'])
+        self.assertEqual(gw1.metodo_pago, 'transferencia')
+        self.assertIsNotNone(gw1.cuenta_bancaria)
+        self.assertEqual(gw1.cuenta_bancaria.nombre, 'Mercado Pago')
+
+        resp_w_efvo = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Verduleria efectivo',
+                'monto': 3000,
+                'es_rapido': True,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_w_efvo.status_code, 201)
+        gw2 = Gasto.objects.get(id=resp_w_efvo.json()['gasto']['id'])
+        self.assertEqual(gw2.metodo_pago, 'efectivo')
+        self.assertIsNone(gw2.cuenta_bancaria)
+
+
 

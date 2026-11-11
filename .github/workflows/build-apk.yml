@@ -62,13 +62,14 @@ jobs:
       - name: Publicar Release directo con el APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1.1
-          name: "Ga$tos Android APK v2.1.1"
+          tag_name: v2.2.0
+          name: "Ga$tos Android APK v2.2.0"
           body: |
-            ### App Android de Ga$tos v2.1.0 — Edición/Eliminación en Modal + Nuevo Widget Estética Figma
-            - **Editar y Eliminar Movimientos desde Modal Inferior**: Tocá cualquier gasto, ingreso o transferencia en `Inicio` o `Movimientos` para abrir el modal animado que sube desde abajo y modificar sus datos o eliminarlo.
-            - **Marcado Automático de Movimientos del Widget (`⚡ Completar`)**: Todos los gastos e ingresos cargados desde el Widget quedan marcados con el badge `⚡ Completar` y filtro rápido para que puedas completarlos con categoría, cuenta y etiquetas cuando entres a la app.
-            - **Widget Rediseñado con la Nueva Estética Figma**: Nuevo diseño oscuro (`#151821`) con píldora violeta para el selector de presupuesto, botón coral (`↑ Gasto`) y botón esmeralda (`↓ Ingreso`).
+            ### App Android de Ga$tos v2.2.0 — Categorías Dinámicas, Billetera Favorita ⭐ y Detección Automática en Widget
+            - **Conservación de Datos en Formularios**: Al elegir tags de persona o medio de pago en gastos/edición ya no se borra la categoría ni el resto de los campos.
+            - **Categorías Dinámicas con Chips y Autocompletado**: Podés tocar una categoría existente como chip o escribir el nombre de una nueva categoría para crearla en el momento.
+            - **Billetera Favorita (`⭐`) y Orden Inteligente**: Marcá tu billetera favorita en `Cuentas` para que aparezca primera y preseleccionada al elegir transferencia, seguida por las billeteras con saldo positivo.
+            - **Detección Automática en Gastos/Ingresos Rápidos del Widget**: Si en el concepto del widget escribís `efectivo` o `transferencia`, se asigna automáticamente ese medio de pago (y tu billetera favorita si es transferencia).
             - Descarga **app-debug.apk** para instalar o actualizar.
           files: android/app/build/outputs/apk/debug/*.apk
         env:

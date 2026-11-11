@@ -98,6 +98,82 @@ def resolve_gasto_icon_tone(gasto):
     return 'bag', 'rose'
 
 
+def normalize_text_plain(text):
+    """Normaliza texto en minúsculas y sin tildes para detección de palabras clave."""
+    s = (text or '').lower().strip()
+    for a, b in [('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u')]:
+        s = s.replace(a, b)
+    return s
+
+
+def detectar_metodo_y_cuenta_desde_concepto(texto, user):
+    """
+    Detecta si en el concepto de un movimiento rápido figura 'efectivo' o 'transferencia'
+    (o el nombre de una billetera/banco del usuario) y devuelve (metodo_detectado, cuenta_obj).
+    """
+    norm = normalize_text_plain(texto)
+    if not norm:
+        return None, None
+
+    words = set(norm.replace(',', ' ').replace('.', ' ').replace('-', ' ').split())
+    metodo_detectado = None
+
+    transf_keywords = {'transferencia', 'tranferencia', 'trnsferencia', 'transf', 'mercadopago', 'mp', 'brubank', 'uala'}
+    efectivo_keywords = {'efectivo', 'efvo', 'cash'}
+    tarjeta_keywords = {'tarjeta', 'credito'}
+
+    if words & efectivo_keywords or 'efectivo' in norm:
+        metodo_detectado = 'efectivo'
+    elif (
+        words & transf_keywords
+        or 'transferencia' in norm
+        or 'tranferencia' in norm
+        or 'trnsferencia' in norm
+        or 'mercado pago' in norm
+    ):
+        metodo_detectado = 'transferencia'
+    elif words & tarjeta_keywords or 'tarjeta' in norm:
+        metodo_detectado = 'tarjeta'
+
+    cuenta_detectada = None
+    if user and metodo_detectado != 'efectivo':
+        user_cuentas = list(CuentaBancaria.objects.filter(usuario=user).order_by('-es_favorita', 'nombre'))
+        for c in user_cuentas:
+            c_norm = normalize_text_plain(c.nombre)
+            if c_norm and c_norm in norm:
+                cuenta_detectada = c
+                if not metodo_detectado:
+                    metodo_detectado = 'tarjeta' if c.tipo == 'tarjeta' else 'transferencia'
+                break
+
+        if not cuenta_detectada and metodo_detectado == 'transferencia':
+            # Si es transferencia y no nombró una billetera específica, usar la favorita si existe
+            fav = next((c for c in user_cuentas if c.es_favorita and c.tipo != 'tarjeta'), None)
+            if fav:
+                cuenta_detectada = fav
+
+    return metodo_detectado, cuenta_detectada
+
+
+def resolve_or_create_categoria(categoria_id, categoria_nombre):
+    """Busca una categoría por nombre (creándola si es nueva) o por ID."""
+    cat_nom = (categoria_nombre or '').strip()
+    if cat_nom:
+        cat = Categoria.objects.filter(nombre__iexact=cat_nom).first()
+        if not cat:
+            clean_name = cat_nom[:100]
+            if clean_name == clean_name.lower():
+                clean_name = clean_name.capitalize()
+            cat = Categoria.objects.create(nombre=clean_name)
+        return cat
+    if categoria_id:
+        try:
+            return Categoria.objects.filter(id=int(categoria_id)).first()
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
 def get_user_initials(user):
     first = (user.first_name or '').strip()
     last = (user.last_name or '').strip()
@@ -308,7 +384,7 @@ def presupuesto_detalle_api(request, pk=None):
     personas_disponibles = get_user_recent_personas(user)
 
     if not presupuesto:
-        user_cuentas = list(CuentaBancaria.objects.filter(usuario=user).order_by('nombre'))
+        user_cuentas = list(CuentaBancaria.objects.filter(usuario=user).order_by('-es_favorita', 'nombre'))
         return JsonResponse({
             'success': True,
             'user': {
@@ -339,6 +415,7 @@ def presupuesto_detalle_api(request, pk=None):
                         'name': c.nombre,
                         'subtitle': c.subtitulo_display,
                         'tipo': c.tipo,
+                        'es_favorita': bool(c.es_favorita),
                         'balance': 0.0,
                         'icon': 'card' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'wallet'),
                         'icon_class': 'macro' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'mp'),
@@ -350,7 +427,14 @@ def presupuesto_detalle_api(request, pk=None):
             'categorias_disponibles': categorias_disponibles,
             'personas_disponibles': personas_disponibles,
             'cuentas_disponibles': [
-                {'id': c.id, 'nombre': c.nombre, 'tipo': c.tipo, 'subtitle': c.subtitulo_display}
+                {
+                    'id': c.id,
+                    'nombre': c.nombre,
+                    'tipo': c.tipo,
+                    'subtitle': c.subtitulo_display,
+                    'es_favorita': bool(c.es_favorita),
+                    'balance': 0.0,
+                }
                 for c in user_cuentas
             ],
         })
@@ -628,11 +712,13 @@ def presupuesto_detalle_api(request, pk=None):
             icon_name = 'wallet'
             icon_cls = 'mp'
 
+        is_fav = bool(c_obj.es_favorita) if c_obj else False
         cuentas_items.append({
             'id': c_obj.id if c_obj else 0,
             'name': st['nombre'],
             'subtitle': sub,
             'tipo': c_tipo,
+            'es_favorita': is_fav,
             'balance': bal,
             'gastos_tarjeta': float(gas_tarj),
             'icon': icon_name,
@@ -640,8 +726,36 @@ def presupuesto_detalle_api(request, pk=None):
             'is_system': False,
         })
 
-    # Ordenar cuentas: primero las que tienen movimiento o saldo != 0, luego alfabético
-    cuentas_items.sort(key=lambda x: (0 if (x['balance'] != 0 or x['gastos_tarjeta'] != 0) else 1, -abs(x['balance']), x['name'].lower()))
+    # Ordenar cuentas:
+    # 1) Favorita arriba de todo
+    # 2) Las que tienen saldo positivo arriba (ordenadas de mayor a menor saldo)
+    # 3) Las que tienen movimiento / tarjeta
+    # 4) Resto por orden alfabético
+    def sort_key_cuenta(x):
+        fav_rank = 0 if x.get('es_favorita') else 1
+        bal = x.get('balance', 0.0)
+        gt = x.get('gastos_tarjeta', 0.0)
+        if bal > 0:
+            bal_rank = 0
+        elif bal != 0 or gt != 0:
+            bal_rank = 1
+        else:
+            bal_rank = 2
+        return (fav_rank, bal_rank, -bal, -abs(bal), (x.get('name') or x.get('nombre') or '').lower())
+
+    cuentas_items.sort(key=sort_key_cuenta)
+
+    cuentas_disponibles_list = [
+        {
+            'id': item['id'],
+            'nombre': item['name'],
+            'tipo': item['tipo'],
+            'subtitle': item['subtitle'],
+            'es_favorita': item['es_favorita'],
+            'balance': item['balance'],
+        }
+        for item in cuentas_items
+    ]
 
     # Agregar Efectivo disponible como cuenta del presupuesto
     cuentas_items.append({
@@ -649,6 +763,7 @@ def presupuesto_detalle_api(request, pk=None):
         'name': 'Efectivo',
         'subtitle': 'Dinero disponible',
         'tipo': 'efectivo',
+        'es_favorita': False,
         'balance': float(saldo_efectivo),
         'gastos_tarjeta': 0.0,
         'icon': 'cash',
@@ -663,6 +778,7 @@ def presupuesto_detalle_api(request, pk=None):
             'name': 'Tarjetas (Próx. mes)',
             'subtitle': 'Tarjeta de crédito',
             'tipo': 'tarjeta',
+            'es_favorita': False,
             'balance': -float(total_tarjeta),
             'gastos_tarjeta': float(total_tarjeta),
             'icon': 'card',
@@ -713,10 +829,7 @@ def presupuesto_detalle_api(request, pk=None):
         },
         'categorias_disponibles': categorias_disponibles,
         'personas_disponibles': personas_disponibles,
-        'cuentas_disponibles': [
-            {'id': c.id, 'nombre': c.nombre, 'tipo': c.tipo, 'subtitle': c.subtitulo_display}
-            for c in user_cuentas
-        ],
+        'cuentas_disponibles': cuentas_disponibles_list,
     })
 
 
@@ -983,17 +1096,26 @@ def crear_cuenta_api(request):
         tipo = 'billetera'
 
     nombre_clean = nombre_raw[:60]
+    es_fav = bool(data.get('es_favorita', False))
+    if es_fav:
+        CuentaBancaria.objects.filter(usuario=request.api_user, es_favorita=True).update(es_favorita=False)
+
     cuenta = CuentaBancaria.objects.filter(usuario=request.api_user, nombre__iexact=nombre_clean).first()
     created = False
     if cuenta:
         cuenta.nombre = nombre_clean
         cuenta.tipo = tipo
+        if 'es_favorita' in data:
+            cuenta.es_favorita = es_fav
         cuenta.save()
     else:
+        # Si es la primera billetera del usuario, marcarla como favorita por defecto
+        has_any = CuentaBancaria.objects.filter(usuario=request.api_user).exists()
         cuenta = CuentaBancaria.objects.create(
             usuario=request.api_user,
             nombre=nombre_clean,
             tipo=tipo,
+            es_favorita=es_fav or (not has_any and tipo != 'tarjeta'),
         )
         created = True
 
@@ -1025,9 +1147,56 @@ def crear_cuenta_api(request):
             'id': cuenta.id,
             'nombre': cuenta.nombre,
             'tipo': cuenta.tipo,
+            'es_favorita': bool(cuenta.es_favorita),
             'subtitle': cuenta.subtitulo_display,
         }
     }, status=201 if created else 200)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def toggle_cuenta_favorita_api(request):
+    """
+    Marca o desmarca una CuentaBancaria como la billetera favorita del usuario.
+    POST /api/cuentas/favorita/
+    Body: {"id": 3, "nombre": "Mercado Pago"}
+    """
+    data = parse_request_data(request)
+    cid = data.get('id') or data.get('cuenta_id')
+    nombre_raw = (data.get('nombre') or '').strip()
+
+    cuenta = None
+    if cid and int(cid) > 0:
+        cuenta = CuentaBancaria.objects.filter(id=cid, usuario=request.api_user).first()
+    if not cuenta and nombre_raw:
+        cuenta = CuentaBancaria.objects.filter(usuario=request.api_user, nombre__iexact=nombre_raw).first()
+        if not cuenta:
+            cuenta = CuentaBancaria.objects.create(
+                usuario=request.api_user,
+                nombre=nombre_raw[:60],
+                tipo='billetera',
+                es_favorita=False,
+            )
+
+    if not cuenta:
+        return JsonResponse({'success': False, 'error': 'Cuenta no encontrada'}, status=404)
+
+    nueva_fav = not cuenta.es_favorita
+    CuentaBancaria.objects.filter(usuario=request.api_user).update(es_favorita=False)
+    cuenta.es_favorita = nueva_fav
+    cuenta.save()
+
+    return JsonResponse({
+        'success': True,
+        'es_favorita': cuenta.es_favorita,
+        'mensaje': f'⭐ {cuenta.nombre} marcada como billetera favorita' if cuenta.es_favorita else f'{cuenta.nombre} ya no es favorita',
+        'cuenta': {
+            'id': cuenta.id,
+            'nombre': cuenta.nombre,
+            'es_favorita': cuenta.es_favorita,
+        }
+    })
 
 
 @csrf_exempt
@@ -1232,14 +1401,10 @@ def crear_gasto_api(request):
     elif es_rapido and not nombre.startswith('⚡'):
         nombre = f"⚡ {nombre}"
 
-    # Categoría opcional (por ID o por nombre)
-    categoria = None
+    # Categoría opcional (por ID o por nombre; si el nombre no existe, se crea automáticamente)
     categoria_id = data.get('categoria_id')
     categoria_nombre = (data.get('categoria_nombre') or '').strip()
-    if categoria_id:
-        categoria = Categoria.objects.filter(id=categoria_id).first()
-    elif categoria_nombre:
-        categoria = Categoria.objects.filter(nombre__iexact=categoria_nombre).first()
+    categoria = resolve_or_create_categoria(categoria_id, categoria_nombre)
 
     # Fecha opcional
     fecha = None
@@ -1262,6 +1427,12 @@ def crear_gasto_api(request):
     if metodo_pago not in ['efectivo', 'transferencia', 'tarjeta']:
         metodo_pago = 'efectivo'
 
+    # Detectar automáticamente efectivo / transferencia en el concepto (especialmente desde el Widget)
+    cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    metodo_det, cuenta_det = detectar_metodo_y_cuenta_desde_concepto(f"{nombre} {descripcion}", request.api_user)
+    if metodo_det and (es_rapido or not data.get('metodo_pago')):
+        metodo_pago = metodo_det
+
     persona_raw = (data.get('persona') or '').strip()
     if persona_raw:
         parts = [p.strip().title() for p in persona_raw.split(',') if p.strip()]
@@ -1274,7 +1445,6 @@ def crear_gasto_api(request):
         persona = ''
 
     cuenta_bancaria = None
-    cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
     if cuenta_raw and metodo_pago != 'efectivo' and cuenta_raw.lower() != 'efectivo':
         cuenta_bancaria = CuentaBancaria.objects.filter(
             usuario=request.api_user,
@@ -1286,6 +1456,14 @@ def crear_gasto_api(request):
                 nombre=cuenta_raw.title(),
                 tipo='tarjeta' if metodo_pago == 'tarjeta' else 'billetera'
             )
+    elif metodo_pago != 'efectivo' and cuenta_det:
+        cuenta_bancaria = cuenta_det
+    elif metodo_pago == 'transferencia' and not cuenta_raw:
+        # Si eligió transferencia sin especificar cuenta, usar la billetera favorita si existe
+        cuenta_bancaria = CuentaBancaria.objects.filter(
+            usuario=request.api_user,
+            es_favorita=True
+        ).exclude(tipo='tarjeta').first()
 
     gasto = Gasto(
         presupuesto=presupuesto,
@@ -1371,8 +1549,12 @@ def crear_ingreso_api(request):
     if tipo_ingreso not in ['transferencia', 'efectivo', 'sueldo']:
         tipo_ingreso = 'transferencia'
 
-    cuenta_bancaria = None
     cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    metodo_det, cuenta_det = detectar_metodo_y_cuenta_desde_concepto(f"{nombre} {data.get('descripcion') or ''}", request.api_user)
+    if metodo_det in ['efectivo', 'transferencia'] and (es_rapido or not data.get('tipo_ingreso')):
+        tipo_ingreso = metodo_det
+
+    cuenta_bancaria = None
     if cuenta_raw and tipo_ingreso != 'efectivo' and cuenta_raw.lower() != 'efectivo':
         cuenta_bancaria = CuentaBancaria.objects.filter(
             usuario=request.api_user,
@@ -1384,6 +1566,13 @@ def crear_ingreso_api(request):
                 nombre=cuenta_raw.title(),
                 tipo='billetera'
             )
+    elif tipo_ingreso != 'efectivo' and cuenta_det:
+        cuenta_bancaria = cuenta_det
+    elif tipo_ingreso != 'efectivo' and not cuenta_raw:
+        cuenta_bancaria = CuentaBancaria.objects.filter(
+            usuario=request.api_user,
+            es_favorita=True
+        ).exclude(tipo='tarjeta').first()
 
     fecha = None
     fecha_raw = (data.get('fecha') or '').strip()
@@ -1801,9 +1990,10 @@ def editar_movimiento_api(request):
         if metodo_pago in ['efectivo', 'transferencia', 'tarjeta']:
             gasto.metodo_pago = metodo_pago
 
-        if 'categoria_id' in data:
+        if 'categoria_nombre' in data or 'categoria_id' in data:
             cat_id = data.get('categoria_id')
-            gasto.categoria = Categoria.objects.filter(id=cat_id).first() if cat_id else None
+            cat_nom = (data.get('categoria_nombre') or '').strip()
+            gasto.categoria = resolve_or_create_categoria(cat_id, cat_nom)
 
         if 'persona' in data:
             persona_raw = (data.get('persona') or '').strip()

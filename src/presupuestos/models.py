@@ -242,13 +242,14 @@ class CuentaBancaria(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='cuentas_bancarias')
     nombre = models.CharField(max_length=60)
     tipo = models.CharField(max_length=20, choices=TIPOS_CUENTA, default='billetera')
+    es_favorita = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(default=timezone.now)
 
     class Meta:
         unique_together = ('usuario', 'nombre')
         verbose_name = 'Cuenta Bancaria / Billetera'
         verbose_name_plural = 'Cuentas Bancarias / Billeteras'
-        ordering = ['nombre']
+        ordering = ['-es_favorita', 'nombre']
 
     @property
     def subtitulo_display(self):

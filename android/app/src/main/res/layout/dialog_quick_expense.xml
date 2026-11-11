@@ -68,7 +68,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="⚡ Quedará marcado en la app para que completes categoría, cuenta o etiqueta luego."
+        android:text="⚡ Si escribís 'efectivo' o 'transferencia' en el concepto se asigna automático; queda marcado para completar luego."
         android:textColor="#F0BD62"
         android:textSize="11sp"
         android:layout_marginBottom="16dp" />
@@ -131,7 +131,7 @@
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:inputType="textCapSentences"
-        android:hint="Ej. Supermercado (vacío = ⚡ Gasto rápido)"
+        android:hint="Ej. Kiosco efectivo / Super transferencia"
         android:textColor="@color/text_primary"
         android:textColorHint="@color/text_muted"
         android:textSize="13.5sp"

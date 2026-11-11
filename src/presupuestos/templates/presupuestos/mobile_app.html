@@ -893,6 +893,41 @@
     .account-list article > svg {
       color: #a9aaba;
     }
+    .fav-star-btn {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #2e3244;
+      border-radius: 9px;
+      background: #1c1f2b;
+      color: #7d8094;
+      font-size: 14px;
+      padding: 0;
+    }
+    .fav-star-btn.active {
+      border-color: rgba(240, 189, 98, 0.55);
+      background: rgba(240, 189, 98, 0.16);
+      color: #f0bd62;
+    }
+    .badge-fav {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: rgba(240, 189, 98, 0.18);
+      border: 1px solid rgba(240, 189, 98, 0.45);
+      color: #f0bd62;
+      font-size: 8.5px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .sheet-backdrop.no-anim,
+    .bottom-sheet.no-anim {
+      animation: none !important;
+    }
     .outline-add {
       width: 100%;
       height: 46px;
@@ -1235,6 +1270,7 @@
       // Form state
       gastoMetodo: 'transferencia',
       gastoCuenta: '',
+      gastoCategoria: '',
       gastoPersonas: [],
       ingresoTipo: 'transferencia',
       ingresoCuenta: '',
@@ -1243,8 +1279,20 @@
       editingTarjetaPrestamo: null,
       editingMov: null,
       editMetodo: 'efectivo',
+      editCategoria: '',
+      editCuenta: '',
       editPersonas: [],
       confirmDeleteMov: false,
+      sheetNoAnim: false,
+      formDraft: {
+        monto: '',
+        nombre: '',
+        fecha: '',
+        persona_extra: '',
+        nota: '',
+        origen_cuenta: '',
+        destino_cuenta: '',
+      },
     };
 
     // Sincronizar con query params o AndroidBridge si está presente
@@ -1361,22 +1409,95 @@
       loadBudgetDetail(state.selectedBudgetId, 0);
     }
 
+    function getDefaultCuentaForMetodo(metodo) {
+      const cuentas = (state.data && state.data.cuentas_disponibles) || [];
+      if (!cuentas.length || metodo === 'efectivo') return '';
+      if (metodo === 'tarjeta') {
+        const tarj = cuentas.find(c => c.tipo === 'tarjeta');
+        return tarj ? tarj.nombre : cuentas[0].nombre;
+      }
+      const fav = cuentas.find(c => c.es_favorita && c.tipo !== 'tarjeta');
+      if (fav) return fav.nombre;
+      const nonCard = cuentas.find(c => c.tipo !== 'tarjeta');
+      return nonCard ? nonCard.nombre : cuentas[0].nombre;
+    }
+
+    function syncFormDraftFromDom() {
+      const formGasto = document.getElementById('formGasto');
+      if (formGasto) {
+        const fd = new FormData(formGasto);
+        if (fd.get('monto') !== null) state.formDraft.monto = fd.get('monto');
+        if (fd.get('nombre') !== null) state.formDraft.nombre = fd.get('nombre');
+        if (fd.get('fecha') !== null) state.formDraft.fecha = fd.get('fecha');
+        if (fd.get('categoria_nombre') !== null) state.gastoCategoria = fd.get('categoria_nombre');
+        if (fd.get('cuenta_bancaria') !== null) state.gastoCuenta = fd.get('cuenta_bancaria');
+        if (fd.get('persona_extra') !== null) {
+          state.formDraft.persona_extra = fd.get('persona_extra');
+          state.gastoPersonas = fd.get('persona_extra').split(',').map(s => s.trim()).filter(Boolean);
+        }
+      }
+      const formIngreso = document.getElementById('formIngreso');
+      if (formIngreso) {
+        const fd = new FormData(formIngreso);
+        if (fd.get('monto') !== null) state.formDraft.monto = fd.get('monto');
+        if (fd.get('nombre') !== null) state.formDraft.nombre = fd.get('nombre');
+        if (fd.get('fecha') !== null) state.formDraft.fecha = fd.get('fecha');
+        if (fd.get('cuenta_bancaria') !== null) state.ingresoCuenta = fd.get('cuenta_bancaria');
+      }
+      const formTransferencia = document.getElementById('formTransferencia');
+      if (formTransferencia) {
+        const fd = new FormData(formTransferencia);
+        if (fd.get('monto') !== null) state.formDraft.monto = fd.get('monto');
+        if (fd.get('nota') !== null) state.formDraft.nota = fd.get('nota');
+        if (fd.get('origen_cuenta') !== null) state.formDraft.origen_cuenta = fd.get('origen_cuenta');
+        if (fd.get('destino_cuenta') !== null) state.formDraft.destino_cuenta = fd.get('destino_cuenta');
+      }
+      const formEditarMov = document.getElementById('formEditarMov');
+      if (formEditarMov && state.editingMov) {
+        const fd = new FormData(formEditarMov);
+        if (fd.get('monto') !== null) state.editingMov.raw_monto = fd.get('monto');
+        if (fd.get('nombre') !== null) state.editingMov.title = fd.get('nombre');
+        if (fd.get('categoria_nombre') !== null) state.editCategoria = fd.get('categoria_nombre');
+        if (fd.get('cuenta_bancaria') !== null) state.editCuenta = fd.get('cuenta_bancaria');
+        if (fd.get('persona') !== null) {
+          state.editingMov.persona = fd.get('persona');
+          state.editPersonas = fd.get('persona').split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (fd.get('nota') !== null) state.editingMov.nota = fd.get('nota');
+        if (fd.get('concepto') !== null) state.editingMov.concepto = fd.get('concepto');
+        if (fd.get('tarjeta_id') !== null) state.editingMov.tarjeta_id = fd.get('tarjeta_id');
+        if (fd.get('tasa_interes') !== null) state.editingMov.tasa_interes = fd.get('tasa_interes');
+        if (fd.get('monto_proximo_mes') !== null) state.editingMov.monto_proximo_mes = fd.get('monto_proximo_mes');
+      }
+    }
+
     function openSheet(name) {
       if (name === 'prestamo_nueva_tarjeta') {
         state.editingTarjetaPrestamo = null;
       }
+      state.sheetNoAnim = false;
       state.sheet = name;
+      const todayIso = new Date().toISOString().slice(0, 10);
+      state.formDraft = {
+        monto: '',
+        nombre: '',
+        fecha: todayIso,
+        persona_extra: '',
+        nota: '',
+        origen_cuenta: '',
+        destino_cuenta: '',
+      };
       if (name === 'gasto') {
-        const cuentas = (state.data && state.data.cuentas_disponibles) || [];
         state.gastoMetodo = 'transferencia';
-        state.gastoCuenta = cuentas.length ? cuentas[0].nombre : '';
+        state.gastoCuenta = getDefaultCuentaForMetodo('transferencia');
+        state.gastoCategoria = '';
         state.gastoPersonas = [];
       } else if (name === 'ingreso') {
-        const cuentas = (state.data && state.data.cuentas_disponibles) || [];
         state.ingresoTipo = 'transferencia';
-        state.ingresoCuenta = cuentas.length ? cuentas[0].nombre : '';
+        state.ingresoCuenta = getDefaultCuentaForMetodo('transferencia');
       } else if (name === 'transferencia') {
         state.transModo = 'efectivo_a_cuenta';
+        state.formDraft.destino_cuenta = getDefaultCuentaForMetodo('transferencia');
       }
       render();
     }
@@ -1926,25 +2047,29 @@
             <small>Efectivo: ${money(cData.saldo_efectivo)} · Bancos/Billeteras: ${money(cData.saldo_transferencia)}</small>
           </div>
           <div class="subheading-row">
-            <h3 class="subheading">Mis cuentas</h3>
+            <h3 class="subheading">Mis cuentas <small style="color:var(--muted);font-weight:500;font-size:10px;">(tocá ⭐ para elegir favorita)</small></h3>
             <button type="button" data-open-sheet="transferencia" style="border:0;background:transparent;color:#5dc6ef;font-size:11px;font-weight:700;">
               ⇄ Transferir fondos
             </button>
           </div>
           <div class="account-list">
             ${items.map(acc => `
-              <article data-account-filter="${escapeHtml(acc.name)}">
+              <article data-account-filter="${escapeHtml(acc.name)}" style="${!acc.is_system ? 'grid-template-columns: 41px 1fr auto 30px;' : ''}">
                 <span class="bank-icon ${escapeHtml(acc.icon_class)}">
                   ${iconSvg(acc.icon)}
                 </span>
                 <div>
-                  <strong>${escapeHtml(acc.name)}</strong>
+                  <strong>${escapeHtml(acc.name)}${acc.es_favorita ? `<span class="badge-fav">⭐ Favorita</span>` : ''}</strong>
                   <small>${escapeHtml(acc.subtitle)}${acc.gastos_tarjeta > 0 && acc.tipo !== 'tarjeta' ? ` · Tarjeta: −${money(acc.gastos_tarjeta)}` : ''}</small>
                 </div>
                 <b class="${acc.balance < 0 ? 'negative' : ''}">
                   ${acc.balance < 0 ? '−' : ''}${money(Math.abs(acc.balance))}
                 </b>
-                ${iconSvg('chevron', 18)}
+                ${!acc.is_system ? `
+                  <button type="button" class="fav-star-btn ${acc.es_favorita ? 'active' : ''}" data-toggle-fav-cuenta="${acc.id}" data-toggle-fav-nombre="${escapeHtml(acc.name)}" title="Marcar como favorita para transferencias">
+                    ${acc.es_favorita ? '⭐' : '☆'}
+                  </button>
+                ` : iconSvg('chevron', 18)}
               </article>
             `).join('')}
           </div>
@@ -2096,9 +2221,10 @@
       }
 
       if (state.sheet === 'gasto') {
+        const draft = state.formDraft || {};
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2108,33 +2234,38 @@
                 <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
               </div>
               <form id="formGasto">
-                <label>
-                  Monto
-                  <div class="amount-input">
-                    <span>$</span>
-                    <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" inputmode="decimal" autofocus />
-                  </div>
-                </label>
-                <label>
-                  Concepto (opcional para carga rápida)
-                  <input name="nombre" placeholder="Ej. Supermercado (vacío = ⚡ Gasto rápido)" />
-                </label>
                 <div class="form-row">
                   <label>
-                    Categoría
-                    <select name="categoria_id">
-                      <option value="">Sin categoría</option>
-                      ${categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`).join('')}
-                    </select>
+                    Monto
+                    <div class="amount-input">
+                      <span>$</span>
+                      <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" value="${escapeHtml(draft.monto || '')}" inputmode="decimal" ${!state.sheetNoAnim ? 'autofocus' : ''} />
+                    </div>
                   </label>
                   <label>
                     Fecha
                     <div class="date-field">
                       ${iconSvg('calendar', 17)}
-                      <input type="date" name="fecha" value="${todayIso}" />
+                      <input type="date" name="fecha" value="${escapeHtml(draft.fecha || todayIso)}" />
                     </div>
                   </label>
                 </div>
+                <label>
+                  Concepto (opcional para carga rápida)
+                  <input name="nombre" value="${escapeHtml(draft.nombre || '')}" placeholder="Ej. Supermercado (vacío = ⚡ Gasto rápido)" />
+                </label>
+                <label>
+                  Categoría / Tipo de gasto (tocá una o escribí una nueva)
+                  <div class="chips-selector">
+                    ${categorias.map(c => `
+                      <button type="button" class="chip-btn ${(state.gastoCategoria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-categoria="${escapeHtml(c.nombre)}">🏷️ ${escapeHtml(c.nombre)}</button>
+                    `).join('')}
+                  </div>
+                  <input name="categoria_nombre" id="inpGastoCategoria" list="categoriasDatalist" value="${escapeHtml(state.gastoCategoria || '')}" placeholder="Elegí arriba o escribí una categoría nueva..." autocomplete="off" />
+                  <datalist id="categoriasDatalist">
+                    ${categorias.map(c => `<option value="${escapeHtml(c.nombre)}"></option>`).join('')}
+                  </datalist>
+                </label>
                 <label>
                   Medio de pago
                   <div class="chips-selector">
@@ -2150,9 +2281,14 @@
                 ${state.gastoMetodo !== 'efectivo' ? `
                   <label>
                     Cuenta / Billetera / Tarjeta
+                    <div class="chips-selector">
+                      ${cuentas.map(c => `
+                        <button type="button" class="chip-btn ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-gasto-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                      `).join('')}
+                    </div>
                     <select name="cuenta_bancaria" id="selectGastoCuenta">
                       <option value="">Seleccionar cuenta...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${state.gastoCuenta === c.nombre ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.balance > 0 ? ' · ' + money(c.balance) : ''})</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2173,9 +2309,10 @@
       }
 
       if (state.sheet === 'ingreso') {
+        const draft = state.formDraft || {};
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2189,12 +2326,12 @@
                   Monto
                   <div class="amount-input">
                     <span>$</span>
-                    <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" inputmode="decimal" autofocus />
+                    <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" value="${escapeHtml(draft.monto || '')}" inputmode="decimal" ${!state.sheetNoAnim ? 'autofocus' : ''} />
                   </div>
                 </label>
                 <label>
                   Concepto
-                  <input name="nombre" placeholder="Ej. Sueldo, Venta, Transferencia" />
+                  <input name="nombre" value="${escapeHtml(draft.nombre || '')}" placeholder="Ej. Sueldo, Venta, Transferencia" />
                 </label>
                 <div class="form-row">
                   <label>
@@ -2209,16 +2346,21 @@
                     Fecha
                     <div class="date-field">
                       ${iconSvg('calendar', 17)}
-                      <input type="date" name="fecha" value="${todayIso}" />
+                      <input type="date" name="fecha" value="${escapeHtml(draft.fecha || todayIso)}" />
                     </div>
                   </label>
                 </div>
                 ${state.ingresoTipo !== 'efectivo' ? `
                   <label>
                     Cuenta / Billetera destino
+                    <div class="chips-selector">
+                      ${cuentas.map(c => `
+                        <button type="button" class="chip-btn ${(state.ingresoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-ingreso-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                      `).join('')}
+                    </div>
                     <select name="cuenta_bancaria">
                       <option value="">Seleccionar cuenta...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${state.ingresoCuenta === c.nombre ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.ingresoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.balance > 0 ? ' · ' + money(c.balance) : ''})</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2230,9 +2372,10 @@
       }
 
       if (state.sheet === 'transferencia') {
+        const draft = state.formDraft || {};
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2255,7 +2398,7 @@
                     Cuenta de origen (sale dinero)
                     <select name="origen_cuenta" required>
                       <option value="">Seleccionar cuenta origen...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('')}
+                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(draft.origen_cuenta || '') === c.nombre ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)}</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2264,7 +2407,7 @@
                     Cuenta de destino (entra dinero)
                     <select name="destino_cuenta" required>
                       <option value="">Seleccionar cuenta destino...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}">${escapeHtml(c.nombre)}</option>`).join('')}
+                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(draft.destino_cuenta || '') === c.nombre ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)}</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2272,12 +2415,12 @@
                   Monto a transferir
                   <div class="amount-input">
                     <span>$</span>
-                    <input name="monto" type="number" step="0.01" min="0.01" required placeholder="Ej. 30000" inputmode="decimal" />
+                    <input name="monto" type="number" step="0.01" min="0.01" required value="${escapeHtml(draft.monto || '')}" placeholder="Ej. 30000" inputmode="decimal" />
                   </div>
                 </label>
                 <label>
                   Nota (opcional)
-                  <input name="nota" placeholder="Ej. Depósito en efectivo a Mercado Pago" />
+                  <input name="nota" value="${escapeHtml(draft.nota || '')}" placeholder="Ej. Depósito en efectivo a Mercado Pago" />
                 </label>
                 <button type="submit" class="submit purple">Confirmar transferencia</button>
               </form>
@@ -2288,8 +2431,8 @@
 
       if (state.sheet === 'cuenta') {
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2317,6 +2460,10 @@
                     <span>$</span>
                     <input name="saldo_inicial" type="number" step="0.01" min="0" placeholder="0 (dejar en 0 si solo querés crearla)" inputmode="decimal" />
                   </div>
+                </label>
+                <label style="flex-direction:row;align-items:center;gap:9px;margin-top:4px;cursor:pointer;">
+                  <input type="checkbox" name="es_favorita" value="1" style="width:18px;height:18px;accent-color:#f0bd62;" />
+                  <span>⭐ Marcar como mi billetera favorita (aparece primera en transferencias)</span>
                 </label>
                 <button type="submit" class="submit purple">Guardar cuenta</button>
               </form>
@@ -2367,8 +2514,8 @@
 
       if (state.sheet === 'prestamo_tarjeta') {
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2417,8 +2564,8 @@
 
       if (state.sheet === 'prestamo_efectivo') {
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2448,8 +2595,8 @@
 
       if (state.sheet === 'prestamo_diferencia') {
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2486,8 +2633,8 @@
       if (state.sheet === 'prestamo_nueva_tarjeta') {
         const editT = state.editingTarjetaPrestamo || {};
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2535,8 +2682,8 @@
 
       if (state.sheet === 'prestamo_cerrar_ciclo') {
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2579,6 +2726,8 @@
 
         let fieldsHtml = '';
         if (tm === 'gasto') {
+          const curCat = state.editCategoria !== undefined ? state.editCategoria : (m.categoria && m.categoria !== 'Sin categoría' ? m.categoria : '');
+          const curCuenta = state.editCuenta !== undefined ? state.editCuenta : (m.cuenta_bancaria || '');
           fieldsHtml = `
             <label>
               Monto
@@ -2592,11 +2741,16 @@
               <input name="nombre" required value="${escapeHtml(cleanName)}" placeholder="Nombre del gasto" />
             </label>
             <label>
-              Categoría
-              <select name="categoria_id">
-                <option value="">Sin categoría</option>
-                ${categorias.map(c => `<option value="${c.id}" ${String(m.categoria_id) === String(c.id) ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('')}
-              </select>
+              Categoría / Tipo de gasto (tocá una o escribí una nueva)
+              <div class="chips-selector">
+                ${categorias.map(c => `
+                  <button type="button" class="chip-btn ${(curCat || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-categoria="${escapeHtml(c.nombre)}">🏷️ ${escapeHtml(c.nombre)}</button>
+                `).join('')}
+              </div>
+              <input name="categoria_nombre" list="categoriasDatalistEdit" value="${escapeHtml(curCat)}" placeholder="Elegí arriba o escribí una categoría nueva..." autocomplete="off" />
+              <datalist id="categoriasDatalistEdit">
+                ${categorias.map(c => `<option value="${escapeHtml(c.nombre)}"></option>`).join('')}
+              </datalist>
             </label>
             <label>
               Medio de pago
@@ -2613,9 +2767,14 @@
             ${state.editMetodo !== 'efectivo' ? `
               <label>
                 Cuenta / Billetera / Tarjeta
+                <div class="chips-selector">
+                  ${cuentas.map(c => `
+                    <button type="button" class="chip-btn ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                  `).join('')}
+                </div>
                 <select name="cuenta_bancaria">
                   <option value="">Sin cuenta específica</option>
-                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(m.cuenta_bancaria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
                 </select>
               </label>
             ` : ''}
@@ -2630,6 +2789,7 @@
             </label>
           `;
         } else if (tm === 'ingreso') {
+          const curCuenta = state.editCuenta !== undefined ? state.editCuenta : (m.cuenta_bancaria || '');
           fieldsHtml = `
             <label>
               Monto
@@ -2653,9 +2813,14 @@
             ${state.editMetodo !== 'efectivo' ? `
               <label>
                 Cuenta / Billetera destino
+                <div class="chips-selector">
+                  ${cuentas.map(c => `
+                    <button type="button" class="chip-btn ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                  `).join('')}
+                </div>
                 <select name="cuenta_bancaria">
                   <option value="">Sin cuenta específica</option>
-                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(m.cuenta_bancaria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
                 </select>
               </label>
             ` : ''}
@@ -2744,8 +2909,8 @@
         }
 
         return `
-          <div class="sheet-backdrop" id="sheetBackdrop">
-            <div class="bottom-sheet form-sheet">
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
@@ -2940,6 +3105,10 @@
             state.editingMov = found;
             state.editMetodo = found.metodo_pago || found.tipo_ingreso || 'efectivo';
             state.editPersonas = (found.persona || '').split(',').map(s => s.trim()).filter(Boolean);
+            state.editCategoria = (found.categoria && found.categoria !== 'Sin categoría') ? found.categoria : '';
+            state.editCuenta = found.cuenta_bancaria || getDefaultCuentaForMetodo(state.editMetodo);
+            state.formDraft = {};
+            state.sheetNoAnim = false;
             state.confirmDeleteMov = false;
             state.sheet = 'editar_mov';
             render();
@@ -2949,7 +3118,12 @@
 
       document.querySelectorAll('[data-edit-metodo]').forEach(btn => {
         btn.onclick = () => {
+          syncFormDraftFromDom();
           state.editMetodo = btn.getAttribute('data-edit-metodo');
+          if (state.editMetodo !== 'efectivo' && !state.editCuenta) {
+            state.editCuenta = getDefaultCuentaForMetodo(state.editMetodo);
+          }
+          state.sheetNoAnim = true;
           render();
         };
       });
@@ -2957,17 +3131,44 @@
       const selectEditTipoIngreso = document.getElementById('selectEditTipoIngreso');
       if (selectEditTipoIngreso) {
         selectEditTipoIngreso.onchange = (e) => {
+          syncFormDraftFromDom();
           state.editMetodo = e.target.value;
+          if (state.editMetodo !== 'efectivo' && !state.editCuenta) {
+            state.editCuenta = getDefaultCuentaForMetodo(state.editMetodo);
+          }
+          state.sheetNoAnim = true;
           render();
         };
       }
 
       document.querySelectorAll('[data-edit-toggle-persona]').forEach(btn => {
         btn.onclick = () => {
+          syncFormDraftFromDom();
           const p = btn.getAttribute('data-edit-toggle-persona');
           const idx = state.editPersonas.indexOf(p);
           if (idx >= 0) state.editPersonas.splice(idx, 1);
           else state.editPersonas.push(p);
+          delete state.formDraft.edit_persona;
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-edit-select-categoria]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          const catName = btn.getAttribute('data-edit-select-categoria');
+          state.editCategoria = state.editCategoria === catName ? '' : catName;
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-edit-select-cuenta]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.editCuenta = btn.getAttribute('data-edit-select-cuenta');
+          state.sheetNoAnim = true;
           render();
         };
       });
@@ -2978,15 +3179,17 @@
           e.preventDefault();
           const fd = new FormData(formEditarMov);
           const m = state.editingMov;
+          const catTyped = (fd.get('categoria_nombre') || state.editCategoria || '').trim();
           const payload = {
             id: m.id,
             tipo_movimiento: m.tipo_movimiento,
             monto: fd.get('monto'),
             nombre: fd.get('nombre') || '',
             categoria_id: fd.get('categoria_id') || null,
+            categoria_nombre: catTyped,
             metodo_pago: state.editMetodo,
             tipo_ingreso: fd.get('tipo_ingreso') || state.editMetodo,
-            cuenta_bancaria: state.editMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || ''),
+            cuenta_bancaria: state.editMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || state.editCuenta || ''),
             persona: fd.get('persona') !== null ? fd.get('persona') : state.editPersonas.join(', '),
             nota: fd.get('nota') || '',
             concepto: fd.get('concepto') || '',
@@ -3013,7 +3216,9 @@
       if (btnDeleteMov && state.editingMov) {
         btnDeleteMov.onclick = async () => {
           if (!state.confirmDeleteMov) {
+            syncFormDraftFromDom();
             state.confirmDeleteMov = true;
+            state.sheetNoAnim = true;
             render();
             return;
           }
@@ -3036,6 +3241,24 @@
           }
         };
       }
+
+      document.querySelectorAll('[data-toggle-fav-cuenta]').forEach(btn => {
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          const cId = Number(btn.getAttribute('data-toggle-fav-cuenta')) || null;
+          const cNombre = btn.getAttribute('data-cuenta-nombre') || '';
+          const res = await apiFetch('/api/cuentas/favorita/', {
+            method: 'POST',
+            body: { id: cId, nombre: cNombre },
+          });
+          if (res.ok && res.data && res.data.success) {
+            showToast(res.data.es_favorita ? `⭐ ${res.data.nombre} marcada como favorita` : `Se quitó favorita a ${res.data.nombre}`);
+            await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
+          } else {
+            showToast((res.data && res.data.error) || 'No se pudo cambiar favorita');
+          }
+        };
+      });
 
       document.querySelectorAll('[data-account-filter]').forEach(art => {
         art.onclick = () => {
@@ -3097,17 +3320,44 @@
       // Eventos dentro de hoja Gasto
       document.querySelectorAll('[data-gasto-metodo]').forEach(btn => {
         btn.onclick = () => {
+          syncFormDraftFromDom();
           state.gastoMetodo = btn.getAttribute('data-gasto-metodo');
+          if (state.gastoMetodo !== 'efectivo' && !state.gastoCuenta) {
+            state.gastoCuenta = getDefaultCuentaForMetodo(state.gastoMetodo);
+          }
+          state.sheetNoAnim = true;
           render();
         };
       });
 
       document.querySelectorAll('[data-toggle-persona]').forEach(btn => {
         btn.onclick = () => {
+          syncFormDraftFromDom();
           const p = btn.getAttribute('data-toggle-persona');
           const idx = state.gastoPersonas.indexOf(p);
           if (idx >= 0) state.gastoPersonas.splice(idx, 1);
           else state.gastoPersonas.push(p);
+          delete state.formDraft.gasto_persona_extra;
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-select-categoria]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          const catName = btn.getAttribute('data-select-categoria');
+          state.gastoCategoria = state.gastoCategoria === catName ? '' : catName;
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-select-gasto-cuenta]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.gastoCuenta = btn.getAttribute('data-select-gasto-cuenta');
+          state.sheetNoAnim = true;
           render();
         };
       });
@@ -3115,14 +3365,30 @@
       const selectTipoIngreso = document.getElementById('selectTipoIngreso');
       if (selectTipoIngreso) {
         selectTipoIngreso.onchange = (e) => {
+          syncFormDraftFromDom();
           state.ingresoTipo = e.target.value;
+          if (state.ingresoTipo !== 'efectivo' && !state.ingresoCuenta) {
+            state.ingresoCuenta = getDefaultCuentaForMetodo(state.ingresoTipo);
+          }
+          state.sheetNoAnim = true;
           render();
         };
       }
 
+      document.querySelectorAll('[data-select-ingreso-cuenta]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.ingresoCuenta = btn.getAttribute('data-select-ingreso-cuenta');
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
       document.querySelectorAll('[data-trans-modo]').forEach(btn => {
         btn.onclick = () => {
+          syncFormDraftFromDom();
           state.transModo = btn.getAttribute('data-trans-modo');
+          state.sheetNoAnim = true;
           render();
         };
       });
@@ -3133,6 +3399,7 @@
         formGasto.onsubmit = async (e) => {
           e.preventDefault();
           const fd = new FormData(formGasto);
+          const catTyped = (fd.get('categoria_nombre') || state.gastoCategoria || '').trim();
           const res = await apiFetch('/api/gastos/crear/', {
             method: 'POST',
             body: {
@@ -3140,9 +3407,10 @@
               nombre: fd.get('nombre') || '',
               monto: fd.get('monto'),
               categoria_id: fd.get('categoria_id') || null,
+              categoria_nombre: catTyped,
               fecha: fd.get('fecha') || '',
               metodo_pago: state.gastoMetodo,
-              cuenta_bancaria: state.gastoMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || ''),
+              cuenta_bancaria: state.gastoMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || state.gastoCuenta || ''),
               persona: fd.get('persona_extra') || state.gastoPersonas.join(', '),
             }
           });
@@ -3171,7 +3439,7 @@
               monto: fd.get('monto'),
               tipo_ingreso: tipo,
               fecha: fd.get('fecha') || '',
-              cuenta_bancaria: tipo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || ''),
+              cuenta_bancaria: tipo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || state.ingresoCuenta || ''),
             }
           });
           if (res.ok && res.data && res.data.success) {
@@ -3233,6 +3501,7 @@
               nombre: fd.get('nombre'),
               tipo: fd.get('tipo') || 'billetera',
               saldo_inicial: fd.get('saldo_inicial') || 0,
+              es_favorita: Boolean(fd.get('es_favorita')),
               presupuesto_id: state.selectedBudgetId,
             }
           });

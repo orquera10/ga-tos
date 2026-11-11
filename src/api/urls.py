@@ -22,6 +22,7 @@ urlpatterns = [
     path('movimientos/editar/', views.editar_movimiento_api, name='editar_movimiento'),
     path('movimientos/eliminar/', views.eliminar_movimiento_api, name='eliminar_movimiento'),
     path('cuentas/crear/', views.crear_cuenta_api, name='crear_cuenta'),
+    path('cuentas/favorita/', views.toggle_cuenta_favorita_api, name='toggle_cuenta_favorita'),
     path('cuentas/<int:pk>/eliminar/', views.eliminar_cuenta_api, name='eliminar_cuenta'),
 
     # Acciones específicas para presupuestos tipo Préstamo
