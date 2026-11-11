@@ -1388,7 +1388,18 @@ def crear_gasto_api(request):
             'error': 'Presupuesto no encontrado o no tienes permiso para cargar gastos en él'
         }, status=404)
 
-    es_rapido = bool(data.get('es_rapido', False))
+    raw_es_rapido = data.get('es_rapido')
+    es_rapido = bool(
+        raw_es_rapido in (True, 'true', 'True', 1, '1')
+        or not nombre
+        or (
+            'fecha' not in data
+            and 'categoria_nombre' not in data
+            and not data.get('categoria_id')
+            and not data.get('persona')
+            and not data.get('cuenta_bancaria')
+        )
+    )
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         es_rapido = True
@@ -1532,7 +1543,12 @@ def crear_ingreso_api(request):
     if not presupuesto:
         return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
 
-    es_rapido = bool(data.get('es_rapido', False))
+    raw_es_rapido = data.get('es_rapido')
+    es_rapido = bool(
+        raw_es_rapido in (True, 'true', 'True', 1, '1')
+        or not nombre
+        or ('fecha' not in data and not data.get('cuenta_bancaria'))
+    )
     # Si no se especificó nombre, asignar nombre automático secuencial
     if not nombre:
         es_rapido = True

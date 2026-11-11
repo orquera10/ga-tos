@@ -476,24 +476,121 @@
       background: rgba(255, 255, 255, 0.03);
     }
     .transaction.rapido-row {
-      background: rgba(240, 189, 98, 0.07);
-      margin: 0 -10px;
-      padding: 0 10px;
+      background: linear-gradient(90deg, rgba(240, 189, 98, 0.16), rgba(240, 189, 98, 0.05));
+      margin: 4px -10px;
+      padding: 6px 10px;
       border-radius: 13px;
+      border-left: 3.5px solid #f0bd62;
+      box-shadow: inset 0 0 0 1px rgba(240, 189, 98, 0.25);
+    }
+    .tx-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .tx-title-row strong {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .badge-rapido {
+      flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       gap: 3px;
-      margin-left: 6px;
-      padding: 2px 7px;
-      border-radius: 10px;
-      background: rgba(240, 189, 98, 0.2);
-      border: 1px solid rgba(240, 189, 98, 0.45);
-      color: #f0bd62;
+      padding: 2px 8px;
+      border-radius: 9px;
+      background: rgba(240, 189, 98, 0.25);
+      border: 1px solid rgba(240, 189, 98, 0.65);
+      color: #ffd479;
       font-size: 9px;
-      font-weight: 700;
-      vertical-align: middle;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      box-shadow: 0 2px 8px rgba(240, 189, 98, 0.22);
+    }
+    .cat-combo {
+      position: relative;
+      width: 100%;
+    }
+    .cat-combo-box {
+      display: flex;
+      align-items: center;
+      border: 1px solid #30333f;
+      border-radius: 11px;
+      background: #1c1f29;
+      overflow: hidden;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .cat-combo-box:focus-within {
+      border-color: #7769ef;
+      box-shadow: 0 0 0 3px rgba(103, 88, 232, 0.18);
+    }
+    .cat-combo-box input {
+      flex: 1;
+      min-width: 0;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      height: 44px;
+      padding: 0 12px;
+      color: #f4f3fa;
+      font-size: 12px;
+    }
+    .cat-combo-toggle {
+      width: 40px;
+      height: 44px;
+      border: 0;
+      border-left: 1px solid #2b2e3b;
+      background: #232634;
+      color: #b8b9c9;
+      font-size: 13px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .cat-combo-menu {
+      display: none;
+      margin-top: 6px;
+      max-height: 195px;
+      overflow-y: auto;
+      border: 1px solid #34384a;
+      border-radius: 12px;
+      background: #181b26;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+      padding: 5px;
+    }
+    .cat-combo-menu.open {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .cat-combo-opt {
+      width: 100%;
+      padding: 9px 11px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #d7d8e5;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cat-combo-opt:active,
+    .cat-combo-opt.active {
+      background: rgba(102, 87, 232, 0.24);
+      color: #fff;
+    }
+    .cat-combo-opt.cat-combo-create {
+      border-top: 1px dashed #2e3244;
+      margin-top: 3px;
+      color: #55d2ad;
     }
     .rapido-banner {
       margin: 12px 0 4px;
@@ -1638,6 +1735,47 @@
       return `conic-gradient(${stops.join(', ')})`;
     }
 
+    function renderCategoryComboHtml(categorias, currentValue, inputId) {
+      const val = (currentValue || '').trim();
+      const valLow = val.toLowerCase();
+      return `
+        <div class="cat-combo" id="${inputId}Wrap">
+          <div class="cat-combo-box">
+            <input
+              name="categoria_nombre"
+              id="${inputId}"
+              class="cat-combo-input"
+              data-combo-id="${inputId}"
+              value="${escapeHtml(val)}"
+              placeholder="Elegí del desplegable o escribí una nueva..."
+              autocomplete="off"
+            />
+            <button type="button" class="cat-combo-toggle" data-toggle-cat-menu="${inputId}" title="Ver categorías">
+              ▾
+            </button>
+          </div>
+          <div class="cat-combo-menu" id="${inputId}Menu">
+            <button type="button" class="cat-combo-opt ${!val ? 'active' : ''}" data-pick-cat="" data-target-input="${inputId}" data-cat-search="">
+              <span>Sin categoría</span>
+              ${!val ? '<span>✓</span>' : ''}
+            </button>
+            ${categorias.map(c => {
+              const isSel = valLow === c.nombre.toLowerCase();
+              return `
+                <button type="button" class="cat-combo-opt ${isSel ? 'active' : ''}" data-pick-cat="${escapeHtml(c.nombre)}" data-target-input="${inputId}" data-cat-search="${escapeHtml(c.nombre.toLowerCase())}">
+                  <span>🏷️ ${escapeHtml(c.nombre)}</span>
+                  ${isSel ? '<span>✓</span>' : ''}
+                </button>
+              `;
+            }).join('')}
+            <button type="button" class="cat-combo-opt cat-combo-create" id="${inputId}CreateOpt" data-pick-cat="${escapeHtml(val)}" data-target-input="${inputId}" style="display:none;">
+              <span>➕ Crear nueva categoría: <strong id="${inputId}CreateText"></strong></span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     function renderSingleTransactionArticle(item) {
       const isCardExpense = item.tipo_movimiento === 'gasto' && item.metodo_pago === 'tarjeta';
       const isPos = item.amount > 0 && !item.is_transfer;
@@ -1649,8 +1787,12 @@
           ${iconSvg(item.icon, 20)}
         </span>
         <div>
-          <strong>${escapeHtml(cleanTitle)}${item.es_rapido ? `<span class="badge-rapido">⚡ Completar</span>` : ''}${isCardExpense ? `<span class="badge-tarjeta-info">💳 Tarjeta</span>` : ''}</strong>
-          <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Toca para editar' : ''}</small>
+          <div class="tx-title-row">
+            <strong>${escapeHtml(cleanTitle)}</strong>
+            ${item.es_rapido ? `<span class="badge-rapido">⚡ Modificar</span>` : ''}
+            ${isCardExpense ? `<span class="badge-tarjeta-info">💳 Tarjeta</span>` : ''}
+          </div>
+          <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Cargado rápido (tocá para completar)' : ''}</small>
         </div>
         <div style="text-align:right;">
           <b class="${cls}">${sign}${money(Math.abs(item.amount))}</b>
@@ -2480,16 +2622,8 @@
                   <input name="nombre" value="${escapeHtml(draft.nombre || '')}" placeholder="Ej. Supermercado (vacío = ⚡ Gasto rápido)" />
                 </label>
                 <label>
-                  Categoría / Tipo de gasto (tocá una o escribí una nueva)
-                  <div class="chips-selector">
-                    ${categorias.map(c => `
-                      <button type="button" class="chip-btn ${(state.gastoCategoria || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-categoria="${escapeHtml(c.nombre)}">🏷️ ${escapeHtml(c.nombre)}</button>
-                    `).join('')}
-                  </div>
-                  <input name="categoria_nombre" id="inpGastoCategoria" list="categoriasDatalist" value="${escapeHtml(state.gastoCategoria || '')}" placeholder="Elegí arriba o escribí una categoría nueva..." autocomplete="off" />
-                  <datalist id="categoriasDatalist">
-                    ${categorias.map(c => `<option value="${escapeHtml(c.nombre)}"></option>`).join('')}
-                  </datalist>
+                  Categoría / Tipo de gasto
+                  ${renderCategoryComboHtml(categorias, state.gastoCategoria || '', 'inpGastoCategoria')}
                 </label>
                 <label>
                   Medio de pago
@@ -2966,16 +3100,8 @@
               <input name="nombre" required value="${escapeHtml(cleanName)}" placeholder="Nombre del gasto" />
             </label>
             <label>
-              Categoría / Tipo de gasto (tocá una o escribí una nueva)
-              <div class="chips-selector">
-                ${categorias.map(c => `
-                  <button type="button" class="chip-btn ${(curCat || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-categoria="${escapeHtml(c.nombre)}">🏷️ ${escapeHtml(c.nombre)}</button>
-                `).join('')}
-              </div>
-              <input name="categoria_nombre" list="categoriasDatalistEdit" value="${escapeHtml(curCat)}" placeholder="Elegí arriba o escribí una categoría nueva..." autocomplete="off" />
-              <datalist id="categoriasDatalistEdit">
-                ${categorias.map(c => `<option value="${escapeHtml(c.nombre)}"></option>`).join('')}
-              </datalist>
+              Categoría / Tipo de gasto
+              ${renderCategoryComboHtml(categorias, curCat, 'inpEditCategoria')}
             </label>
             <label>
               Medio de pago
@@ -3568,13 +3694,85 @@
         };
       });
 
-      document.querySelectorAll('[data-select-categoria]').forEach(btn => {
-        btn.onclick = () => {
-          syncFormDraftFromDom();
-          const catName = btn.getAttribute('data-select-categoria');
-          state.gastoCategoria = state.gastoCategoria === catName ? '' : catName;
-          state.sheetNoAnim = true;
-          render();
+      // Desplegable editable de Categorías (en Nuevo Gasto y Editar Movimiento)
+      const updateCatMenuFilter = (comboId, filterText) => {
+        const menu = document.getElementById(`${comboId}Menu`);
+        if (!menu) return;
+        const q = (filterText || '').trim().toLowerCase();
+        let exactMatch = false;
+        menu.querySelectorAll('.cat-combo-opt:not(.cat-combo-create)').forEach(opt => {
+          const s = (opt.getAttribute('data-cat-search') || '').toLowerCase();
+          if (!q || !s || s.includes(q)) {
+            opt.style.display = 'flex';
+          } else {
+            opt.style.display = 'none';
+          }
+          if (q && s === q) exactMatch = true;
+        });
+        const createOpt = document.getElementById(`${comboId}CreateOpt`);
+        const createTxt = document.getElementById(`${comboId}CreateText`);
+        if (createOpt && createTxt) {
+          if (q && !exactMatch) {
+            createOpt.style.display = 'flex';
+            createOpt.setAttribute('data-pick-cat', filterText.trim());
+            createTxt.textContent = `"${filterText.trim()}"`;
+          } else {
+            createOpt.style.display = 'none';
+          }
+        }
+      };
+
+      document.querySelectorAll('[data-toggle-cat-menu]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const comboId = btn.getAttribute('data-toggle-cat-menu');
+          const menu = document.getElementById(`${comboId}Menu`);
+          if (menu) {
+            const isOpen = menu.classList.toggle('open');
+            if (isOpen) {
+              updateCatMenuFilter(comboId, '');
+            }
+          }
+        };
+      });
+
+      document.querySelectorAll('.cat-combo-input').forEach(inp => {
+        const comboId = inp.getAttribute('data-combo-id');
+        inp.onfocus = () => {
+          const menu = document.getElementById(`${comboId}Menu`);
+          if (menu) {
+            menu.classList.add('open');
+            updateCatMenuFilter(comboId, '');
+          }
+        };
+        inp.oninput = (e) => {
+          const val = e.target.value;
+          if (comboId === 'inpGastoCategoria') state.gastoCategoria = val;
+          else if (comboId === 'inpEditCategoria') state.editCategoria = val;
+          const menu = document.getElementById(`${comboId}Menu`);
+          if (menu) menu.classList.add('open');
+          updateCatMenuFilter(comboId, val);
+        };
+      });
+
+      document.querySelectorAll('[data-pick-cat]').forEach(opt => {
+        opt.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const picked = opt.getAttribute('data-pick-cat') || '';
+          const targetId = opt.getAttribute('data-target-input');
+          const inp = document.getElementById(targetId);
+          if (inp) inp.value = picked;
+          if (targetId === 'inpGastoCategoria') state.gastoCategoria = picked;
+          else if (targetId === 'inpEditCategoria') state.editCategoria = picked;
+          const menu = document.getElementById(`${targetId}Menu`);
+          if (menu) {
+            menu.querySelectorAll('.cat-combo-opt').forEach(o => {
+              o.classList.toggle('active', (o.getAttribute('data-pick-cat') || '') === picked);
+            });
+            menu.classList.remove('open');
+          }
         };
       });
 
