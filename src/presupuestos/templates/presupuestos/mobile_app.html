@@ -2647,7 +2647,7 @@
           </button>
 
           <div class="subheading-row" style="margin-top:26px;">
-            <h3 class="subheading">💳 Tarjetas de Crédito</h3>
+            <h3 class="subheading">💳 Tarjetas de Crédito ${d.mes_info && d.mes_info.mes_seleccionado !== 'todos' ? `<small style="color:#a99fff;font-weight:600;font-size:10px;">· ${escapeHtml(d.mes_info.mes_label)}</small>` : ''}</h3>
             ${cData.total_tarjeta > 0 ? `<span style="font-size:11px;font-weight:700;color:#f0bd62;">Mes: −${money(cData.total_tarjeta)}</span>` : ''}
           </div>
           <div class="account-list">
@@ -2655,7 +2655,10 @@
               const fechasParts = [];
               if (acc.fecha_cierre_str) fechasParts.push(`📅 Cierre: ${acc.fecha_cierre_str}`);
               if (acc.fecha_vencimiento_str) fechasParts.push(`⏳ Vence: ${acc.fecha_vencimiento_str}`);
-              const fechasInfo = fechasParts.length ? fechasParts.join(' · ') : (acc.is_system ? 'Consumos acumulados con tarjeta' : 'Sin fechas configuradas · Tocá ✎ para agregar cierre/venc.');
+              const mesLbl = (d.mes_info && d.mes_info.mes_seleccionado !== 'todos') ? d.mes_info.mes_label : 'este mes';
+              const fechasInfo = fechasParts.length
+                ? fechasParts.join(' · ')
+                : (acc.is_system ? 'Consumos acumulados con tarjeta' : `⚠️ Configurar cierre y venc. de ${mesLbl} (tocá ✎)`);
               const resT = acc.resumen_tarjeta;
               const antNote = (resT && resT.total_mes_anterior > 0) ? ` · ${resT.mes_anterior_label}: −${money(resT.total_mes_anterior)}` : '';
               return `
@@ -2665,7 +2668,7 @@
                   </span>
                   <div>
                     <strong>${escapeHtml(acc.name)}</strong>
-                    <small style="color:${acc.fecha_cierre_str || acc.fecha_vencimiento_str ? '#d9d2ff' : 'var(--muted)'};">${escapeHtml(fechasInfo)}${escapeHtml(antNote)}</small>
+                    <small style="color:${fechasParts.length ? '#d9d2ff' : '#f0bd62'};">${escapeHtml(fechasInfo)}${escapeHtml(antNote)}</small>
                   </div>
                   <b class="${acc.balance < 0 ? 'negative' : ''}" style="color:#f0bd62;">
                     ${acc.balance < 0 ? '−' : ''}${money(Math.abs(acc.balance))}
@@ -2674,7 +2677,7 @@
                     <button type="button" class="btn-card-resumen" data-open-resumen-tarjeta="${escapeHtml(acc.name)}" title="Ver resumen y pagar tarjeta">
                       📄 Resumen / Pagar
                     </button>
-                    <button type="button" class="fav-star-btn" data-edit-cuenta-card="${acc.id}" title="Editar cierre y vencimiento de tarjeta" style="color:#a99fff;font-size:13px;">
+                    <button type="button" class="fav-star-btn" data-edit-cuenta-card="${acc.id}" title="Configurar cierre y vencimiento de tarjeta en ${escapeHtml(mesLbl)}" style="color:#a99fff;font-size:13px;">
                       ✎
                     </button>
                   ` : iconSvg('chevron', 18)}
@@ -2893,6 +2896,18 @@
                       `).join('')}
                     </div>
                   </label>
+                  ${cardObj ? `
+                    <div style="padding:8px 11px;border-radius:11px;background:#1a1d2a;border:1px solid #2b2f42;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10.5px;">
+                      <span style="color:${cardObj.fecha_cierre_str || cardObj.fecha_vencimiento_str ? '#d9d2ff' : '#f0bd62'};">
+                        ${cardObj.fecha_cierre_str || cardObj.fecha_vencimiento_str
+                          ? `📅 Cierre: ${escapeHtml(cardObj.fecha_cierre_str || '-')} · ⏳ Vence: ${escapeHtml(cardObj.fecha_vencimiento_str || '-')}`
+                          : `⚠️ Sin cierre/vencimiento configurado en este mes`}
+                      </span>
+                      <button type="button" class="btn-card-resumen" data-edit-cuenta-card="${cardObj.id}" style="padding:4px 8px;">
+                        ✎ Fechas del mes
+                      </button>
+                    </div>
+                  ` : ''}
                   <label>
                     Período de consumos a consultar / pagar
                     <div class="chips-selector">
@@ -3255,15 +3270,17 @@
         const edC = state.editingCuentaObj;
         const curTipo = state.cuentaTipo || (edC ? edC.tipo : 'billetera');
         const curNombre = draft.cuenta_nombre !== '' ? draft.cuenta_nombre : (edC ? edC.name || edC.nombre : '');
-        const curCierre = draft.fecha_cierre !== '' ? draft.fecha_cierre : (edC ? edC.fecha_cierre || '' : '');
-        const curVenc = draft.fecha_vencimiento !== '' ? draft.fecha_vencimiento : (edC ? edC.fecha_vencimiento || '' : '');
+        const curCierre = draft.fecha_cierre !== '' ? draft.fecha_cierre : (edC ? (edC.fecha_cierre || edC.sugerencia_cierre || '') : '');
+        const curVenc = draft.fecha_vencimiento !== '' ? draft.fecha_vencimiento : (edC ? (edC.fecha_vencimiento || edC.sugerencia_vencimiento || '') : '');
+        const mesActivoLabel = (d && d.mes_info && d.mes_info.mes_seleccionado !== 'todos') ? d.mes_info.mes_label : 'este mes';
+        const usandoSugerencia = Boolean(edC && !edC.fechas_configuradas_mes && (edC.sugerencia_cierre || edC.sugerencia_vencimiento));
         return `
           <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
             <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
-                  <span class="overline">MIS CUENTAS Y TARJETAS</span>
+                  <span class="overline">${curTipo === 'tarjeta' ? 'FECHAS DE TARJETA · ' + escapeHtml(mesActivoLabel.toUpperCase()) : 'MIS CUENTAS Y TARJETAS'}</span>
                   <h2>${edC ? 'Editar ' + escapeHtml(edC.name || edC.nombre) : (curTipo === 'tarjeta' ? 'Agregar tarjeta de crédito' : 'Agregar billetera o banco')}</h2>
                 </div>
                 <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
@@ -3290,20 +3307,29 @@
                 ${curTipo === 'tarjeta' ? `
                   <div class="form-row">
                     <label>
-                      Fecha de cierre
+                      Cierre en ${escapeHtml(mesActivoLabel)}
                       <div class="date-field">
                         ${iconSvg('calendar', 17)}
                         <input type="date" name="fecha_cierre" value="${escapeHtml(curCierre)}" />
                       </div>
                     </label>
                     <label>
-                      Fecha de vencimiento
+                      Vencimiento (${escapeHtml(mesActivoLabel)})
                       <div class="date-field">
                         ${iconSvg('calendar', 17)}
                         <input type="date" name="fecha_vencimiento" value="${escapeHtml(curVenc)}" />
                       </div>
                     </label>
                   </div>
+                  ${usandoSugerencia ? `
+                    <small style="color:#f0bd62;font-size:10px;">
+                      💡 Te sugerimos estas fechas para ${escapeHtml(mesActivoLabel)} según el mes anterior; ajustá el día exacto y tocá Guardar.
+                    </small>
+                  ` : `
+                    <small style="color:#9899a8;font-size:10px;">
+                      🗓️ Estas fechas quedan guardadas específicamente para ${escapeHtml(mesActivoLabel)}.
+                    </small>
+                  `}
                 ` : `
                   ${!edC ? `
                     <label>
@@ -3963,8 +3989,8 @@
               cuenta_nombre: found.name || found.nombre || '',
               cuenta_saldo_inicial: '',
               cuenta_es_favorita: Boolean(found.es_favorita),
-              fecha_cierre: found.fecha_cierre || '',
-              fecha_vencimiento: found.fecha_vencimiento || '',
+              fecha_cierre: found.fecha_cierre || found.sugerencia_cierre || '',
+              fecha_vencimiento: found.fecha_vencimiento || found.sugerencia_vencimiento || '',
             };
             state.sheetNoAnim = false;
             state.sheet = 'cuenta';
@@ -4635,6 +4661,9 @@
           e.preventDefault();
           const fd = new FormData(formCuenta);
           const tipo = fd.get('tipo') || state.cuentaTipo || 'billetera';
+          const mesSel = (state.data && state.data.mes_info && state.data.mes_info.mes_seleccionado !== 'todos')
+            ? state.data.mes_info.mes_seleccionado
+            : '';
           const res = await apiFetch('/api/cuentas/crear/', {
             method: 'POST',
             body: {
@@ -4645,13 +4674,14 @@
               es_favorita: Boolean(fd.get('es_favorita')),
               fecha_cierre: fd.get('fecha_cierre') || '',
               fecha_vencimiento: fd.get('fecha_vencimiento') || '',
+              mes: mesSel,
               presupuesto_id: state.selectedBudgetId,
             }
           });
           if (res.ok && res.data && res.data.success) {
             state.sheet = null;
             state.editingCuentaObj = null;
-            showToast(tipo === 'tarjeta' ? '✓ Tarjeta guardada' : '✓ Cuenta guardada');
+            showToast(tipo === 'tarjeta' ? '✓ Fechas de tarjeta guardadas' : '✓ Cuenta guardada');
             await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
           } else {
             showToast((res.data && res.data.error) || 'Error al guardar cuenta');

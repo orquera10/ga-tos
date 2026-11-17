@@ -245,6 +245,7 @@ class CuentaBancaria(models.Model):
     es_favorita = models.BooleanField(default=False)
     fecha_cierre = models.DateField(null=True, blank=True, verbose_name='Fecha de cierre (tarjeta)')
     fecha_vencimiento = models.DateField(null=True, blank=True, verbose_name='Fecha de vencimiento (tarjeta)')
+    fechas_por_mes = models.JSONField(default=dict, blank=True, verbose_name='Fechas de cierre y vencimiento por mes')
     fecha_creacion = models.DateTimeField(default=timezone.now)
 
     class Meta:

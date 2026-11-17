@@ -607,6 +607,40 @@ class ApiEndpointsTestCase(TestCase):
         self.assertIsNotNone(visa_dic)
         self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_anterior'], 20000.0)
         self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_actual'], 20000.0)
+        # En diciembre aún no se habían configurado las fechas de diciembre -> fechas_configuradas_mes es False pero sugiere fecha
+        self.assertFalse(visa_dic['fechas_configuradas_mes'])
+        self.assertEqual(visa_dic['sugerencia_cierre'], '2026-12-24')
+
+        # Configurar un cierre distinto para Diciembre 2026 (ej. cierra el 22/12 y vence el 06/01)
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Visa Patagonia',
+                'tipo': 'tarjeta',
+                'mes': '2026-12',
+                'fecha_cierre': '2026-12-22',
+                'fecha_vencimiento': '2027-01-06',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        det_dic2 = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
+            **self.auth_headers
+        ).json()
+        visa_dic2 = next((c for c in det_dic2['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        self.assertTrue(visa_dic2['fechas_configuradas_mes'])
+        self.assertEqual(visa_dic2['fecha_cierre_str'], '22/12')
+        self.assertEqual(visa_dic2['fecha_vencimiento_str'], '06/01')
+
+        # Y en Noviembre 2026 sigue conservando su cierre 24/11 y vencimiento 05/12
+        det_nov2 = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-11',
+            **self.auth_headers
+        ).json()
+        visa_nov2 = next((c for c in det_nov2['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        self.assertEqual(visa_nov2['fecha_cierre_str'], '24/11')
+        self.assertEqual(visa_nov2['fecha_vencimiento_str'], '05/12')
 
         # 4. Pagar en Diciembre 2026 el resumen de Noviembre ($20.000 + $3.500 de impuestos = $23.500)
         resp_pago = self.client.post(

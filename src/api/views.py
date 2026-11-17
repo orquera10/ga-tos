@@ -197,15 +197,74 @@ def parse_fecha_hora_input(fecha_raw):
     return None
 
 
-def serialize_cuenta_fechas(c_obj):
-    """Devuelve fechas de cierre y vencimiento formateadas para tarjetas."""
-    fc = getattr(c_obj, 'fecha_cierre', None) if c_obj else None
-    fv = getattr(c_obj, 'fecha_vencimiento', None) if c_obj else None
+def serialize_cuenta_fechas(c_obj, mes_ym=None):
+    """Devuelve fechas de cierre y vencimiento formateadas para tarjetas (por mes seleccionado si aplica)."""
+    if not c_obj:
+        return {
+            'fecha_cierre': '',
+            'fecha_vencimiento': '',
+            'fecha_cierre_str': '',
+            'fecha_vencimiento_str': '',
+            'fechas_configuradas_mes': False,
+            'sugerencia_cierre': '',
+            'sugerencia_vencimiento': '',
+        }
+
+    fechas_map = getattr(c_obj, 'fechas_por_mes', None) or {}
+    base_fc = getattr(c_obj, 'fecha_cierre', None)
+    base_fv = getattr(c_obj, 'fecha_vencimiento', None)
+
+    fc = None
+    fv = None
+    configurado_mes = False
+
+    if mes_ym and re.match(r'^\d{4}-\d{2}$', str(mes_ym)):
+        if mes_ym in fechas_map and isinstance(fechas_map[mes_ym], dict):
+            fc_s = (fechas_map[mes_ym].get('fecha_cierre') or '').strip()
+            fv_s = (fechas_map[mes_ym].get('fecha_vencimiento') or '').strip()
+            fc = parse_date(fc_s) if fc_s else None
+            fv = parse_date(fv_s) if fv_s else None
+            configurado_mes = bool(fc or fv)
+        elif base_fc and base_fc.strftime('%Y-%m') == mes_ym:
+            fc = base_fc
+            fv = base_fv
+            configurado_mes = True
+    else:
+        fc = base_fc
+        fv = base_fv
+        configurado_mes = bool(fc or fv)
+
+    # Calcular sugerencia para el mes seleccionado en base al último cierre/vencimiento conocido
+    sug_fc = ''
+    sug_fv = ''
+    target_ym = mes_ym if (mes_ym and re.match(r'^\d{4}-\d{2}$', str(mes_ym))) else timezone.localdate().strftime('%Y-%m')
+    try:
+        ty, tm = [int(x) for x in target_ym.split('-')[:2]]
+        ref_fc = fc or base_fc
+        ref_fv = fv or base_fv
+        if ref_fc:
+            last_d = calendar.monthrange(ty, tm)[1]
+            sug_fc = date(ty, tm, min(ref_fc.day, last_d)).strftime('%Y-%m-%d')
+        if ref_fv:
+            # Si el vencimiento suele caer en los primeros días del mes siguiente al cierre:
+            if ref_fc and ref_fv.day < ref_fc.day:
+                vy_str, vm_str = shift_ym(target_ym, 1).split('-')[:2]
+                vy, vm = int(vy_str), int(vm_str)
+            else:
+                vy, vm = ty, tm
+            last_vd = calendar.monthrange(vy, vm)[1]
+            sug_fv = date(vy, vm, min(ref_fv.day, last_vd)).strftime('%Y-%m-%d')
+    except Exception:
+        pass
+
     return {
         'fecha_cierre': fc.strftime('%Y-%m-%d') if fc else '',
         'fecha_vencimiento': fv.strftime('%Y-%m-%d') if fv else '',
         'fecha_cierre_str': fc.strftime('%d/%m') if fc else '',
         'fecha_vencimiento_str': fv.strftime('%d/%m') if fv else '',
+        'fechas_configuradas_mes': configurado_mes,
+        'sugerencia_cierre': sug_fc,
+        'sugerencia_vencimiento': sug_fv,
     }
 
 
@@ -897,6 +956,7 @@ def presupuesto_detalle_api(request, pk=None):
             icon_cls = 'mp'
 
         is_fav = bool(c_obj.es_favorita) if c_obj else False
+        fechas_mes_target = mes_seleccionado if (presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos') else None
         cuentas_items.append({
             'id': c_obj.id if c_obj else 0,
             'name': st['nombre'],
@@ -918,7 +978,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': icon_name,
             'icon_class': icon_cls,
             'is_system': False,
-            **serialize_cuenta_fechas(c_obj),
+            **serialize_cuenta_fechas(c_obj, mes_ym=fechas_mes_target),
         })
 
     # Ordenar cuentas:
@@ -952,6 +1012,9 @@ def presupuesto_detalle_api(request, pk=None):
             'fecha_vencimiento': item.get('fecha_vencimiento', ''),
             'fecha_cierre_str': item.get('fecha_cierre_str', ''),
             'fecha_vencimiento_str': item.get('fecha_vencimiento_str', ''),
+            'fechas_configuradas_mes': item.get('fechas_configuradas_mes', False),
+            'sugerencia_cierre': item.get('sugerencia_cierre', ''),
+            'sugerencia_vencimiento': item.get('sugerencia_vencimiento', ''),
         }
         for item in cuentas_items
     ]
@@ -1327,6 +1390,12 @@ def crear_cuenta_api(request):
     fv_raw = (data.get('fecha_vencimiento') or '').strip()
     fecha_cierre_val = parse_date(fc_raw) if fc_raw else None
     fecha_vencimiento_val = parse_date(fv_raw) if fv_raw else None
+    mes_ym = (data.get('mes') or '').strip()
+    if not re.match(r'^\d{4}-\d{2}$', mes_ym):
+        if fecha_cierre_val:
+            mes_ym = fecha_cierre_val.strftime('%Y-%m')
+        else:
+            mes_ym = timezone.localdate().strftime('%Y-%m')
 
     cuenta_id = data.get('id') or data.get('cuenta_id')
     cuenta = None
@@ -1346,6 +1415,14 @@ def crear_cuenta_api(request):
                 cuenta.fecha_cierre = fecha_cierre_val
             if 'fecha_vencimiento' in data:
                 cuenta.fecha_vencimiento = fecha_vencimiento_val
+            if 'fecha_cierre' in data or 'fecha_vencimiento' in data:
+                f_map = dict(cuenta.fechas_por_mes or {})
+                prev_entry = f_map.get(mes_ym) if isinstance(f_map.get(mes_ym), dict) else {}
+                f_map[mes_ym] = {
+                    'fecha_cierre': fecha_cierre_val.strftime('%Y-%m-%d') if fecha_cierre_val else ('' if 'fecha_cierre' in data else prev_entry.get('fecha_cierre', '')),
+                    'fecha_vencimiento': fecha_vencimiento_val.strftime('%Y-%m-%d') if fecha_vencimiento_val else ('' if 'fecha_vencimiento' in data else prev_entry.get('fecha_vencimiento', '')),
+                }
+                cuenta.fechas_por_mes = f_map
         else:
             cuenta.fecha_cierre = None
             cuenta.fecha_vencimiento = None
@@ -1353,6 +1430,12 @@ def crear_cuenta_api(request):
     else:
         # Si es la primera billetera del usuario, marcarla como favorita por defecto
         has_any = CuentaBancaria.objects.filter(usuario=request.api_user).exclude(tipo='tarjeta').exists()
+        init_fechas_map = {}
+        if tipo == 'tarjeta' and (fecha_cierre_val or fecha_vencimiento_val):
+            init_fechas_map[mes_ym] = {
+                'fecha_cierre': fecha_cierre_val.strftime('%Y-%m-%d') if fecha_cierre_val else '',
+                'fecha_vencimiento': fecha_vencimiento_val.strftime('%Y-%m-%d') if fecha_vencimiento_val else '',
+            }
         cuenta = CuentaBancaria.objects.create(
             usuario=request.api_user,
             nombre=nombre_clean,
@@ -1360,6 +1443,7 @@ def crear_cuenta_api(request):
             es_favorita=es_fav or (not has_any and tipo != 'tarjeta'),
             fecha_cierre=fecha_cierre_val if tipo == 'tarjeta' else None,
             fecha_vencimiento=fecha_vencimiento_val if tipo == 'tarjeta' else None,
+            fechas_por_mes=init_fechas_map,
         )
         created = True
 
@@ -1393,7 +1477,7 @@ def crear_cuenta_api(request):
             'tipo': cuenta.tipo,
             'es_favorita': bool(cuenta.es_favorita),
             'subtitle': cuenta.subtitulo_display,
-            **serialize_cuenta_fechas(cuenta),
+            **serialize_cuenta_fechas(cuenta, mes_ym=mes_ym),
         }
     }, status=201 if created else 200)
 
