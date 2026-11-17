@@ -174,6 +174,38 @@ def resolve_or_create_categoria(categoria_id, categoria_nombre):
     return None
 
 
+def parse_fecha_hora_input(fecha_raw):
+    """Convierte un string YYYY-MM-DDTHH:MM o YYYY-MM-DD en datetime aware local."""
+    s = (fecha_raw or '').strip()
+    if not s:
+        return None
+    parsed_dt = parse_datetime(s)
+    if parsed_dt:
+        if timezone.is_naive(parsed_dt):
+            return timezone.make_aware(parsed_dt, timezone.get_current_timezone())
+        return timezone.localtime(parsed_dt)
+    parsed_d = parse_date(s)
+    if parsed_d:
+        now_local = timezone.localtime(timezone.now())
+        return timezone.make_aware(
+            datetime.combine(parsed_d, now_local.time()),
+            timezone.get_current_timezone()
+        )
+    return None
+
+
+def serialize_cuenta_fechas(c_obj):
+    """Devuelve fechas de cierre y vencimiento formateadas para tarjetas."""
+    fc = getattr(c_obj, 'fecha_cierre', None) if c_obj else None
+    fv = getattr(c_obj, 'fecha_vencimiento', None) if c_obj else None
+    return {
+        'fecha_cierre': fc.strftime('%Y-%m-%d') if fc else '',
+        'fecha_vencimiento': fv.strftime('%Y-%m-%d') if fv else '',
+        'fecha_cierre_str': fc.strftime('%d/%m') if fc else '',
+        'fecha_vencimiento_str': fv.strftime('%d/%m') if fv else '',
+    }
+
+
 def get_user_initials(user):
     first = (user.first_name or '').strip()
     last = (user.last_name or '').strip()
@@ -420,6 +452,7 @@ def presupuesto_detalle_api(request, pk=None):
                         'icon': 'card' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'wallet'),
                         'icon_class': 'macro' if c.tipo == 'tarjeta' else ('cash' if c.tipo == 'efectivo' else 'mp'),
                         'is_system': False,
+                        **serialize_cuenta_fechas(c),
                     }
                     for c in user_cuentas
                 ],
@@ -434,6 +467,7 @@ def presupuesto_detalle_api(request, pk=None):
                     'subtitle': c.subtitulo_display,
                     'es_favorita': bool(c.es_favorita),
                     'balance': 0.0,
+                    **serialize_cuenta_fechas(c),
                 }
                 for c in user_cuentas
             ],
@@ -492,6 +526,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': icon,
             'tone': tone,
             'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+            'fecha_hora_iso': dt_local.strftime('%Y-%m-%dT%H:%M'),
         })
 
     for i in ingresos:
@@ -524,6 +559,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': 'cash' if i.tipo_ingreso == 'efectivo' else 'swap',
             'tone': 'green',
             'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+            'fecha_hora_iso': dt_local.strftime('%Y-%m-%dT%H:%M'),
         })
 
     for t in transferencias:
@@ -556,6 +592,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': 'swap',
             'tone': 'blue',
             'fecha_iso': dt_local.strftime('%Y-%m-%d'),
+            'fecha_hora_iso': dt_local.strftime('%Y-%m-%dT%H:%M'),
         })
 
     raw_movs.sort(key=lambda x: x['_sort_dt'], reverse=True)
@@ -724,6 +761,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': icon_name,
             'icon_class': icon_cls,
             'is_system': False,
+            **serialize_cuenta_fechas(c_obj),
         })
 
     # Ordenar cuentas:
@@ -753,6 +791,10 @@ def presupuesto_detalle_api(request, pk=None):
             'subtitle': item['subtitle'],
             'es_favorita': item['es_favorita'],
             'balance': item['balance'],
+            'fecha_cierre': item.get('fecha_cierre', ''),
+            'fecha_vencimiento': item.get('fecha_vencimiento', ''),
+            'fecha_cierre_str': item.get('fecha_cierre_str', ''),
+            'fecha_vencimiento_str': item.get('fecha_vencimiento_str', ''),
         }
         for item in cuentas_items
     ]
@@ -1100,22 +1142,43 @@ def crear_cuenta_api(request):
     if es_fav:
         CuentaBancaria.objects.filter(usuario=request.api_user, es_favorita=True).update(es_favorita=False)
 
-    cuenta = CuentaBancaria.objects.filter(usuario=request.api_user, nombre__iexact=nombre_clean).first()
+    fc_raw = (data.get('fecha_cierre') or '').strip()
+    fv_raw = (data.get('fecha_vencimiento') or '').strip()
+    fecha_cierre_val = parse_date(fc_raw) if fc_raw else None
+    fecha_vencimiento_val = parse_date(fv_raw) if fv_raw else None
+
+    cuenta_id = data.get('id') or data.get('cuenta_id')
+    cuenta = None
+    if cuenta_id and str(cuenta_id).isdigit() and int(cuenta_id) > 0:
+        cuenta = CuentaBancaria.objects.filter(id=int(cuenta_id), usuario=request.api_user).first()
+    if not cuenta:
+        cuenta = CuentaBancaria.objects.filter(usuario=request.api_user, nombre__iexact=nombre_clean).first()
+
     created = False
     if cuenta:
         cuenta.nombre = nombre_clean
         cuenta.tipo = tipo
         if 'es_favorita' in data:
             cuenta.es_favorita = es_fav
+        if tipo == 'tarjeta':
+            if 'fecha_cierre' in data:
+                cuenta.fecha_cierre = fecha_cierre_val
+            if 'fecha_vencimiento' in data:
+                cuenta.fecha_vencimiento = fecha_vencimiento_val
+        else:
+            cuenta.fecha_cierre = None
+            cuenta.fecha_vencimiento = None
         cuenta.save()
     else:
         # Si es la primera billetera del usuario, marcarla como favorita por defecto
-        has_any = CuentaBancaria.objects.filter(usuario=request.api_user).exists()
+        has_any = CuentaBancaria.objects.filter(usuario=request.api_user).exclude(tipo='tarjeta').exists()
         cuenta = CuentaBancaria.objects.create(
             usuario=request.api_user,
             nombre=nombre_clean,
             tipo=tipo,
             es_favorita=es_fav or (not has_any and tipo != 'tarjeta'),
+            fecha_cierre=fecha_cierre_val if tipo == 'tarjeta' else None,
+            fecha_vencimiento=fecha_vencimiento_val if tipo == 'tarjeta' else None,
         )
         created = True
 
@@ -1149,6 +1212,7 @@ def crear_cuenta_api(request):
             'tipo': cuenta.tipo,
             'es_favorita': bool(cuenta.es_favorita),
             'subtitle': cuenta.subtitulo_display,
+            **serialize_cuenta_fechas(cuenta),
         }
     }, status=201 if created else 200)
 
@@ -1417,21 +1481,8 @@ def crear_gasto_api(request):
     categoria_nombre = (data.get('categoria_nombre') or '').strip()
     categoria = resolve_or_create_categoria(categoria_id, categoria_nombre)
 
-    # Fecha opcional
-    fecha = None
-    fecha_raw = (data.get('fecha') or '').strip()
-    if fecha_raw:
-        parsed_dt = parse_datetime(fecha_raw)
-        if parsed_dt:
-            fecha = parsed_dt
-        else:
-            parsed_d = parse_date(fecha_raw)
-            if parsed_d:
-                now_local = timezone.localtime(timezone.now())
-                fecha = timezone.make_aware(
-                    datetime.combine(parsed_d, now_local.time()),
-                    timezone.get_current_timezone()
-                )
+    # Fecha y hora opcional
+    fecha = parse_fecha_hora_input(data.get('fecha'))
 
     descripcion = (data.get('descripcion') or '').strip()
     metodo_pago = (data.get('metodo_pago') or 'efectivo').lower().strip()
@@ -1590,20 +1641,7 @@ def crear_ingreso_api(request):
             es_favorita=True
         ).exclude(tipo='tarjeta').first()
 
-    fecha = None
-    fecha_raw = (data.get('fecha') or '').strip()
-    if fecha_raw:
-        parsed_dt = parse_datetime(fecha_raw)
-        if parsed_dt:
-            fecha = parsed_dt
-        else:
-            parsed_d = parse_date(fecha_raw)
-            if parsed_d:
-                now_local = timezone.localtime(timezone.now())
-                fecha = timezone.make_aware(
-                    datetime.combine(parsed_d, now_local.time()),
-                    timezone.get_current_timezone()
-                )
+    fecha = parse_fecha_hora_input(data.get('fecha'))
 
     ingreso = Ingreso(
         presupuesto=presupuesto,
@@ -2043,6 +2081,10 @@ def editar_movimiento_api(request):
         if 'descripcion' in data:
             gasto.descripcion = (data.get('descripcion') or '').strip() or None
 
+        nueva_fecha = parse_fecha_hora_input(data.get('fecha'))
+        if nueva_fecha:
+            gasto.fecha = nueva_fecha
+
         gasto.es_rapido = False
         gasto.full_clean()
         gasto.save()
@@ -2113,6 +2155,10 @@ def editar_movimiento_api(request):
 
         if 'descripcion' in data:
             ingreso.descripcion = (data.get('descripcion') or '').strip() or None
+
+        nueva_fecha = parse_fecha_hora_input(data.get('fecha'))
+        if nueva_fecha:
+            ingreso.fecha = nueva_fecha
 
         ingreso.es_rapido = False
         ingreso.full_clean()

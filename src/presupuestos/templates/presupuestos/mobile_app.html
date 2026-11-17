@@ -1485,6 +1485,8 @@
       ingresoTipo: 'transferencia',
       ingresoCuenta: '',
       transModo: 'efectivo_a_cuenta', // 'efectivo_a_cuenta' | 'cuenta_a_efectivo' | 'entre_cuentas'
+      cuentaTipo: 'billetera',
+      editingCuentaObj: null,
       selectedCicloId: 0,
       editingTarjetaPrestamo: null,
       editingMov: null,
@@ -1502,8 +1504,34 @@
         nota: '',
         origen_cuenta: '',
         destino_cuenta: '',
+        cuenta_nombre: '',
+        cuenta_saldo_inicial: '',
+        cuenta_es_favorita: false,
+        fecha_cierre: '',
+        fecha_vencimiento: '',
       },
     };
+
+    function getNowDateTimeLocalIso() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      return `${y}-${m}-${d}T${hh}:${mm}`;
+    }
+
+    function getFilteredCuentasForMetodo(cuentas, metodo) {
+      const all = cuentas || [];
+      if (metodo === 'tarjeta') {
+        const cards = all.filter(c => c.tipo === 'tarjeta');
+        const others = all.filter(c => c.tipo !== 'tarjeta');
+        return cards.length ? cards : others;
+      }
+      const wallets = all.filter(c => c.tipo !== 'tarjeta');
+      return wallets.length ? wallets : all;
+    }
 
     // Sincronizar con query params o AndroidBridge si está presente
     try {
@@ -1667,6 +1695,7 @@
         const fd = new FormData(formEditarMov);
         if (fd.get('monto') !== null) state.editingMov.raw_monto = fd.get('monto');
         if (fd.get('nombre') !== null) state.editingMov.title = fd.get('nombre');
+        if (fd.get('fecha') !== null) state.editingMov.fecha_hora_iso = fd.get('fecha');
         if (fd.get('categoria_nombre') !== null) state.editCategoria = fd.get('categoria_nombre');
         if (fd.get('cuenta_bancaria') !== null) state.editCuenta = fd.get('cuenta_bancaria');
         if (fd.get('persona') !== null) {
@@ -1679,23 +1708,37 @@
         if (fd.get('tasa_interes') !== null) state.editingMov.tasa_interes = fd.get('tasa_interes');
         if (fd.get('monto_proximo_mes') !== null) state.editingMov.monto_proximo_mes = fd.get('monto_proximo_mes');
       }
+      const formCuenta = document.getElementById('formCuenta');
+      if (formCuenta) {
+        const fd = new FormData(formCuenta);
+        if (fd.get('nombre') !== null) state.formDraft.cuenta_nombre = fd.get('nombre');
+        if (fd.get('saldo_inicial') !== null) state.formDraft.cuenta_saldo_inicial = fd.get('saldo_inicial');
+        state.formDraft.cuenta_es_favorita = Boolean(fd.get('es_favorita'));
+        if (fd.get('fecha_cierre') !== null) state.formDraft.fecha_cierre = fd.get('fecha_cierre');
+        if (fd.get('fecha_vencimiento') !== null) state.formDraft.fecha_vencimiento = fd.get('fecha_vencimiento');
+      }
     }
 
-    function openSheet(name) {
+    function openSheet(name, extra = null) {
       if (name === 'prestamo_nueva_tarjeta') {
         state.editingTarjetaPrestamo = null;
       }
       state.sheetNoAnim = false;
       state.sheet = name;
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const nowDateTimeIso = getNowDateTimeLocalIso();
       state.formDraft = {
         monto: '',
         nombre: '',
-        fecha: todayIso,
+        fecha: nowDateTimeIso,
         persona_extra: '',
         nota: '',
         origen_cuenta: '',
         destino_cuenta: '',
+        cuenta_nombre: '',
+        cuenta_saldo_inicial: '',
+        cuenta_es_favorita: false,
+        fecha_cierre: '',
+        fecha_vencimiento: '',
       };
       if (name === 'gasto') {
         state.gastoMetodo = 'transferencia';
@@ -1708,6 +1751,9 @@
       } else if (name === 'transferencia') {
         state.transModo = 'efectivo_a_cuenta';
         state.formDraft.destino_cuenta = getDefaultCuentaForMetodo('transferencia');
+      } else if (name === 'cuenta') {
+        state.editingCuentaObj = null;
+        state.cuentaTipo = (extra && extra.tipo) ? extra.tipo : 'billetera';
       }
       render();
     }
@@ -2400,48 +2446,86 @@
       const p = d.presupuesto;
       const cData = d.cuentas || { patrimonio_total: 0, items: [] };
       const items = cData.items || [];
+      const liquidasItems = items.filter(acc => acc.tipo !== 'tarjeta' && acc.id !== -2);
+      const tarjetasItems = items.filter(acc => acc.tipo === 'tarjeta' || acc.id === -2);
 
       return `
         <section class="page-section">
           <div class="page-title">
             <span class="overline">TU DINERO · ${escapeHtml(p ? p.nombre : '')}</span>
             <h1>Cuentas</h1>
-            <p>Balance de tus bancos, billeteras virtuales y efectivo.</p>
+            <p>Balance de tus billeteras, bancos, efectivo y tarjetas por separado.</p>
           </div>
           <div class="accounts-total">
             <span>Patrimonio disponible (${escapeHtml(p ? p.nombre : '')})</span>
             <strong>${money(cData.patrimonio_total)}</strong>
             <small>Efectivo: ${money(cData.saldo_efectivo)} · Bancos/Billeteras: ${money(cData.saldo_transferencia)}</small>
           </div>
+
           <div class="subheading-row">
-            <h3 class="subheading">Mis cuentas <small style="color:var(--muted);font-weight:500;font-size:10px;">(tocá ⭐ para elegir favorita)</small></h3>
+            <h3 class="subheading">🏦 Billeteras, Bancos y Efectivo <small style="color:var(--muted);font-weight:500;font-size:10px;">(⭐ favorita)</small></h3>
             <button type="button" data-open-sheet="transferencia" style="border:0;background:transparent;color:#5dc6ef;font-size:11px;font-weight:700;">
-              ⇄ Transferir fondos
+              ⇄ Transferir
             </button>
           </div>
           <div class="account-list">
-            ${items.map(acc => `
+            ${liquidasItems.length ? liquidasItems.map(acc => `
               <article data-account-filter="${escapeHtml(acc.name)}" style="${!acc.is_system ? 'grid-template-columns: 41px 1fr auto 30px;' : ''}">
                 <span class="bank-icon ${escapeHtml(acc.icon_class)}">
                   ${iconSvg(acc.icon)}
                 </span>
                 <div>
                   <strong>${escapeHtml(acc.name)}${acc.es_favorita ? `<span class="badge-fav">⭐ Favorita</span>` : ''}</strong>
-                  <small>${escapeHtml(acc.subtitle)}${acc.gastos_tarjeta > 0 && acc.tipo !== 'tarjeta' ? ` · Tarjeta: −${money(acc.gastos_tarjeta)}` : ''}</small>
+                  <small>${escapeHtml(acc.subtitle)}${acc.gastos_tarjeta > 0 ? ` · Consumos tarj.: −${money(acc.gastos_tarjeta)}` : ''}</small>
                 </div>
                 <b class="${acc.balance < 0 ? 'negative' : ''}">
                   ${acc.balance < 0 ? '−' : ''}${money(Math.abs(acc.balance))}
                 </b>
                 ${!acc.is_system ? `
-                  <button type="button" class="fav-star-btn ${acc.es_favorita ? 'active' : ''}" data-toggle-fav-cuenta="${acc.id}" data-toggle-fav-nombre="${escapeHtml(acc.name)}" title="Marcar como favorita para transferencias">
+                  <button type="button" class="fav-star-btn ${acc.es_favorita ? 'active' : ''}" data-toggle-fav-cuenta="${acc.id}" data-cuenta-nombre="${escapeHtml(acc.name)}" title="Marcar como favorita para transferencias">
                     ${acc.es_favorita ? '⭐' : '☆'}
                   </button>
                 ` : iconSvg('chevron', 18)}
               </article>
-            `).join('')}
+            `).join('') : `<div class="empty" style="padding:18px 10px;">No tenés billeteras o bancos cargados aún.</div>`}
           </div>
-          <button type="button" class="outline-add" data-open-sheet="cuenta">
-            ${iconSvg('plus', 19)} Agregar una cuenta
+          <button type="button" class="outline-add" data-open-cuenta-tipo="billetera">
+            ${iconSvg('plus', 19)} Agregar billetera o banco
+          </button>
+
+          <div class="subheading-row" style="margin-top:26px;">
+            <h3 class="subheading">💳 Tarjetas de Crédito</h3>
+            ${cData.total_tarjeta > 0 ? `<span style="font-size:11px;font-weight:700;color:#f0bd62;">Total: −${money(cData.total_tarjeta)}</span>` : ''}
+          </div>
+          <div class="account-list">
+            ${tarjetasItems.length ? tarjetasItems.map(acc => {
+              const fechasParts = [];
+              if (acc.fecha_cierre_str) fechasParts.push(`📅 Cierre: ${acc.fecha_cierre_str}`);
+              if (acc.fecha_vencimiento_str) fechasParts.push(`⏳ Vence: ${acc.fecha_vencimiento_str}`);
+              const fechasInfo = fechasParts.length ? fechasParts.join(' · ') : (acc.is_system ? 'Consumos acumulados con tarjeta' : 'Sin fechas configuradas · Tocá ✎ para agregar cierre/venc.');
+              return `
+                <article data-account-filter="${escapeHtml(acc.name)}" style="${!acc.is_system ? 'grid-template-columns: 41px 1fr auto 30px;' : ''}">
+                  <span class="bank-icon macro">
+                    ${iconSvg('card')}
+                  </span>
+                  <div>
+                    <strong>${escapeHtml(acc.name)}</strong>
+                    <small style="color:${acc.fecha_cierre_str || acc.fecha_vencimiento_str ? '#d9d2ff' : 'var(--muted)'};">${escapeHtml(fechasInfo)}</small>
+                  </div>
+                  <b class="${acc.balance < 0 ? 'negative' : ''}" style="color:#f0bd62;">
+                    ${acc.balance < 0 ? '−' : ''}${money(Math.abs(acc.balance))}
+                  </b>
+                  ${!acc.is_system ? `
+                    <button type="button" class="fav-star-btn" data-edit-cuenta-card="${acc.id}" title="Editar cierre y vencimiento de tarjeta" style="color:#a99fff;font-size:13px;">
+                      ✎
+                    </button>
+                  ` : iconSvg('chevron', 18)}
+                </article>
+              `;
+            }).join('') : `<div class="empty" style="padding:18px 10px;">No agregaste tarjetas de crédito todavía.</div>`}
+          </div>
+          <button type="button" class="outline-add" data-open-cuenta-tipo="tarjeta">
+            ${iconSvg('plus', 19)} Agregar tarjeta de crédito
           </button>
         </section>
       `;
@@ -2455,6 +2539,7 @@
       const personas = (d && d.personas_disponibles) || [];
       const presupuestos = (d && d.presupuestos) || [];
       const todayIso = new Date().toISOString().slice(0, 10);
+      const nowDateTimeIso = getNowDateTimeLocalIso();
 
       if (state.sheet === 'menu') {
         if (p && p.tipo === 'prestamo') {
@@ -2589,6 +2674,7 @@
 
       if (state.sheet === 'gasto') {
         const draft = state.formDraft || {};
+        const cuentasMetodo = getFilteredCuentasForMetodo(cuentas, state.gastoMetodo);
         return `
           <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
             <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
@@ -2601,22 +2687,20 @@
                 <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
               </div>
               <form id="formGasto">
-                <div class="form-row">
-                  <label>
-                    Monto
-                    <div class="amount-input">
-                      <span>$</span>
-                      <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" value="${escapeHtml(draft.monto || '')}" inputmode="decimal" ${!state.sheetNoAnim ? 'autofocus' : ''} />
-                    </div>
-                  </label>
-                  <label>
-                    Fecha
-                    <div class="date-field">
-                      ${iconSvg('calendar', 17)}
-                      <input type="date" name="fecha" value="${escapeHtml(draft.fecha || todayIso)}" />
-                    </div>
-                  </label>
-                </div>
+                <label>
+                  Monto
+                  <div class="amount-input">
+                    <span>$</span>
+                    <input name="monto" type="number" step="0.01" min="0.01" required placeholder="0" value="${escapeHtml(draft.monto || '')}" inputmode="decimal" ${!state.sheetNoAnim ? 'autofocus' : ''} />
+                  </div>
+                </label>
+                <label>
+                  Fecha y hora
+                  <div class="date-field">
+                    ${iconSvg('calendar', 17)}
+                    <input type="datetime-local" name="fecha" value="${escapeHtml(draft.fecha || nowDateTimeIso)}" />
+                  </div>
+                </label>
                 <label>
                   Concepto (opcional para carga rápida)
                   <input name="nombre" value="${escapeHtml(draft.nombre || '')}" placeholder="Ej. Supermercado (vacío = ⚡ Gasto rápido)" />
@@ -2639,15 +2723,15 @@
                 </label>
                 ${state.gastoMetodo !== 'efectivo' ? `
                   <label>
-                    Cuenta / Billetera / Tarjeta
+                    ${state.gastoMetodo === 'tarjeta' ? 'Tarjeta de crédito' : 'Billetera / Banco'}
                     <div class="chips-selector">
-                      ${cuentas.map(c => `
-                        <button type="button" class="chip-btn ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-gasto-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                      ${cuentasMetodo.map(c => `
+                        <button type="button" class="chip-btn ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-gasto-cuenta="${escapeHtml(c.nombre)}">${c.tipo === 'tarjeta' ? '💳 ' : (c.es_favorita ? '⭐ ' : '🏦 ')}${escapeHtml(c.nombre)}</button>
                       `).join('')}
                     </div>
                     <select name="cuenta_bancaria" id="selectGastoCuenta">
-                      <option value="">Seleccionar cuenta...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.balance > 0 ? ' · ' + money(c.balance) : ''})</option>`).join('')}
+                      <option value="">Seleccionar ${state.gastoMetodo === 'tarjeta' ? 'tarjeta' : 'cuenta'}...</option>
+                      ${cuentasMetodo.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.gastoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.fecha_cierre_str ? ' · Cierre ' + c.fecha_cierre_str : (c.balance > 0 ? ' · ' + money(c.balance) : '')})</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2669,6 +2753,7 @@
 
       if (state.sheet === 'ingreso') {
         const draft = state.formDraft || {};
+        const cuentasIngreso = getFilteredCuentasForMetodo(cuentas, 'transferencia');
         return `
           <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
             <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
@@ -2692,34 +2777,32 @@
                   Concepto
                   <input name="nombre" value="${escapeHtml(draft.nombre || '')}" placeholder="Ej. Sueldo, Venta, Transferencia" />
                 </label>
-                <div class="form-row">
-                  <label>
-                    Tipo de ingreso
-                    <select name="tipo_ingreso" id="selectTipoIngreso">
-                      <option value="transferencia" ${state.ingresoTipo === 'transferencia' ? 'selected' : ''}>🏦 Transferencia</option>
-                      <option value="sueldo" ${state.ingresoTipo === 'sueldo' ? 'selected' : ''}>💼 Sueldo</option>
-                      <option value="efectivo" ${state.ingresoTipo === 'efectivo' ? 'selected' : ''}>💵 Efectivo</option>
-                    </select>
-                  </label>
-                  <label>
-                    Fecha
-                    <div class="date-field">
-                      ${iconSvg('calendar', 17)}
-                      <input type="date" name="fecha" value="${escapeHtml(draft.fecha || todayIso)}" />
-                    </div>
-                  </label>
-                </div>
+                <label>
+                  Tipo de ingreso
+                  <select name="tipo_ingreso" id="selectTipoIngreso">
+                    <option value="transferencia" ${state.ingresoTipo === 'transferencia' ? 'selected' : ''}>🏦 Transferencia</option>
+                    <option value="sueldo" ${state.ingresoTipo === 'sueldo' ? 'selected' : ''}>💼 Sueldo</option>
+                    <option value="efectivo" ${state.ingresoTipo === 'efectivo' ? 'selected' : ''}>💵 Efectivo</option>
+                  </select>
+                </label>
+                <label>
+                  Fecha y hora
+                  <div class="date-field">
+                    ${iconSvg('calendar', 17)}
+                    <input type="datetime-local" name="fecha" value="${escapeHtml(draft.fecha || nowDateTimeIso)}" />
+                  </div>
+                </label>
                 ${state.ingresoTipo !== 'efectivo' ? `
                   <label>
                     Cuenta / Billetera destino
                     <div class="chips-selector">
-                      ${cuentas.map(c => `
+                      ${cuentasIngreso.map(c => `
                         <button type="button" class="chip-btn ${(state.ingresoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-select-ingreso-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
                       `).join('')}
                     </div>
                     <select name="cuenta_bancaria">
                       <option value="">Seleccionar cuenta...</option>
-                      ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.ingresoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.balance > 0 ? ' · ' + money(c.balance) : ''})</option>`).join('')}
+                      ${cuentasIngreso.map(c => `<option value="${escapeHtml(c.nombre)}" ${(state.ingresoCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.balance > 0 ? ' · ' + money(c.balance) : ''})</option>`).join('')}
                     </select>
                   </label>
                 ` : ''}
@@ -2789,42 +2872,75 @@
       }
 
       if (state.sheet === 'cuenta') {
+        const draft = state.formDraft || {};
+        const edC = state.editingCuentaObj;
+        const curTipo = state.cuentaTipo || (edC ? edC.tipo : 'billetera');
+        const curNombre = draft.cuenta_nombre !== '' ? draft.cuenta_nombre : (edC ? edC.name || edC.nombre : '');
+        const curCierre = draft.fecha_cierre !== '' ? draft.fecha_cierre : (edC ? edC.fecha_cierre || '' : '');
+        const curVenc = draft.fecha_vencimiento !== '' ? draft.fecha_vencimiento : (edC ? edC.fecha_vencimiento || '' : '');
         return `
           <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
             <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
               <div class="handle"></div>
               <div class="sheet-title">
                 <div>
-                  <span class="overline">MIS CUENTAS</span>
-                  <h2>Agregar una cuenta</h2>
+                  <span class="overline">MIS CUENTAS Y TARJETAS</span>
+                  <h2>${edC ? 'Editar ' + escapeHtml(edC.name || edC.nombre) : (curTipo === 'tarjeta' ? 'Agregar tarjeta de crédito' : 'Agregar billetera o banco')}</h2>
                 </div>
                 <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
               </div>
               <form id="formCuenta">
+                <input type="hidden" name="cuenta_id" value="${edC ? edC.id : ''}" />
                 <label>
-                  Nombre del banco, billetera o tarjeta
-                  <input name="nombre" required placeholder="Ej. Mercado Pago, Brubank, Patagonia, Ualá" autofocus />
-                </label>
-                <label>
-                  Tipo de cuenta
-                  <select name="tipo">
-                    <option value="billetera">📱 Billetera virtual</option>
-                    <option value="banco">🏦 Cuenta bancaria</option>
-                    <option value="tarjeta">💳 Tarjeta de crédito</option>
-                  </select>
-                </label>
-                <label>
-                  Saldo inicial en ${escapeHtml(p ? p.nombre : 'este presupuesto')} (opcional)
-                  <div class="amount-input">
-                    <span>$</span>
-                    <input name="saldo_inicial" type="number" step="0.01" min="0" placeholder="0 (dejar en 0 si solo querés crearla)" inputmode="decimal" />
+                  Tipo
+                  <div class="chips-selector">
+                    ${[
+                      { k: 'billetera', l: '📱 Billetera virtual' },
+                      { k: 'banco', l: '🏦 Banco' },
+                      { k: 'tarjeta', l: '💳 Tarjeta de crédito' }
+                    ].map(t => `
+                      <button type="button" class="chip-btn ${curTipo === t.k ? 'selected' : ''}" data-cuenta-tipo-chip="${t.k}">${t.l}</button>
+                    `).join('')}
                   </div>
+                  <input type="hidden" name="tipo" value="${escapeHtml(curTipo)}" />
                 </label>
-                <label style="flex-direction:row;align-items:center;gap:9px;margin-top:4px;cursor:pointer;">
-                  <input type="checkbox" name="es_favorita" value="1" style="width:18px;height:18px;accent-color:#f0bd62;" />
-                  <span>⭐ Marcar como mi billetera favorita (aparece primera en transferencias)</span>
+                <label>
+                  ${curTipo === 'tarjeta' ? 'Nombre de la tarjeta' : 'Nombre del banco o billetera'}
+                  <input name="nombre" required value="${escapeHtml(curNombre)}" placeholder="${curTipo === 'tarjeta' ? 'Ej. Visa Patagonia, Naranja X, Master Macro' : 'Ej. Mercado Pago, Brubank, Ualá'}" ${!state.sheetNoAnim ? 'autofocus' : ''} />
                 </label>
-                <button type="submit" class="submit purple">Guardar cuenta</button>
+                ${curTipo === 'tarjeta' ? `
+                  <div class="form-row">
+                    <label>
+                      Fecha de cierre
+                      <div class="date-field">
+                        ${iconSvg('calendar', 17)}
+                        <input type="date" name="fecha_cierre" value="${escapeHtml(curCierre)}" />
+                      </div>
+                    </label>
+                    <label>
+                      Fecha de vencimiento
+                      <div class="date-field">
+                        ${iconSvg('calendar', 17)}
+                        <input type="date" name="fecha_vencimiento" value="${escapeHtml(curVenc)}" />
+                      </div>
+                    </label>
+                  </div>
+                ` : `
+                  ${!edC ? `
+                    <label>
+                      Saldo inicial en ${escapeHtml(p ? p.nombre : 'este presupuesto')} (opcional)
+                      <div class="amount-input">
+                        <span>$</span>
+                        <input name="saldo_inicial" type="number" step="0.01" min="0" value="${escapeHtml(draft.cuenta_saldo_inicial || '')}" placeholder="0 (dejar en 0 si solo querés crearla)" inputmode="decimal" />
+                      </div>
+                    </label>
+                  ` : ''}
+                  <label style="flex-direction:row;align-items:center;gap:9px;margin-top:4px;cursor:pointer;">
+                    <input type="checkbox" name="es_favorita" value="1" ${(edC && edC.es_favorita) || draft.cuenta_es_favorita ? 'checked' : ''} style="width:18px;height:18px;accent-color:#f0bd62;" />
+                    <span>⭐ Marcar como mi billetera favorita (aparece primera en transferencias)</span>
+                  </label>
+                `}
+                <button type="submit" class="submit purple">${edC ? 'Guardar cambios' : (curTipo === 'tarjeta' ? 'Guardar tarjeta' : 'Guardar cuenta')}</button>
               </form>
             </div>
           </div>
@@ -3087,12 +3203,21 @@
         if (tm === 'gasto') {
           const curCat = state.editCategoria !== undefined ? state.editCategoria : (m.categoria && m.categoria !== 'Sin categoría' ? m.categoria : '');
           const curCuenta = state.editCuenta !== undefined ? state.editCuenta : (m.cuenta_bancaria || '');
+          const curFechaHora = m.fecha_hora_iso || (m.fecha_iso ? `${m.fecha_iso}T12:00` : nowDateTimeIso);
+          const cuentasEdit = getFilteredCuentasForMetodo(cuentas, state.editMetodo);
           fieldsHtml = `
             <label>
               Monto
               <div class="amount-input">
                 <span>$</span>
                 <input name="monto" type="number" step="0.01" min="0.01" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Fecha y hora
+              <div class="date-field">
+                ${iconSvg('calendar', 17)}
+                <input type="datetime-local" name="fecha" value="${escapeHtml(curFechaHora)}" />
               </div>
             </label>
             <label>
@@ -3117,15 +3242,15 @@
             </label>
             ${state.editMetodo !== 'efectivo' ? `
               <label>
-                Cuenta / Billetera / Tarjeta
+                ${state.editMetodo === 'tarjeta' ? 'Tarjeta de crédito' : 'Billetera / Banco'}
                 <div class="chips-selector">
-                  ${cuentas.map(c => `
-                    <button type="button" class="chip-btn ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
+                  ${cuentasEdit.map(c => `
+                    <button type="button" class="chip-btn ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-cuenta="${escapeHtml(c.nombre)}">${c.tipo === 'tarjeta' ? '💳 ' : (c.es_favorita ? '⭐ ' : '🏦 ')}${escapeHtml(c.nombre)}</button>
                   `).join('')}
                 </div>
                 <select name="cuenta_bancaria">
                   <option value="">Sin cuenta específica</option>
-                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                  ${cuentasEdit.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)}${c.fecha_cierre_str ? ' · Cierre ' + c.fecha_cierre_str : ''})</option>`).join('')}
                 </select>
               </label>
             ` : ''}
@@ -3141,12 +3266,21 @@
           `;
         } else if (tm === 'ingreso') {
           const curCuenta = state.editCuenta !== undefined ? state.editCuenta : (m.cuenta_bancaria || '');
+          const curFechaHora = m.fecha_hora_iso || (m.fecha_iso ? `${m.fecha_iso}T12:00` : nowDateTimeIso);
+          const cuentasEditIng = getFilteredCuentasForMetodo(cuentas, 'transferencia');
           fieldsHtml = `
             <label>
               Monto
               <div class="amount-input">
                 <span>$</span>
                 <input name="monto" type="number" step="0.01" min="0.01" required value="${rawMonto}" inputmode="decimal" />
+              </div>
+            </label>
+            <label>
+              Fecha y hora
+              <div class="date-field">
+                ${iconSvg('calendar', 17)}
+                <input type="datetime-local" name="fecha" value="${escapeHtml(curFechaHora)}" />
               </div>
             </label>
             <label>
@@ -3165,13 +3299,13 @@
               <label>
                 Cuenta / Billetera destino
                 <div class="chips-selector">
-                  ${cuentas.map(c => `
+                  ${cuentasEditIng.map(c => `
                     <button type="button" class="chip-btn ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}" data-edit-select-cuenta="${escapeHtml(c.nombre)}">${c.es_favorita ? '⭐ ' : '🏦 '}${escapeHtml(c.nombre)}</button>
                   `).join('')}
                 </div>
                 <select name="cuenta_bancaria">
                   <option value="">Sin cuenta específica</option>
-                  ${cuentas.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
+                  ${cuentasEditIng.map(c => `<option value="${escapeHtml(c.nombre)}" ${(curCuenta || '').toLowerCase() === c.nombre.toLowerCase() ? 'selected' : ''}>${c.es_favorita ? '⭐ ' : ''}${escapeHtml(c.nombre)} (${escapeHtml(c.subtitle)})</option>`).join('')}
                 </select>
               </label>
             ` : ''}
@@ -3410,6 +3544,49 @@
         btn.onclick = () => openSheet(btn.getAttribute('data-open-sheet'));
       });
 
+      document.querySelectorAll('[data-open-cuenta-tipo]').forEach(btn => {
+        btn.onclick = () => openSheet('cuenta', { tipo: btn.getAttribute('data-open-cuenta-tipo') || 'billetera' });
+      });
+
+      document.querySelectorAll('[data-edit-cuenta-card]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const cid = Number(btn.getAttribute('data-edit-cuenta-card'));
+          const items = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
+          const found = items.find(c => Number(c.id) === cid);
+          if (found) {
+            state.editingCuentaObj = found;
+            state.cuentaTipo = found.tipo || 'tarjeta';
+            state.formDraft = {
+              monto: '',
+              nombre: '',
+              fecha: getNowDateTimeLocalIso(),
+              persona_extra: '',
+              nota: '',
+              origen_cuenta: '',
+              destino_cuenta: '',
+              cuenta_nombre: found.name || found.nombre || '',
+              cuenta_saldo_inicial: '',
+              cuenta_es_favorita: Boolean(found.es_favorita),
+              fecha_cierre: found.fecha_cierre || '',
+              fecha_vencimiento: found.fecha_vencimiento || '',
+            };
+            state.sheetNoAnim = false;
+            state.sheet = 'cuenta';
+            render();
+          }
+        };
+      });
+
+      document.querySelectorAll('[data-cuenta-tipo-chip]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.cuentaTipo = btn.getAttribute('data-cuenta-tipo-chip') || 'billetera';
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
       document.querySelectorAll('[data-close-sheet]').forEach(btn => {
         btn.onclick = () => {
           state.sheet = null;
@@ -3470,8 +3647,10 @@
       document.querySelectorAll('[data-edit-metodo]').forEach(btn => {
         btn.onclick = () => {
           syncFormDraftFromDom();
-          state.editMetodo = btn.getAttribute('data-edit-metodo');
-          if (state.editMetodo !== 'efectivo' && !state.editCuenta) {
+          const nextMetodo = btn.getAttribute('data-edit-metodo');
+          const prevMetodo = state.editMetodo;
+          state.editMetodo = nextMetodo;
+          if (state.editMetodo !== 'efectivo' && (!state.editCuenta || prevMetodo !== nextMetodo)) {
             state.editCuenta = getDefaultCuentaForMetodo(state.editMetodo);
           }
           state.sheetNoAnim = true;
@@ -3536,6 +3715,7 @@
             tipo_movimiento: m.tipo_movimiento,
             monto: fd.get('monto'),
             nombre: fd.get('nombre') || '',
+            fecha: fd.get('fecha') || '',
             categoria_id: fd.get('categoria_id') || null,
             categoria_nombre: catTyped,
             metodo_pago: state.editMetodo,
@@ -3672,8 +3852,10 @@
       document.querySelectorAll('[data-gasto-metodo]').forEach(btn => {
         btn.onclick = () => {
           syncFormDraftFromDom();
-          state.gastoMetodo = btn.getAttribute('data-gasto-metodo');
-          if (state.gastoMetodo !== 'efectivo' && !state.gastoCuenta) {
+          const nextMetodo = btn.getAttribute('data-gasto-metodo');
+          const prevMetodo = state.gastoMetodo;
+          state.gastoMetodo = nextMetodo;
+          if (state.gastoMetodo !== 'efectivo' && (!state.gastoCuenta || prevMetodo !== nextMetodo)) {
             state.gastoCuenta = getDefaultCuentaForMetodo(state.gastoMetodo);
           }
           state.sheetNoAnim = true;
@@ -3912,28 +4094,33 @@
         };
       }
 
-      // Submit Nueva Cuenta
+      // Submit Nueva Cuenta o Edición de Tarjeta
       const formCuenta = document.getElementById('formCuenta');
       if (formCuenta) {
         formCuenta.onsubmit = async (e) => {
           e.preventDefault();
           const fd = new FormData(formCuenta);
+          const tipo = fd.get('tipo') || state.cuentaTipo || 'billetera';
           const res = await apiFetch('/api/cuentas/crear/', {
             method: 'POST',
             body: {
+              id: fd.get('cuenta_id') || null,
               nombre: fd.get('nombre'),
-              tipo: fd.get('tipo') || 'billetera',
+              tipo,
               saldo_inicial: fd.get('saldo_inicial') || 0,
               es_favorita: Boolean(fd.get('es_favorita')),
+              fecha_cierre: fd.get('fecha_cierre') || '',
+              fecha_vencimiento: fd.get('fecha_vencimiento') || '',
               presupuesto_id: state.selectedBudgetId,
             }
           });
           if (res.ok && res.data && res.data.success) {
             state.sheet = null;
-            showToast('✓ Cuenta agregada');
+            state.editingCuentaObj = null;
+            showToast(tipo === 'tarjeta' ? '✓ Tarjeta guardada' : '✓ Cuenta guardada');
             await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
           } else {
-            showToast((res.data && res.data.error) || 'Error al agregar cuenta');
+            showToast((res.data && res.data.error) || 'Error al guardar cuenta');
           }
         };
       }

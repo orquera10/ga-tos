@@ -243,6 +243,8 @@ class CuentaBancaria(models.Model):
     nombre = models.CharField(max_length=60)
     tipo = models.CharField(max_length=20, choices=TIPOS_CUENTA, default='billetera')
     es_favorita = models.BooleanField(default=False)
+    fecha_cierre = models.DateField(null=True, blank=True, verbose_name='Fecha de cierre (tarjeta)')
+    fecha_vencimiento = models.DateField(null=True, blank=True, verbose_name='Fecha de vencimiento (tarjeta)')
     fecha_creacion = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -460,5 +460,74 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(gw2.metodo_pago, 'efectivo')
         self.assertIsNone(gw2.cuenta_bancaria)
 
+    def test_tarjeta_fechas_cierre_vencimiento_y_fecha_hora_movimientos(self):
+        # 1. Crear tarjeta de crédito con fecha de cierre y fecha de vencimiento
+        resp_card = self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Visa Patagonia',
+                'tipo': 'tarjeta',
+                'fecha_cierre': '2026-11-24',
+                'fecha_vencimiento': '2026-12-05',
+                'presupuesto_id': self.presupuesto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_card.status_code, 201)
+        card_json = resp_card.json()['cuenta']
+        self.assertEqual(card_json['fecha_cierre'], '2026-11-24')
+        self.assertEqual(card_json['fecha_vencimiento'], '2026-12-05')
+        self.assertEqual(card_json['fecha_cierre_str'], '24/11')
+        self.assertEqual(card_json['fecha_vencimiento_str'], '05/12')
+
+        # 2. Crear gasto con fecha y hora (datetime-local)
+        resp_g = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': self.presupuesto.id,
+                'nombre': 'Farmacia',
+                'monto': 6500,
+                'fecha': '2026-11-16T18:45',
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Visa Patagonia',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_g.status_code, 201)
+        gid = resp_g.json()['gasto']['id']
+
+        # 3. Editar fecha y hora del gasto desde editar_movimiento_api
+        resp_edit = self.client.post(
+            '/api/movimientos/editar/',
+            data=json.dumps({
+                'id': gid,
+                'tipo_movimiento': 'gasto',
+                'nombre': 'Farmacia turno',
+                'monto': 6500,
+                'fecha': '2026-11-16T21:30',
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Visa Patagonia',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_edit.status_code, 200)
+
+        # 4. Verificar en presupuesto_detalle_api que viene fecha_hora_iso y las fechas de la tarjeta
+        resp_det = self.client.get(
+            f'/api/presupuestos/{self.presupuesto.id}/detalle/',
+            **self.auth_headers
+        ).json()
+        mov = next((m for m in resp_det['movimientos'] if m['uid'] == f'gasto-{gid}'), None)
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov['fecha_hora_iso'], '2026-11-16T21:30')
+        visa_item = next((c for c in resp_det['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        self.assertIsNotNone(visa_item)
+        self.assertEqual(visa_item['fecha_cierre_str'], '24/11')
+        self.assertEqual(visa_item['fecha_vencimiento_str'], '05/12')
+
+
 
 
