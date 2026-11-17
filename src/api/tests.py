@@ -584,29 +584,63 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(resp_cuotas.status_code, 201)
         self.assertEqual(resp_cuotas.json()['cuotas_creadas'], 3)
         self.assertEqual(resp_cuotas.json()['gasto']['monto'], 20000.0)
+        self.assertEqual(resp_cuotas.json()['gasto']['mes_resumen'], '2026-12')
+        self.assertFalse(resp_cuotas.json()['gasto']['es_post_cierre'])
 
-        # 3. Consultar Noviembre 2026 y Diciembre 2026 con el selector de mes
+        # 2b. Compra DESPUÉS del cierre de Noviembre (cierra 24/11, compra el 25/11 -> pasa a Enero 2027)
+        resp_post = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'nombre': 'Campera Post Cierre',
+                'monto': 35000,
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Visa Patagonia',
+                'cuotas_totales': 1,
+                'fecha': '2026-11-25T19:00',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_post.status_code, 201)
+        self.assertEqual(resp_post.json()['gasto']['mes_resumen'], '2027-01')
+        self.assertTrue(resp_post.json()['gasto']['es_post_cierre'])
+
+        # 3. Consultar Noviembre 2026, Diciembre 2026 y Enero 2027 con el selector de mes
         det_nov = self.client.get(
             f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-11',
             **self.auth_headers
         ).json()
         self.assertEqual(det_nov['mes_info']['mes_seleccionado'], '2026-11')
-        titles_nov = [m['title'] for m in det_nov['movimientos']]
-        self.assertIn('Zapatillas (Cuota 1/3)', titles_nov)
-        self.assertNotIn('Zapatillas (Cuota 2/3)', titles_nov)
+        origen_titles_nov = [m['title'] for m in det_nov['mes_info']['compras_tarjeta_mes_origen']]
+        self.assertIn('Zapatillas (Cuota 1/3)', origen_titles_nov)
+        self.assertIn('Campera Post Cierre', origen_titles_nov)
+        self.assertEqual(det_nov['mes_info']['total_origen_pasa_siguiente'], 20000.0)
+        self.assertEqual(det_nov['mes_info']['total_origen_pasa_subsiguiente'], 35000.0)
 
+        # En Diciembre 2026 entra la Cuota 1/3 (comprada el 15/11 antes del cierre 24/11), pero NO la compra post-cierre del 25/11
         det_dic = self.client.get(
             f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
             **self.auth_headers
         ).json()
         self.assertEqual(det_dic['mes_info']['mes_seleccionado'], '2026-12')
         titles_dic = [m['title'] for m in det_dic['movimientos']]
-        self.assertIn('Zapatillas (Cuota 2/3)', titles_dic)
+        self.assertIn('Zapatillas (Cuota 1/3)', titles_dic)
+        self.assertNotIn('Campera Post Cierre', titles_dic)
 
         visa_dic = next((c for c in det_dic['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
         self.assertIsNotNone(visa_dic)
-        self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_anterior'], 20000.0)
         self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_actual'], 20000.0)
+        self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_siguiente'], 55000.0)  # Cuota 2 ($20k) + Campera post-cierre ($35k) en Enero 2027
+
+        # En Enero 2027 entra la Cuota 2/3 ($20.000) + la compra post-cierre del 25/11 ($35.000)
+        det_ene = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2027-01',
+            **self.auth_headers
+        ).json()
+        titles_ene = [m['title'] for m in det_ene['movimientos']]
+        self.assertIn('Zapatillas (Cuota 2/3)', titles_ene)
+        self.assertIn('Campera Post Cierre', titles_ene)
         # En diciembre aún no se habían configurado las fechas de diciembre -> fechas_configuradas_mes es False pero sugiere fecha
         self.assertFalse(visa_dic['fechas_configuradas_mes'])
         self.assertEqual(visa_dic['sugerencia_cierre'], '2026-12-24')

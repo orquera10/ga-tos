@@ -1865,10 +1865,15 @@
         state.resumenTarjetaNombre = (extra && extra.tarjetaNombre) || (cardItems[0] ? cardItems[0].name : '');
         const foundCard = cardItems.find(c => c.name === state.resumenTarjetaNombre);
         const resT = foundCard && foundCard.resumen_tarjeta;
-        // Si en el mes anterior hay consumos y en el actual no (o estamos en el mes siguiente pagando resumen), preseleccionar anterior si corresponde
         if (extra && extra.periodo) {
           state.resumenTarjetaPeriodo = extra.periodo;
-        } else if (resT && resT.total_mes_actual === 0 && resT.total_mes_anterior > 0) {
+        } else if (resT && resT.total_mes_actual > 0) {
+          state.resumenTarjetaPeriodo = 'actual';
+        } else if (resT && resT.total_mes_siguiente > 0) {
+          state.resumenTarjetaPeriodo = 'siguiente';
+        } else if (resT && resT.total_mes_subsiguiente > 0) {
+          state.resumenTarjetaPeriodo = 'subsiguiente';
+        } else if (resT && resT.total_mes_anterior > 0) {
           state.resumenTarjetaPeriodo = 'anterior';
         } else {
           state.resumenTarjetaPeriodo = 'actual';
@@ -1951,6 +1956,13 @@
       const sign = item.is_transfer ? '⇄ ' : (item.amount > 0 ? '+' : '−');
       const cls = item.is_transfer ? 'transfer-amt' : (isCardExpense ? 'card-amt' : (isPos ? 'positive' : ''));
       const cleanTitle = (item.title || '').replace(/^⚡\s*/, '');
+      const cardBadgeText = isCardExpense
+        ? (item.es_ajuste_tarjeta
+            ? '💳 Ajuste resumen'
+            : (item.mes_resumen_label
+                ? `💳 ${item.es_post_cierre ? 'Post-cierre · ' : ''}Pasa a ${item.mes_resumen_label}`
+                : '💳 Tarjeta'))
+        : '';
       return `<article class="transaction ${item.es_rapido ? 'rapido-row' : ''}" data-edit-mov="${escapeHtml(item.uid)}" title="Toca para editar o eliminar">
         <span class="transaction-icon ${escapeHtml(item.tone)}">
           ${iconSvg(item.icon, 20)}
@@ -1959,7 +1971,7 @@
           <div class="tx-title-row">
             <strong>${escapeHtml(cleanTitle)}</strong>
             ${item.es_rapido ? `<span class="badge-rapido">⚡ Modificar</span>` : ''}
-            ${isCardExpense ? `<span class="badge-tarjeta-info">💳 Tarjeta</span>` : ''}
+            ${isCardExpense ? `<span class="badge-tarjeta-info">${escapeHtml(cardBadgeText)}</span>` : ''}
           </div>
           <small>${escapeHtml(item.detail)}${item.es_rapido ? ' · Cargado rápido (tocá para completar)' : ''}</small>
         </div>
@@ -2481,6 +2493,31 @@
           </div>
           <div class="date-label">${escapeHtml(isPrestamo && d.prestamo_info && d.prestamo_info.ciclo_actual ? d.prestamo_info.ciclo_actual.nombre : (p ? p.mes_label : ''))} (${filtered.length})</div>
           ${renderTransactionsByDayHtml(filtered, isPrestamo)}
+          ${(!isPrestamo && d.mes_info && d.mes_info.mes_seleccionado !== 'todos' && d.mes_info.compras_tarjeta_mes_origen && d.mes_info.compras_tarjeta_mes_origen.length) ? `
+            <div class="day-group" style="margin-top:20px;border:1px solid rgba(156,145,255,0.28);border-radius:16px;padding:12px;background:#161824;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                <div>
+                  <span class="overline" style="color:#a99fff;">COMPRAS CON TARJETA EN ${escapeHtml((d.mes_info.mes_label || '').toUpperCase())}</span>
+                  <strong style="display:block;font-size:13px;color:#eeeef6;">Pasan a próximos resúmenes según fecha de cierre</strong>
+                </div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                  ${d.mes_info.total_origen_pasa_siguiente > 0 ? `
+                    <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_siguiente)}">
+                      ➔ ${escapeHtml(d.mes_info.mes_siguiente_label)}: −${money(d.mes_info.total_origen_pasa_siguiente)}
+                    </button>
+                  ` : ''}
+                  ${d.mes_info.total_origen_pasa_subsiguiente > 0 ? `
+                    <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_subsiguiente)}">
+                      ⏭️ Post-cierre ➔ ${escapeHtml(d.mes_info.mes_subsiguiente_label)}: −${money(d.mes_info.total_origen_pasa_subsiguiente)}
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+              <div class="transaction-list">
+                ${d.mes_info.compras_tarjeta_mes_origen.map(item => renderSingleTransactionArticle(item)).join('')}
+              </div>
+            </div>
+          ` : ''}
         </section>
       `;
     }
@@ -2660,7 +2697,14 @@
                 ? fechasParts.join(' · ')
                 : (acc.is_system ? 'Consumos acumulados con tarjeta' : `⚠️ Configurar cierre y venc. de ${mesLbl} (tocá ✎)`);
               const resT = acc.resumen_tarjeta;
-              const antNote = (resT && resT.total_mes_anterior > 0) ? ` · ${resT.mes_anterior_label}: −${money(resT.total_mes_anterior)}` : '';
+              const extraNotes = [];
+              if (resT && resT.total_mes_siguiente > 0) {
+                extraNotes.push(`➔ ${resT.mes_siguiente_label}: −${money(resT.total_mes_siguiente)}`);
+              }
+              if (resT && resT.total_mes_subsiguiente > 0) {
+                extraNotes.push(`⏭️ Post-cierre ➔ ${resT.mes_subsiguiente_label}: −${money(resT.total_mes_subsiguiente)}`);
+              }
+              const antNote = extraNotes.length ? ` · ${extraNotes.join(' · ')}` : '';
               return `
                 <article data-account-filter="${escapeHtml(acc.name)}" style="${!acc.is_system ? 'grid-template-columns: 41px 1fr auto auto 30px;' : ''}">
                   <span class="bank-icon macro">
@@ -2690,6 +2734,40 @@
           </button>
         </section>
       `;
+    }
+
+    function getResumenPeriodoData(resT, periodo) {
+      const r = resT || {};
+      if (periodo === 'siguiente') {
+        return {
+          ym: r.mes_siguiente_ym || '',
+          label: r.mes_siguiente_label || 'Mes siguiente',
+          total: Number(r.total_mes_siguiente) || 0,
+          consumos: r.consumos_mes_siguiente || [],
+        };
+      }
+      if (periodo === 'subsiguiente') {
+        return {
+          ym: r.mes_subsiguiente_ym || '',
+          label: r.mes_subsiguiente_label || 'Mes subsiguiente',
+          total: Number(r.total_mes_subsiguiente) || 0,
+          consumos: r.consumos_mes_subsiguiente || [],
+        };
+      }
+      if (periodo === 'anterior') {
+        return {
+          ym: r.mes_anterior_ym || '',
+          label: r.mes_anterior_label || 'Mes anterior',
+          total: Number(r.total_mes_anterior) || 0,
+          consumos: r.consumos_mes_anterior || [],
+        };
+      }
+      return {
+        ym: r.mes_actual_ym || '',
+        label: r.mes_actual_label || 'Mes actual',
+        total: Number(r.total_mes_actual) || 0,
+        consumos: r.consumos_mes_actual || [],
+      };
     }
 
     function renderSheet(d) {
@@ -2863,12 +2941,21 @@
           mes_anterior_label: 'Mes anterior',
           total_mes_anterior: 0,
           consumos_mes_anterior: [],
+          mes_siguiente_ym: '',
+          mes_siguiente_label: 'Mes siguiente',
+          total_mes_siguiente: 0,
+          consumos_mes_siguiente: [],
+          mes_subsiguiente_ym: '',
+          mes_subsiguiente_label: 'Mes subsiguiente',
+          total_mes_subsiguiente: 0,
+          consumos_mes_subsiguiente: [],
         };
-        const usarAnt = state.resumenTarjetaPeriodo === 'anterior';
-        const consumosLista = usarAnt ? (resT.consumos_mes_anterior || []) : (resT.consumos_mes_actual || []);
-        const subtotalConsumos = Number(usarAnt ? resT.total_mes_anterior : resT.total_mes_actual) || 0;
-        const mesResumenYm = usarAnt ? resT.mes_anterior_ym : resT.mes_actual_ym;
-        const mesResumenLabel = usarAnt ? resT.mes_anterior_label : resT.mes_actual_label;
+        const curPer = state.resumenTarjetaPeriodo || 'actual';
+        const perData = getResumenPeriodoData(resT, curPer);
+        const consumosLista = perData.consumos;
+        const subtotalConsumos = perData.total;
+        const mesResumenYm = perData.ym;
+        const mesResumenLabel = perData.label;
         const difNum = parseFloat(state.resumenDiferenciaMonto) || 0;
         const totalCalculado = subtotalConsumos + difNum;
         const cuentasPago = getFilteredCuentasForMetodo(cuentas, 'transferencia');
@@ -2909,14 +2996,24 @@
                     </div>
                   ` : ''}
                   <label>
-                    Período de consumos a consultar / pagar
+                    Período de resumen a consultar / pagar
                     <div class="chips-selector">
-                      <button type="button" class="chip-btn ${!usarAnt ? 'selected' : ''}" data-resumen-select-periodo="actual">
+                      <button type="button" class="chip-btn ${curPer === 'actual' ? 'selected' : ''}" data-resumen-select-periodo="actual">
                         📅 ${escapeHtml(resT.mes_actual_label)} (${money(resT.total_mes_actual)})
                       </button>
-                      <button type="button" class="chip-btn ${usarAnt ? 'selected' : ''}" data-resumen-select-periodo="anterior">
-                        ⏮️ ${escapeHtml(resT.mes_anterior_label)} (${money(resT.total_mes_anterior)})
+                      <button type="button" class="chip-btn ${curPer === 'siguiente' ? 'selected' : ''}" data-resumen-select-periodo="siguiente">
+                        ➡️ Pasa a ${escapeHtml(resT.mes_siguiente_label)} (${money(resT.total_mes_siguiente)})
                       </button>
+                      ${(resT.total_mes_subsiguiente > 0 || curPer === 'subsiguiente') ? `
+                        <button type="button" class="chip-btn ${curPer === 'subsiguiente' ? 'selected' : ''}" data-resumen-select-periodo="subsiguiente">
+                          ⏭️ Post-cierre ➔ ${escapeHtml(resT.mes_subsiguiente_label)} (${money(resT.total_mes_subsiguiente)})
+                        </button>
+                      ` : ''}
+                      ${(resT.total_mes_anterior > 0 || curPer === 'anterior') ? `
+                        <button type="button" class="chip-btn ${curPer === 'anterior' ? 'selected' : ''}" data-resumen-select-periodo="anterior">
+                          ⏮️ ${escapeHtml(resT.mes_anterior_label)} (${money(resT.total_mes_anterior)})
+                        </button>
+                      ` : ''}
                     </div>
                   </label>
 
@@ -3119,11 +3216,11 @@
                         <option value="total" ${state.gastoModoCuotas === 'total' ? 'selected' : ''}>Monto = total compra (dividir)</option>
                       </select>
                     </div>
-                    ${(Number(state.gastoCuotas) || 1) > 1 ? `
-                      <small style="color:#a99fff;font-size:10px;margin-top:2px;">
-                        🗓️ Se registrará la Cuota 1/${state.gastoCuotas} en este mes y las cuotas 2 a ${state.gastoCuotas} automáticamente en los meses siguientes.
-                      </small>
-                    ` : ''}
+                    <small style="color:#a99fff;font-size:10px;margin-top:2px;">
+                      🗓️ ${(Number(state.gastoCuotas) || 1) > 1
+                        ? `Se registrará la Cuota 1/${state.gastoCuotas} en el próximo resumen (o al subsiguiente si comprás después del cierre) y las cuotas 2 a ${state.gastoCuotas} en los meses siguientes.`
+                        : `Si comprás antes o el día del cierre pasa al resumen del mes siguiente; después del cierre pasa al mes subsiguiente.`}
+                    </small>
                   </label>
                   <button type="button" class="btn-card-resumen" data-open-resumen-tarjeta="${escapeHtml(state.gastoCuenta || '')}" style="padding:9px;text-align:center;">
                     📄 ¿Querés ver el resumen o pagar la tarjeta? Tocá acá
@@ -4048,7 +4145,10 @@
       document.querySelectorAll('[data-edit-mov]').forEach(art => {
         art.onclick = () => {
           const uid = art.getAttribute('data-edit-mov');
-          const allMovs = (state.data && state.data.movimientos) || [];
+          const allMovs = [
+            ...((state.data && state.data.movimientos) || []),
+            ...((state.data && state.data.mes_info && state.data.mes_info.compras_tarjeta_mes_origen) || []),
+          ];
           const found = allMovs.find(m => m.uid === uid);
           if (found) {
             state.editingMov = found;
@@ -4454,7 +4554,7 @@
           const allItems = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
           const cardObj = allItems.find(c => c.name === state.resumenTarjetaNombre);
           const resT = (cardObj && cardObj.resumen_tarjeta) || {};
-          const sub = Number(state.resumenTarjetaPeriodo === 'anterior' ? resT.total_mes_anterior : resT.total_mes_actual) || 0;
+          const sub = getResumenPeriodoData(resT, state.resumenTarjetaPeriodo).total;
           const dif = parseFloat(e.target.value) || 0;
           inpResumenTotalPagar.value = (sub + dif).toFixed(2);
         };
@@ -4468,7 +4568,7 @@
           const allItems = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
           const cardObj = allItems.find(c => c.name === state.resumenTarjetaNombre);
           const resT = (cardObj && cardObj.resumen_tarjeta) || {};
-          const mesResumenYm = state.resumenTarjetaPeriodo === 'anterior' ? resT.mes_anterior_ym : resT.mes_actual_ym;
+          const mesResumenYm = getResumenPeriodoData(resT, state.resumenTarjetaPeriodo).ym;
           const res = await apiFetch('/api/tarjetas/pagar-resumen/', {
             method: 'POST',
             body: {
@@ -4499,7 +4599,7 @@
           const allItems = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
           const cardObj = allItems.find(c => c.name === state.resumenTarjetaNombre);
           const resT = (cardObj && cardObj.resumen_tarjeta) || {};
-          const mesResumenYm = state.resumenTarjetaPeriodo === 'anterior' ? resT.mes_anterior_ym : resT.mes_actual_ym;
+          const mesResumenYm = getResumenPeriodoData(resT, state.resumenTarjetaPeriodo).ym;
           const res = await apiFetch('/api/tarjetas/pagar-resumen/', {
             method: 'POST',
             body: {

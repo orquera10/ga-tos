@@ -331,6 +331,94 @@ def add_months_datetime(dt, months):
     return dt.replace(year=ny, month=nm, day=nd)
 
 
+def get_fecha_cierre_for_ym(c_obj, target_ym):
+    """
+    Obtiene la fecha de cierre (`date`) de la tarjeta `c_obj` para el mes `target_ym` ('YYYY-MM').
+    1) Si `c_obj.fechas_por_mes` tiene `fecha_cierre` configurada en `target_ym`, usa esa fecha exacta.
+    2) Si no, proyecta el día de cierre habitual de la tarjeta (`c_obj.fecha_cierre` o el último cierre
+       configurado en `fechas_por_mes`) dentro del año/mes `target_ym`.
+    """
+    if not c_obj or not target_ym or not re.match(r'^\d{4}-\d{2}$', str(target_ym)):
+        return None
+
+    fechas_map = getattr(c_obj, 'fechas_por_mes', None) or {}
+    if isinstance(fechas_map, dict) and target_ym in fechas_map:
+        fc_raw = ((fechas_map.get(target_ym) or {}).get('fecha_cierre') or '').strip()
+        fc_parsed = parse_date(fc_raw) if fc_raw else None
+        if fc_parsed:
+            return fc_parsed
+
+    ref_fc = getattr(c_obj, 'fecha_cierre', None)
+    if not ref_fc and isinstance(fechas_map, dict):
+        for ym_k in sorted(fechas_map.keys(), reverse=True):
+            fc_s = ((fechas_map.get(ym_k) or {}).get('fecha_cierre') or '').strip()
+            fc_cand = parse_date(fc_s) if fc_s else None
+            if fc_cand:
+                ref_fc = fc_cand
+                break
+
+    if ref_fc:
+        try:
+            ty, tm = [int(x) for x in target_ym.split('-')[:2]]
+            last_d = calendar.monthrange(ty, tm)[1]
+            return date(ty, tm, min(ref_fc.day, last_d))
+        except Exception:
+            return ref_fc
+
+    return None
+
+
+def calcular_imputacion_tarjeta(g, c_obj=None, cuota1_map=None):
+    """
+    Determina a qué mes de resumen (`mes_resumen_ym`) pasa un gasto con tarjeta según la fecha de cierre:
+    - Si `g.es_ajuste_tarjeta` es True (impuestos/diferencia al pagar resumen): queda en `get_local_ym(g.fecha)`.
+    - Si la compra se realizó ANTES o EL MISMO DÍA del cierre del mes de compra (`compra_dt.date() <= fecha_cierre`
+      o sin cierre configurado):
+        * El consumo (o Cuota 1) pasa al mes siguiente (`compra_ym + 1`, ej. compra en noviembre <= 21/11 pasa a diciembre).
+        * La Cuota k pasa a `compra_ym + k`.
+    - Si la compra se realizó DESPUÉS del cierre del mes de compra (`compra_dt.date() > fecha_cierre`):
+        * El consumo (o Cuota 1) pasa al mes subsiguiente (`compra_ym + 2`, ej. cierra 21/11 y compra 22/11 pasa a enero).
+        * La Cuota k pasa a `compra_ym + 1 + k`.
+    """
+    dt_g = get_local_dt(g.fecha)
+    if getattr(g, 'es_ajuste_tarjeta', False):
+        ym = dt_g.strftime('%Y-%m')
+        return {
+            'compra_dt': dt_g,
+            'compra_ym': ym,
+            'mes_resumen_ym': ym,
+            'es_post_cierre': False,
+            'fecha_cierre_compra': None,
+        }
+
+    cuenta = c_obj or getattr(g, 'cuenta_bancaria', None)
+    k = max(1, int(getattr(g, 'cuota_actual', 1) or 1))
+    grp = getattr(g, 'grupo_cuotas_uid', '') or ''
+    if k > 1 and grp and cuota1_map and grp in cuota1_map:
+        compra_dt = get_local_dt(cuota1_map[grp].fecha)
+    else:
+        compra_dt = add_months_datetime(dt_g, -(k - 1))
+
+    compra_ym = compra_dt.strftime('%Y-%m')
+    fc = get_fecha_cierre_for_ym(cuenta, compra_ym)
+
+    if fc and compra_dt.date() > fc:
+        es_post_cierre = True
+        offset_base = 2
+    else:
+        es_post_cierre = False
+        offset_base = 1
+
+    mes_resumen_ym = shift_ym(compra_ym, offset_base + (k - 1))
+    return {
+        'compra_dt': compra_dt,
+        'compra_ym': compra_ym,
+        'mes_resumen_ym': mes_resumen_ym,
+        'es_post_cierre': es_post_cierre,
+        'fecha_cierre_compra': fc,
+    }
+
+
 def get_user_initials(user):
     first = (user.first_name or '').strip()
     last = (user.last_name or '').strip()
@@ -608,6 +696,20 @@ def presupuesto_detalle_api(request, pk=None):
     hoy_ym = hoy.strftime('%Y-%m')
     mes_param = (request.GET.get('mes') or '').strip()
 
+    cuota1_por_grupo = {
+        g.grupo_cuotas_uid: g
+        for g in all_gastos
+        if g.grupo_cuotas_uid and (g.cuota_actual or 1) == 1
+    }
+    g_imputaciones = {}
+    for g in all_gastos:
+        if g.metodo_pago == 'tarjeta':
+            g_imputaciones[g.id] = calcular_imputacion_tarjeta(
+                g,
+                c_obj=g.cuenta_bancaria,
+                cuota1_map=cuota1_por_grupo,
+            )
+
     # Selector de mes para presupuestos abiertos (y resumen por mes para tarjetas)
     meses_set = {
         shift_ym(hoy_ym, -1),
@@ -617,6 +719,9 @@ def presupuesto_detalle_api(request, pk=None):
     }
     for g in all_gastos:
         meses_set.add(get_local_ym(g.fecha))
+        if g.id in g_imputaciones:
+            meses_set.add(g_imputaciones[g.id]['mes_resumen_ym'])
+            meses_set.add(g_imputaciones[g.id]['compra_ym'])
     for i in all_ingresos:
         meses_set.add(get_local_ym(i.fecha))
     for t in all_transferencias:
@@ -644,17 +749,29 @@ def presupuesto_detalle_api(request, pk=None):
     ]
 
     if presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos':
-        gastos = [g for g in all_gastos if get_local_ym(g.fecha) == mes_seleccionado]
+        gastos = [
+            g for g in all_gastos
+            if (g_imputaciones[g.id]['mes_resumen_ym'] if g.metodo_pago == 'tarjeta' else get_local_ym(g.fecha)) == mes_seleccionado
+        ]
+        gastos_tarjeta_comprados_mes = [
+            g for g in all_gastos
+            if g.metodo_pago == 'tarjeta'
+            and not g.es_ajuste_tarjeta
+            and (g.cuota_actual or 1) == 1
+            and g_imputaciones[g.id]['compra_ym'] == mes_seleccionado
+        ]
         ingresos = [i for i in all_ingresos if get_local_ym(i.fecha) == mes_seleccionado]
         transferencias = [t for t in all_transferencias if get_local_ym(t.fecha) == mes_seleccionado]
     else:
         gastos = all_gastos
+        gastos_tarjeta_comprados_mes = []
         ingresos = all_ingresos
         transferencias = all_transferencias
 
     mes_ref_ym = mes_seleccionado if (mes_seleccionado and mes_seleccionado != 'todos') else hoy_ym
     mes_ant_ym = shift_ym(mes_ref_ym, -1)
     mes_sig_ym = shift_ym(mes_ref_ym, 1)
+    mes_subsig_ym = shift_ym(mes_ref_ym, 2)
 
     total_gastos_all = sum((g.monto for g in gastos), Decimal('0'))
     total_gastos_comp = sum((g.monto for g in gastos if g.metodo_pago != 'tarjeta'), Decimal('0'))
@@ -664,11 +781,10 @@ def presupuesto_detalle_api(request, pk=None):
     saldo_transferencia = presupuesto.saldo_transferencia
     disponible = presupuesto.monto_total_con_ingresos()
 
-    # Armar lista unificada de movimientos
-    raw_movs = []
-    for g in gastos:
+    def serialize_gasto_mov_dict(g):
         icon, tone = resolve_gasto_icon_tone(g)
         cat_label = g.categoria.nombre if g.categoria else 'Sin categoría'
+        imp = g_imputaciones.get(g.id)
         parts_detail = [cat_label]
         if g.cuenta_bancaria:
             parts_detail.append(g.cuenta_bancaria.nombre)
@@ -678,12 +794,16 @@ def presupuesto_detalle_api(request, pk=None):
             parts_detail.append('Efectivo')
         if g.cuotas_totales and g.cuotas_totales > 1:
             parts_detail.append(f"🗓️ Cuota {g.cuota_actual}/{g.cuotas_totales}")
+        if imp and not g.es_ajuste_tarjeta:
+            res_lbl = format_mes_label(imp['mes_resumen_ym'])
+            post_lbl = ' (post-cierre)' if imp['es_post_cierre'] else ''
+            parts_detail.append(f"➔ {res_lbl}{post_lbl}")
         if g.persona:
             parts_detail.append(f"👤 {g.persona}")
-        parts_detail.append(format_fecha_humana(g.fecha))
+        parts_detail.append(format_fecha_humana(imp['compra_dt'] if (imp and not g.es_ajuste_tarjeta) else g.fecha))
 
         dt_local = timezone.localtime(g.fecha) if timezone.is_aware(g.fecha) else g.fecha
-        raw_movs.append({
+        return {
             '_sort_dt': dt_local,
             'uid': f"gasto-{g.id}",
             'id': g.id,
@@ -704,12 +824,35 @@ def presupuesto_detalle_api(request, pk=None):
             'cuotas_totales': g.cuotas_totales or 1,
             'grupo_cuotas_uid': g.grupo_cuotas_uid or '',
             'es_ajuste_tarjeta': bool(g.es_ajuste_tarjeta),
+            'mes_resumen': imp['mes_resumen_ym'] if imp else '',
+            'mes_resumen_label': format_mes_label(imp['mes_resumen_ym']) if imp else '',
+            'compra_ym': imp['compra_ym'] if imp else get_local_ym(g.fecha),
+            'es_post_cierre': bool(imp['es_post_cierre']) if imp else False,
             'is_transfer': False,
             'icon': icon,
             'tone': tone,
             'fecha_iso': dt_local.strftime('%Y-%m-%d'),
             'fecha_hora_iso': dt_local.strftime('%Y-%m-%dT%H:%M'),
-        })
+        }
+
+    # Armar lista unificada de movimientos
+    raw_movs = []
+    for g in gastos:
+        raw_movs.append(serialize_gasto_mov_dict(g))
+
+    compras_tarjeta_mes_origen = []
+    total_origen_pasa_sig = Decimal('0')
+    total_origen_pasa_subsig = Decimal('0')
+    for g in gastos_tarjeta_comprados_mes:
+        d_item = serialize_gasto_mov_dict(g)
+        d_item.pop('_sort_dt', None)
+        compras_tarjeta_mes_origen.append(d_item)
+        imp = g_imputaciones.get(g.id)
+        if imp:
+            if imp['es_post_cierre']:
+                total_origen_pasa_subsig += g.monto
+            else:
+                total_origen_pasa_sig += g.monto
 
     for i in ingresos:
         parts_detail = ['Ingreso']
@@ -844,73 +987,71 @@ def presupuesto_detalle_api(request, pk=None):
                 user_cuentas.append(c)
 
     # Calcular saldos por CuentaBancaria en este presupuesto (liquidez acumulada total, consumos tarjeta del período)
-    cuentas_stats = {}
-    for c in user_cuentas:
-        cuentas_stats[c.nombre.lower()] = {
-            'obj': c,
-            'nombre': c.nombre,
+    def init_cuenta_stat(c_obj, nombre):
+        return {
+            'obj': c_obj,
+            'nombre': nombre,
             'ingresos': Decimal('0'),
             'gastos_liquidos': Decimal('0'),
             'gastos_tarjeta': Decimal('0'),
             'consumos_mes_actual': [],
             'consumos_mes_anterior': [],
+            'consumos_mes_siguiente': [],
+            'consumos_mes_subsiguiente': [],
             'total_mes_actual': Decimal('0'),
             'total_mes_anterior': Decimal('0'),
+            'total_mes_siguiente': Decimal('0'),
+            'total_mes_subsiguiente': Decimal('0'),
         }
+
+    cuentas_stats = {}
+    for c in user_cuentas:
+        cuentas_stats[c.nombre.lower()] = init_cuenta_stat(c, c.nombre)
 
     for i in all_ingresos:
         if i.cuenta_bancaria:
             key = i.cuenta_bancaria.nombre.lower()
             if key not in cuentas_stats:
-                cuentas_stats[key] = {
-                    'obj': i.cuenta_bancaria,
-                    'nombre': i.cuenta_bancaria.nombre,
-                    'ingresos': Decimal('0'),
-                    'gastos_liquidos': Decimal('0'),
-                    'gastos_tarjeta': Decimal('0'),
-                    'consumos_mes_actual': [],
-                    'consumos_mes_anterior': [],
-                    'total_mes_actual': Decimal('0'),
-                    'total_mes_anterior': Decimal('0'),
-                }
+                cuentas_stats[key] = init_cuenta_stat(i.cuenta_bancaria, i.cuenta_bancaria.nombre)
             cuentas_stats[key]['ingresos'] += i.monto
 
     tarjeta_sin_cuenta = Decimal('0')
     for g in all_gastos:
-        g_ym = get_local_ym(g.fecha)
-        in_vista = (presupuesto.tipo != 'abierto' or mes_seleccionado == 'todos' or g_ym == mes_seleccionado)
+        imp = g_imputaciones.get(g.id) if g.metodo_pago == 'tarjeta' else None
+        g_eff_ym = imp['mes_resumen_ym'] if imp else get_local_ym(g.fecha)
+        in_vista = (presupuesto.tipo != 'abierto' or mes_seleccionado == 'todos' or g_eff_ym == mes_seleccionado)
         if g.cuenta_bancaria:
             key = g.cuenta_bancaria.nombre.lower()
             if key not in cuentas_stats:
-                cuentas_stats[key] = {
-                    'obj': g.cuenta_bancaria,
-                    'nombre': g.cuenta_bancaria.nombre,
-                    'ingresos': Decimal('0'),
-                    'gastos_liquidos': Decimal('0'),
-                    'gastos_tarjeta': Decimal('0'),
-                    'consumos_mes_actual': [],
-                    'consumos_mes_anterior': [],
-                    'total_mes_actual': Decimal('0'),
-                    'total_mes_anterior': Decimal('0'),
-                }
+                cuentas_stats[key] = init_cuenta_stat(g.cuenta_bancaria, g.cuenta_bancaria.nombre)
             if g.metodo_pago == 'tarjeta':
                 if in_vista:
                     cuentas_stats[key]['gastos_tarjeta'] += g.monto
+                dt_compra_ref = imp['compra_dt'] if (imp and not g.es_ajuste_tarjeta) else get_local_dt(g.fecha)
                 item_tarj = {
                     'id': g.id,
                     'nombre': g.nombre,
                     'monto': float(g.monto),
-                    'fecha_str': get_local_dt(g.fecha).strftime('%d/%m'),
+                    'fecha_str': dt_compra_ref.strftime('%d/%m'),
                     'cuota_actual': g.cuota_actual or 1,
                     'cuotas_totales': g.cuotas_totales or 1,
                     'es_ajuste_tarjeta': bool(g.es_ajuste_tarjeta),
+                    'es_post_cierre': bool(imp['es_post_cierre']) if imp else False,
+                    'mes_resumen_ym': g_eff_ym,
+                    'mes_resumen_label': format_mes_label(g_eff_ym),
                 }
-                if g_ym == mes_ref_ym or (presupuesto.tipo != 'abierto' and mes_seleccionado == 'todos'):
+                if g_eff_ym == mes_ref_ym or (presupuesto.tipo != 'abierto' and mes_seleccionado == 'todos'):
                     cuentas_stats[key]['consumos_mes_actual'].append(item_tarj)
                     cuentas_stats[key]['total_mes_actual'] += g.monto
-                if g_ym == mes_ant_ym:
+                if g_eff_ym == mes_ant_ym:
                     cuentas_stats[key]['consumos_mes_anterior'].append(item_tarj)
                     cuentas_stats[key]['total_mes_anterior'] += g.monto
+                if g_eff_ym == mes_sig_ym:
+                    cuentas_stats[key]['consumos_mes_siguiente'].append(item_tarj)
+                    cuentas_stats[key]['total_mes_siguiente'] += g.monto
+                if g_eff_ym == mes_subsig_ym:
+                    cuentas_stats[key]['consumos_mes_subsiguiente'].append(item_tarj)
+                    cuentas_stats[key]['total_mes_subsiguiente'] += g.monto
             else:
                 cuentas_stats[key]['gastos_liquidos'] += g.monto
         elif g.metodo_pago == 'tarjeta' and in_vista:
@@ -920,32 +1061,12 @@ def presupuesto_detalle_api(request, pk=None):
         if t.origen_cuenta:
             key = t.origen_cuenta.nombre.lower()
             if key not in cuentas_stats:
-                cuentas_stats[key] = {
-                    'obj': t.origen_cuenta,
-                    'nombre': t.origen_cuenta.nombre,
-                    'ingresos': Decimal('0'),
-                    'gastos_liquidos': Decimal('0'),
-                    'gastos_tarjeta': Decimal('0'),
-                    'consumos_mes_actual': [],
-                    'consumos_mes_anterior': [],
-                    'total_mes_actual': Decimal('0'),
-                    'total_mes_anterior': Decimal('0'),
-                }
+                cuentas_stats[key] = init_cuenta_stat(t.origen_cuenta, t.origen_cuenta.nombre)
             cuentas_stats[key]['gastos_liquidos'] += t.monto
         if t.destino_cuenta:
             key = t.destino_cuenta.nombre.lower()
             if key not in cuentas_stats:
-                cuentas_stats[key] = {
-                    'obj': t.destino_cuenta,
-                    'nombre': t.destino_cuenta.nombre,
-                    'ingresos': Decimal('0'),
-                    'gastos_liquidos': Decimal('0'),
-                    'gastos_tarjeta': Decimal('0'),
-                    'consumos_mes_actual': [],
-                    'consumos_mes_anterior': [],
-                    'total_mes_actual': Decimal('0'),
-                    'total_mes_anterior': Decimal('0'),
-                }
+                cuentas_stats[key] = init_cuenta_stat(t.destino_cuenta, t.destino_cuenta.nombre)
             cuentas_stats[key]['ingresos'] += t.monto
 
     cuentas_items = []
@@ -988,6 +1109,14 @@ def presupuesto_detalle_api(request, pk=None):
                 'mes_anterior_label': format_mes_label(mes_ant_ym),
                 'total_mes_anterior': float(st['total_mes_anterior']),
                 'consumos_mes_anterior': st['consumos_mes_anterior'],
+                'mes_siguiente_ym': mes_sig_ym,
+                'mes_siguiente_label': format_mes_label(mes_sig_ym),
+                'total_mes_siguiente': float(st['total_mes_siguiente']),
+                'consumos_mes_siguiente': st['consumos_mes_siguiente'],
+                'mes_subsiguiente_ym': mes_subsig_ym,
+                'mes_subsiguiente_label': format_mes_label(mes_subsig_ym),
+                'total_mes_subsiguiente': float(st['total_mes_subsiguiente']),
+                'consumos_mes_subsiguiente': st['consumos_mes_subsiguiente'],
             },
             'icon': icon_name,
             'icon_class': icon_cls,
@@ -1086,10 +1215,15 @@ def presupuesto_detalle_api(request, pk=None):
             'mes_anterior_label': format_mes_label(mes_ant_ym),
             'mes_siguiente': mes_sig_ym,
             'mes_siguiente_label': format_mes_label(mes_sig_ym),
+            'mes_subsiguiente': mes_subsig_ym,
+            'mes_subsiguiente_label': format_mes_label(mes_subsig_ym),
             'meses_disponibles': meses_disponibles,
             'ingresos_mes': float(total_ingresos),
             'gastos_computables_mes': float(total_gastos_comp),
             'gastos_tarjeta_mes': float(total_tarjeta),
+            'compras_tarjeta_mes_origen': compras_tarjeta_mes_origen,
+            'total_origen_pasa_siguiente': float(total_origen_pasa_sig),
+            'total_origen_pasa_subsiguiente': float(total_origen_pasa_subsig),
         }
 
     prestamo_info = None
@@ -1869,13 +2003,20 @@ def crear_gasto_api(request):
 
     presupuesto.refresh_from_db()
 
+    imp_creado = calcular_imputacion_tarjeta(gasto, c_obj=cuenta_bancaria) if metodo_pago == 'tarjeta' else None
+    if metodo_pago == 'tarjeta' and imp_creado and not gasto.es_ajuste_tarjeta:
+        res_lbl = format_mes_label(imp_creado['mes_resumen_ym'])
+        post_note = ' (post-cierre)' if imp_creado['es_post_cierre'] else ''
+        if cuotas_totales > 1:
+            msg_resp = f"Compra en {cuotas_totales} cuotas registrada{post_note} · Cuota 1 pasa a {res_lbl}"
+        else:
+            msg_resp = f"Gasto con tarjeta registrado{post_note} · Pasa a {res_lbl}"
+    else:
+        msg_resp = f"Gasto de {presupuesto.moneda} {gasto.monto} registrado exitosamente"
+
     return JsonResponse({
         'success': True,
-        'mensaje': (
-            f'Compra en {cuotas_totales} cuotas de {presupuesto.moneda} {gasto.monto} registrada automáticamente mes a mes'
-            if (metodo_pago == 'tarjeta' and cuotas_totales > 1)
-            else f'Gasto de {presupuesto.moneda} {gasto.monto} registrado exitosamente'
-        ),
+        'mensaje': msg_resp,
         'cuotas_creadas': cuotas_totales if metodo_pago == 'tarjeta' else 1,
         'gasto': {
             'id': gasto.id,
@@ -1886,6 +2027,9 @@ def crear_gasto_api(request):
             'monto': float(gasto.monto),
             'cuota_actual': gasto.cuota_actual,
             'cuotas_totales': gasto.cuotas_totales,
+            'mes_resumen': imp_creado['mes_resumen_ym'] if imp_creado else '',
+            'mes_resumen_label': format_mes_label(imp_creado['mes_resumen_ym']) if imp_creado else '',
+            'es_post_cierre': bool(imp_creado['es_post_cierre']) if imp_creado else False,
             'categoria': gasto.categoria.nombre if gasto.categoria else None,
             'fecha': gasto.fecha.strftime('%Y-%m-%d %H:%M'),
         },
@@ -2420,6 +2564,27 @@ def editar_movimiento_api(request):
         gasto.es_rapido = False
         gasto.full_clean()
         gasto.save()
+
+        # Si pertenece a una compra en cuotas, mantener alineadas la fecha base y tarjeta en las demás cuotas
+        if gasto.grupo_cuotas_uid and (nueva_fecha or 'cuenta_bancaria' in data):
+            k_cur = max(1, gasto.cuota_actual or 1)
+            dt_base_compra = add_months_datetime(get_local_dt(gasto.fecha), -(k_cur - 1))
+            hermanas = Gasto.objects.filter(
+                presupuesto=gasto.presupuesto,
+                grupo_cuotas_uid=gasto.grupo_cuotas_uid
+            ).exclude(id=gasto.id)
+            for h in hermanas:
+                changed_h = False
+                if nueva_fecha:
+                    k_h = max(1, h.cuota_actual or 1)
+                    h.fecha = add_months_datetime(dt_base_compra, k_h - 1)
+                    changed_h = True
+                if 'cuenta_bancaria' in data:
+                    h.cuenta_bancaria = gasto.cuenta_bancaria
+                    changed_h = True
+                if changed_h:
+                    h.save(update_fields=['fecha', 'cuenta_bancaria', 'fecha_actualizacion'])
+
         gasto.presupuesto.actualizar_monto_restante()
         return JsonResponse({'success': True, 'mensaje': 'Gasto actualizado correctamente'})
 
