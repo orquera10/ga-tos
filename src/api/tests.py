@@ -740,6 +740,55 @@ class ApiEndpointsTestCase(TestCase):
         res_dic_ini_titles = [x['nombre'] for x in visa_dic_ini['resumen_tarjeta']['consumos_mes_actual']]
         self.assertIn('Auriculares (Cuota 4/6)', res_dic_ini_titles)
 
+        # 6. Tarjeta que cierra y vence dentro del MISMO mes (ej. Bna_Visa: cierre 05/11, vencimiento 18/11)
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Bna_Visa',
+                'tipo': 'tarjeta',
+                'mes': '2026-11',
+                'fecha_cierre': '2026-11-05',
+                'fecha_vencimiento': '2026-11-18',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        # Compra el 04/11 (antes del cierre 05/11) -> vence el 18/11 (Noviembre 2026)
+        resp_bna_pre = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'nombre': 'Gas Pre Cierre BNA',
+                'monto': 12000,
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Bna_Visa',
+                'fecha': '2026-11-04T10:00',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_bna_pre.status_code, 201)
+        self.assertEqual(resp_bna_pre.json()['gasto']['mes_resumen'], '2026-11')
+        self.assertFalse(resp_bna_pre.json()['gasto']['es_post_cierre'])
+
+        # Compra el 16/11 (después del cierre 05/11) -> cierra el 10/12 y vence en Diciembre 2026
+        resp_bna_post = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'nombre': 'Gas Post Cierre BNA',
+                'monto': 15068,
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Bna_Visa',
+                'fecha': '2026-11-16T21:00',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_bna_post.status_code, 201)
+        self.assertEqual(resp_bna_post.json()['gasto']['mes_resumen'], '2026-12')
+        self.assertTrue(resp_bna_post.json()['gasto']['es_post_cierre'])
+
 
 
 

@@ -368,17 +368,49 @@ def get_fecha_cierre_for_ym(c_obj, target_ym):
     return None
 
 
+def tarjeta_vence_mismo_mes(c_obj, target_ym, fc=None):
+    """
+    Determina si la tarjeta `c_obj` vence dentro del MISMO mes que cierra (ej. Bna_Visa: cierra 05/11 y vence 18/11;
+    cierra 10/12 y vence 23/12) vs al mes siguiente del cierre (ej. Macro_Visa: cierra 19/11 y vence 05/12).
+    """
+    if not c_obj:
+        return False
+    fechas_map = getattr(c_obj, 'fechas_por_mes', None) or {}
+    fv = None
+    if isinstance(fechas_map, dict) and target_ym in fechas_map:
+        fv_s = ((fechas_map.get(target_ym) or {}).get('fecha_vencimiento') or '').strip()
+        fv = parse_date(fv_s) if fv_s else None
+
+    if fc and fv:
+        return (fv.year == fc.year and fv.month == fc.month and fv >= fc)
+
+    # Fallback al par (cierre, vencimiento) más reciente de la tarjeta
+    ref_fc = getattr(c_obj, 'fecha_cierre', None)
+    ref_fv = getattr(c_obj, 'fecha_vencimiento', None)
+    if (not ref_fc or not ref_fv) and isinstance(fechas_map, dict):
+        for ym_k in sorted(fechas_map.keys(), reverse=True):
+            entry = fechas_map.get(ym_k) or {}
+            c_cand = parse_date((entry.get('fecha_cierre') or '').strip()) if entry.get('fecha_cierre') else None
+            v_cand = parse_date((entry.get('fecha_vencimiento') or '').strip()) if entry.get('fecha_vencimiento') else None
+            if c_cand and v_cand:
+                ref_fc, ref_fv = c_cand, v_cand
+                break
+
+    if ref_fc and ref_fv:
+        return (ref_fv.year == ref_fc.year and ref_fv.month == ref_fc.month and ref_fv >= ref_fc)
+    return False
+
+
 def calcular_imputacion_tarjeta(g, c_obj=None, cuota1_map=None):
     """
-    Determina a qué mes de resumen (`mes_resumen_ym`) pasa un gasto con tarjeta según la fecha de cierre:
+    Determina a qué mes de resumen (`mes_resumen_ym`) pasa un gasto con tarjeta según su cierre y vencimiento:
     - Si `g.es_ajuste_tarjeta` es True (impuestos/diferencia al pagar resumen): queda en `get_local_ym(g.fecha)`.
-    - Si la compra se realizó ANTES o EL MISMO DÍA del cierre del mes de compra (`compra_dt.date() <= fecha_cierre`
-      o sin cierre configurado):
-        * El consumo (o Cuota 1) pasa al mes siguiente (`compra_ym + 1`, ej. compra en noviembre <= 21/11 pasa a diciembre).
-        * La Cuota k pasa a `compra_ym + k`.
-    - Si la compra se realizó DESPUÉS del cierre del mes de compra (`compra_dt.date() > fecha_cierre`):
-        * El consumo (o Cuota 1) pasa al mes subsiguiente (`compra_ym + 2`, ej. cierra 21/11 y compra 22/11 pasa a enero).
-        * La Cuota k pasa a `compra_ym + 1 + k`.
+    - Si la tarjeta vence en el MISMO mes que cierra (ej. Bna_Visa: cierra 05/11 y vence 18/11):
+        * Compra ANTES o EL DÍA del cierre (`<= fc`): vence en el mismo mes (`offset_base = 0`, ej. 18/11).
+        * Compra DESPUÉS del cierre (`> fc`, ej. 16/11): entra en el cierre del mes siguiente (10/12) y vence en Diciembre (`offset_base = 1`, ej. 23/12).
+    - Si la tarjeta vence al MES SIGUIENTE del cierre (ej. Macro_Visa: cierra 19/11 y vence 05/12):
+        * Compra ANTES o EL DÍA del cierre (`<= fc`): vence al mes siguiente (`offset_base = 1`, Diciembre).
+        * Compra DESPUÉS del cierre (`> fc`): vence al mes subsiguiente (`offset_base = 2`, Enero).
     """
     dt_g = get_local_dt(g.fecha)
     if getattr(g, 'es_ajuste_tarjeta', False):
@@ -405,13 +437,15 @@ def calcular_imputacion_tarjeta(g, c_obj=None, cuota1_map=None):
 
     compra_ym = compra_dt.strftime('%Y-%m')
     fc = get_fecha_cierre_for_ym(cuenta, compra_ym)
+    mismo_mes = tarjeta_vence_mismo_mes(cuenta, compra_ym, fc=fc)
+    base_shift = 0 if mismo_mes else 1
 
     if fc and compra_dt.date() > fc:
         es_post_cierre = True
-        offset_base = 2
+        offset_base = base_shift + 1
     else:
         es_post_cierre = False
-        offset_base = 1
+        offset_base = base_shift
 
     mes_resumen_ym = shift_ym(compra_ym, offset_base + rel_k)
     return {
