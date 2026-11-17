@@ -789,6 +789,45 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(resp_bna_post.json()['gasto']['mes_resumen'], '2026-12')
         self.assertTrue(resp_bna_post.json()['gasto']['es_post_cierre'])
 
+        # Verificar vence_en_mes en Noviembre 2026 para Bna_Visa y el detalle de consumos + diferencia al pagar en Diciembre 2026
+        det_bna_nov = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-11',
+            **self.auth_headers
+        ).json()
+        bna_nov = next((c for c in det_bna_nov['cuentas']['items'] if c['name'] == 'Bna_Visa'), None)
+        self.assertIsNotNone(bna_nov)
+        self.assertTrue(bna_nov['vence_en_mes'])
+
+        resp_bna_pago = self.client.post(
+            '/api/tarjetas/pagar-resumen/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'tarjeta_nombre': 'Bna_Visa',
+                'accion': 'pagar',
+                'mes_resumen': '2026-12',
+                'monto_total': 20000,
+                'metodo_pago': 'transferencia',
+                'fecha': '2026-12-23T11:00',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_bna_pago.status_code, 201)
+        self.assertEqual(resp_bna_pago.json()['subtotal_consumos'], 15068.0)
+        self.assertEqual(resp_bna_pago.json()['diferencia'], 4932.0)
+
+        det_bna_dic = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
+            **self.auth_headers
+        ).json()
+        pago_mov = next((m for m in det_bna_dic['movimientos'] if m['id'] == resp_bna_pago.json()['gasto_id']), None)
+        self.assertIsNotNone(pago_mov)
+        self.assertIsNotNone(pago_mov['pago_tarjeta_detalle'])
+        self.assertEqual(pago_mov['pago_tarjeta_detalle']['subtotal_consumos'], 15068.0)
+        self.assertEqual(pago_mov['pago_tarjeta_detalle']['monto_pagado'], 20000.0)
+        self.assertEqual(pago_mov['pago_tarjeta_detalle']['diferencia'], 4932.0)
+        self.assertEqual(pago_mov['pago_tarjeta_detalle']['consumos'][0]['nombre'], 'Gas Post Cierre BNA')
+
 
 
 

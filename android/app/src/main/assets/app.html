@@ -1869,11 +1869,14 @@
       } else if (name === 'resumen_tarjeta') {
         const allItems = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
         const cardItems = allItems.filter(c => c.tipo === 'tarjeta' && !c.is_system);
-        state.resumenTarjetaNombre = (extra && extra.tarjetaNombre) || (cardItems[0] ? cardItems[0].name : '');
+        const cardVence = cardItems.find(c => c.vence_en_mes);
+        state.resumenTarjetaNombre = (extra && extra.tarjetaNombre) || (cardVence ? cardVence.name : (cardItems[0] ? cardItems[0].name : ''));
         const foundCard = cardItems.find(c => c.name === state.resumenTarjetaNombre);
         const resT = foundCard && foundCard.resumen_tarjeta;
         if (extra && extra.periodo) {
           state.resumenTarjetaPeriodo = extra.periodo;
+        } else if (foundCard && foundCard.vence_en_mes) {
+          state.resumenTarjetaPeriodo = 'actual';
         } else if (resT && resT.total_mes_actual > 0) {
           state.resumenTarjetaPeriodo = 'actual';
         } else if (resT && resT.total_mes_siguiente > 0) {
@@ -2383,6 +2386,26 @@
             <strong>Cuentas</strong>
           </button>
         </section>
+
+        ${(() => {
+          const allTarjs = ((d.cuentas && d.cuentas.items) || []).filter(c => c.tipo === 'tarjeta' && !c.is_system);
+          if (!allTarjs.length) return '';
+          const vencenMes = allTarjs.filter(c => c.vence_en_mes);
+          const mesNom = (mInfo && mInfo.mes_seleccionado !== 'todos') ? mInfo.mes_label : 'este mes';
+          const subTxt = vencenMes.length
+            ? `Vencen en ${mesNom}: ${vencenMes.map(c => `${c.name} (${c.fecha_vencimiento_str})`).join(', ')}`
+            : `Consultá consumos, diferencias y registrá el pago del resumen`;
+          return `
+            <button type="button" data-open-sheet="resumen_tarjeta" style="width:100%;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid rgba(240,189,98,0.35);background:linear-gradient(135deg,rgba(240,189,98,0.12),rgba(102,87,232,0.12));display:flex;align-items:center;gap:12px;text-align:left;color:#fff;">
+              <span class="action-icon amber" style="width:38px;height:38px;flex-shrink:0;">${iconSvg('card', 18)}</span>
+              <div style="min-width:0;flex:1;">
+                <strong style="display:block;font:700 13px 'Manrope',sans-serif;color:#f5d28b;">💳 Pagar tarjeta</strong>
+                <small style="display:block;font-size:10.5px;color:#cfd1e2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subTxt)}</small>
+              </div>
+              ${iconSvg('chevron', 17)}
+            </button>
+          `;
+        })()}
 
         <section class="budget-card">
           <div class="section-top">
@@ -2975,11 +2998,23 @@
                 <div class="empty">Primero agregá una tarjeta de crédito en la pestaña Cuentas.</div>
               ` : `
                 <form id="formResumenTarjeta">
+                  ${(() => {
+                    const vencenMes = cardItems.filter(c => c.vence_en_mes);
+                    if (!vencenMes.length) return '';
+                    return `
+                      <div style="padding:8px 11px;border-radius:11px;background:rgba(240,189,98,0.12);border:1px solid rgba(240,189,98,0.35);font-size:10.5px;color:#f5d28b;">
+                        ⏳ <strong>Vencen en ${escapeHtml((d.mes_info && d.mes_info.mes_label) || 'este mes')}:</strong>
+                        ${vencenMes.map(c => `${escapeHtml(c.name)} (${escapeHtml(c.fecha_vencimiento_str)})`).join(' · ')}
+                      </div>
+                    `;
+                  })()}
                   <label>
                     Tarjeta seleccionada
                     <div class="chips-selector">
                       ${cardItems.map(c => `
-                        <button type="button" class="chip-btn ${c.name === curCardName ? 'selected' : ''}" data-resumen-select-tarjeta="${escapeHtml(c.name)}">💳 ${escapeHtml(c.name)}</button>
+                        <button type="button" class="chip-btn ${c.name === curCardName ? 'selected' : ''}" data-resumen-select-tarjeta="${escapeHtml(c.name)}">
+                          💳 ${escapeHtml(c.name)}${c.vence_en_mes && c.fecha_vencimiento_str ? ` · ⏳ ${escapeHtml(c.fecha_vencimiento_str)}` : ''}
+                        </button>
                       `).join('')}
                     </div>
                   </label>
@@ -3059,10 +3094,10 @@
                     <span class="overline" style="color:#b6acff;">REGISTRAR PAGO DE LA TARJETA (DESCUENTA DE TU SALDO)</span>
                     <div class="form-row">
                       <label>
-                        Total a pagar
+                        Monto que pagaste ($)
                         <div class="amount-input">
                           <span>$</span>
-                          <input name="monto_total" id="inpResumenTotalPagar" type="number" step="0.01" min="0.01" required value="${totalCalculado > 0 ? totalCalculado.toFixed(2) : ''}" placeholder="0" inputmode="decimal" />
+                          <input name="monto_total" id="inpResumenTotalPagar" type="number" step="0.01" min="0.01" required value="${totalCalculado > 0 ? totalCalculado.toFixed(2) : ''}" placeholder="Ingresá el monto del resumen" inputmode="decimal" />
                         </div>
                       </label>
                       <label>
@@ -3072,6 +3107,11 @@
                           <input type="datetime-local" name="fecha" value="${escapeHtml(draft.fecha || nowDateTimeIso)}" />
                         </div>
                       </label>
+                    </div>
+                    <div id="resumenDiffLive" style="font-size:10.5px;color:#cfd1e2;padding:7px 10px;border-radius:10px;background:#171926;border:1px solid #2b2f42;">
+                      ${subtotalConsumos > 0
+                        ? `Gastos cargados en ${escapeHtml(mesResumenLabel)}: <strong style="color:#f0bd62;">${money(subtotalConsumos)}</strong> · Diferencia: <strong style="color:#55d2ad;">${money(Math.max(0, totalCalculado - subtotalConsumos))}</strong>`
+                        : `Sin gastos cargados para ${escapeHtml(mesResumenLabel)} — ingresá directo el monto que pagaste.`}
                     </div>
                     <label>
                       ¿Con qué pagás la tarjeta?
@@ -3732,7 +3772,43 @@
           const curCuenta = state.editCuenta !== undefined ? state.editCuenta : (m.cuenta_bancaria || '');
           const curFechaHora = m.fecha_hora_iso || (m.fecha_iso ? `${m.fecha_iso}T12:00` : nowDateTimeIso);
           const cuentasEdit = getFilteredCuentasForMetodo(cuentas, state.editMetodo);
+          const pagoDet = m.pago_tarjeta_detalle;
+          const pagoDetHtml = pagoDet ? `
+            <div style="padding:11px 12px;border-radius:14px;background:#171926;border:1px solid rgba(240,189,98,0.32);display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="overline" style="color:#f0bd62;">💳 RESUMEN ${escapeHtml((pagoDet.tarjeta_nombre || '').toUpperCase())} · ${escapeHtml((pagoDet.mes_resumen_label || '').toUpperCase())}</span>
+              </div>
+              ${pagoDet.consumos && pagoDet.consumos.length ? `
+                <div class="card-summary-list" style="max-height:150px;">
+                  ${pagoDet.consumos.map(c => `
+                    <div class="card-summary-row">
+                      <div style="min-width:0;flex:1;">
+                        <strong style="color:#eeeef6;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(c.nombre)}</strong>
+                        <span style="color:#8f91a2;font-size:9.5px;">${escapeHtml(c.fecha_str)}${c.cuotas_totales > 1 ? ` · Cuota ${c.cuota_actual}/${c.cuotas_totales}` : ''}</span>
+                      </div>
+                      <b style="color:#f0bd62;white-space:nowrap;">${money(c.monto)}</b>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : `<div style="font-size:11px;color:#8f91a2;">No había gastos cargados en ${escapeHtml(pagoDet.mes_resumen_label || 'este período')}.</div>`}
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding-top:6px;border-top:1px solid #282b3b;font-size:10.5px;">
+                <div>
+                  <span style="color:#8f91a2;display:block;font-size:9px;">Gastos cargados</span>
+                  <strong style="color:#f0bd62;">${money(pagoDet.subtotal_consumos)}</strong>
+                </div>
+                <div>
+                  <span style="color:#8f91a2;display:block;font-size:9px;">Monto pagado</span>
+                  <strong style="color:#fff;">${money(pagoDet.monto_pagado)}</strong>
+                </div>
+                <div>
+                  <span style="color:#8f91a2;display:block;font-size:9px;">Diferencia</span>
+                  <strong style="color:${pagoDet.diferencia >= 0 ? '#55d2ad' : '#ff8780'};">${pagoDet.diferencia > 0 ? '+' : (pagoDet.diferencia < 0 ? '−' : '')}${money(Math.abs(pagoDet.diferencia))}</strong>
+                </div>
+              </div>
+            </div>
+          ` : '';
           fieldsHtml = `
+            ${pagoDetHtml}
             <label>
               Monto
               <div class="amount-input">
@@ -4599,6 +4675,23 @@
 
       const inpResumenDiferencia = document.getElementById('inpResumenDiferencia');
       const inpResumenTotalPagar = document.getElementById('inpResumenTotalPagar');
+      const resumenDiffLive = document.getElementById('resumenDiffLive');
+      const updateResumenDiffLive = (pagadoVal) => {
+        if (!resumenDiffLive) return;
+        const allItems = (state.data && state.data.cuentas && state.data.cuentas.items) || [];
+        const cardObj = allItems.find(c => c.name === state.resumenTarjetaNombre);
+        const resT = (cardObj && cardObj.resumen_tarjeta) || {};
+        const perData = getResumenPeriodoData(resT, state.resumenTarjetaPeriodo);
+        const sub = perData.total;
+        const pagado = parseFloat(pagadoVal) || 0;
+        const diff = pagado - sub;
+        const diffSign = diff > 0 ? '+' : (diff < 0 ? '−' : '');
+        if (sub > 0) {
+          resumenDiffLive.innerHTML = `Gastos cargados en ${escapeHtml(perData.label)}: <strong style="color:#f0bd62;">${money(sub)}</strong> · Diferencia: <strong style="color:${diff >= 0 ? '#55d2ad' : '#ff8780'};">${diffSign}${money(Math.abs(diff))}</strong>`;
+        } else {
+          resumenDiffLive.innerHTML = `Sin gastos cargados en ${escapeHtml(perData.label)} · Monto a registrar: <strong style="color:#fff;">${money(pagado)}</strong>`;
+        }
+      };
       if (inpResumenDiferencia && inpResumenTotalPagar) {
         inpResumenDiferencia.oninput = (e) => {
           state.resumenDiferenciaMonto = e.target.value;
@@ -4607,8 +4700,13 @@
           const resT = (cardObj && cardObj.resumen_tarjeta) || {};
           const sub = getResumenPeriodoData(resT, state.resumenTarjetaPeriodo).total;
           const dif = parseFloat(e.target.value) || 0;
-          inpResumenTotalPagar.value = (sub + dif).toFixed(2);
+          const nextTotal = (sub + dif).toFixed(2);
+          inpResumenTotalPagar.value = nextTotal;
+          updateResumenDiffLive(nextTotal);
         };
+      }
+      if (inpResumenTotalPagar) {
+        inpResumenTotalPagar.oninput = (e) => updateResumenDiffLive(e.target.value);
       }
 
       const btnSoloGuardarDiferenciaTarjeta = document.getElementById('btnSoloGuardarDiferenciaTarjeta');

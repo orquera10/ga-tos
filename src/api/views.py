@@ -277,6 +277,7 @@ def serialize_cuenta_fechas(c_obj, mes_ym=None):
         'fecha_cierre_str': fc.strftime('%d/%m') if fc else '',
         'fecha_vencimiento_str': fv.strftime('%d/%m') if fv else '',
         'fechas_configuradas_mes': configurado_mes,
+        'vence_en_mes': bool(fv and mes_ym and fv.strftime('%Y-%m') == str(mes_ym)),
         'sugerencia_cierre': sug_fc,
         'sugerencia_vencimiento': sug_fv,
     }
@@ -820,6 +821,61 @@ def presupuesto_detalle_api(request, pk=None):
     saldo_transferencia = presupuesto.saldo_transferencia
     disponible = presupuesto.monto_total_con_ingresos()
 
+    def build_pago_tarjeta_detalle(g):
+        if g.metodo_pago == 'tarjeta':
+            return None
+        desc = g.descripcion or ''
+        nom = g.nombre or ''
+        if not (desc.startswith('Pago de resumen de ') or nom.lower().startswith('pago tarjeta ')):
+            return None
+
+        # Extraer nombre de tarjeta y período
+        card_name = ''
+        m_card = re.search(r'Pago de resumen de ([^·(\[\n]+)', desc)
+        if m_card:
+            card_name = m_card.group(1).strip()
+        if not card_name:
+            m_nom = re.match(r'Pago tarjeta\s+(.+?)(?:\s*\([^)]+\))?$', nom, flags=re.IGNORECASE)
+            if m_nom:
+                card_name = m_nom.group(1).strip()
+        if not card_name:
+            return None
+
+        m_per = re.search(r'\[Periodo:(\d{4}-\d{2})\]', desc)
+        target_ym = m_per.group(1) if m_per else get_local_ym(g.fecha)
+
+        consumos_periodo = [
+            x for x in all_gastos
+            if x.metodo_pago == 'tarjeta'
+            and not x.es_ajuste_tarjeta
+            and x.cuenta_bancaria
+            and x.cuenta_bancaria.nombre.lower() == card_name.lower()
+            and g_imputaciones.get(x.id, {}).get('mes_resumen_ym') == target_ym
+        ]
+        consumos_periodo.sort(key=lambda x: get_local_dt(x.fecha))
+        subtotal_consumos = sum((x.monto for x in consumos_periodo), Decimal('0'))
+        diferencia = g.monto - subtotal_consumos
+
+        return {
+            'tarjeta_nombre': card_name,
+            'mes_resumen': target_ym,
+            'mes_resumen_label': format_mes_label(target_ym),
+            'monto_pagado': float(g.monto),
+            'subtotal_consumos': float(subtotal_consumos),
+            'diferencia': float(diferencia),
+            'consumos': [
+                {
+                    'id': x.id,
+                    'nombre': x.nombre,
+                    'monto': float(x.monto),
+                    'fecha_str': get_local_dt(x.fecha).strftime('%d/%m'),
+                    'cuota_actual': x.cuota_actual or 1,
+                    'cuotas_totales': x.cuotas_totales or 1,
+                }
+                for x in consumos_periodo
+            ],
+        }
+
     def serialize_gasto_mov_dict(g):
         icon, tone = resolve_gasto_icon_tone(g)
         cat_label = g.categoria.nombre if g.categoria else 'Sin categoría'
@@ -867,6 +923,7 @@ def presupuesto_detalle_api(request, pk=None):
             'mes_resumen_label': format_mes_label(imp['mes_resumen_ym']) if imp else '',
             'compra_ym': imp['compra_ym'] if imp else get_local_ym(g.fecha),
             'es_post_cierre': bool(imp['es_post_cierre']) if imp else False,
+            'pago_tarjeta_detalle': build_pago_tarjeta_detalle(g),
             'is_transfer': False,
             'icon': icon,
             'tone': tone,
@@ -2968,11 +3025,32 @@ def pagar_resumen_tarjeta_api(request):
             ).exclude(tipo='tarjeta').first()
 
     mes_label_str = format_mes_label(mes_resumen) if mes_resumen else ''
+    target_ym = mes_resumen if re.match(r'^\d{4}-\d{2}$', mes_resumen) else get_local_ym(fecha_pago)
+    all_tarj_gastos = list(
+        presupuesto.gastos.select_related('cuenta_bancaria').filter(
+            metodo_pago='tarjeta',
+            cuenta_bancaria=tarjeta_obj,
+            es_ajuste_tarjeta=False,
+        )
+    )
+    c1_map = {}
+    for x in all_tarj_gastos:
+        if x.grupo_cuotas_uid:
+            prev_x = c1_map.get(x.grupo_cuotas_uid)
+            if prev_x is None or (x.cuota_actual or 1) < (prev_x.cuota_actual or 1):
+                c1_map[x.grupo_cuotas_uid] = x
+    consumos_periodo = [
+        x for x in all_tarj_gastos
+        if calcular_imputacion_tarjeta(x, c_obj=tarjeta_obj, cuota1_map=c1_map)['mes_resumen_ym'] == target_ym
+    ]
+    subtotal_consumos = sum((x.monto for x in consumos_periodo), Decimal('0'))
+    diferencia_calc = monto_total - subtotal_consumos
+
     nombre_pago = f"Pago tarjeta {tarjeta_obj.nombre}" + (f" ({mes_label_str})" if mes_label_str else "")
     cat_pago = resolve_or_create_categoria(None, 'Tarjeta de crédito')
-    desc_pago = f"Pago de resumen de {tarjeta_obj.nombre}"
+    desc_pago = f"Pago de resumen de {tarjeta_obj.nombre} [Periodo:{target_ym}] · Consumos registrados: ${subtotal_consumos:,.0f} · Diferencia: ${diferencia_calc:,.0f}"
     if monto_diferencia > 0:
-        desc_pago += f" (incluye ${monto_diferencia:,.0f} de {concepto_dif})"
+        desc_pago += f" ({concepto_dif})"
 
     gasto_pago = Gasto.objects.create(
         presupuesto=presupuesto,
@@ -2991,6 +3069,8 @@ def pagar_resumen_tarjeta_api(request):
         'success': True,
         'mensaje': f'Pago de {tarjeta_obj.nombre} por ${monto_total:,.0f} registrado',
         'gasto_id': gasto_pago.id,
+        'subtotal_consumos': float(subtotal_consumos),
+        'diferencia': float(diferencia_calc),
     }, status=201)
 
 
