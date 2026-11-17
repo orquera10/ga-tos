@@ -197,6 +197,20 @@ def parse_fecha_hora_input(fecha_raw):
     return None
 
 
+def resolve_cuenta_tipo(c_obj, saldo_liq=Decimal('0'), gas_tarj=Decimal('0')):
+    """Determina y corrige automáticamente el tipo 'tarjeta' para cuentas de tarjeta de crédito."""
+    if not c_obj:
+        return 'billetera'
+    sub = c_obj.subtitulo_display
+    if c_obj.tipo == 'tarjeta' or sub == 'Tarjeta de crédito' or (saldo_liq == 0 and gas_tarj > 0):
+        if c_obj.tipo != 'tarjeta':
+            c_obj.tipo = 'tarjeta'
+            c_obj.es_favorita = False
+            c_obj.save(update_fields=['tipo', 'es_favorita'])
+        return 'tarjeta'
+    return c_obj.tipo or 'billetera'
+
+
 def serialize_cuenta_fechas(c_obj, mes_ym=None):
     """Devuelve fechas de cierre y vencimiento formateadas para tarjetas (por mes seleccionado si aplica)."""
     if not c_obj:
@@ -939,10 +953,10 @@ def presupuesto_detalle_api(request, pk=None):
         c_obj = st['obj']
         saldo_liq = st['ingresos'] - st['gastos_liquidos']
         gas_tarj = st['gastos_tarjeta']
-        sub = c_obj.subtitulo_display if c_obj else 'Billetera virtual'
-        c_tipo = c_obj.tipo if c_obj else 'billetera'
+        c_tipo = resolve_cuenta_tipo(c_obj, saldo_liq, gas_tarj)
+        sub = 'Tarjeta de crédito' if c_tipo == 'tarjeta' else (c_obj.subtitulo_display if c_obj else 'Billetera virtual')
 
-        if c_tipo == 'tarjeta' or (sub == 'Tarjeta de crédito' and saldo_liq == 0 and gas_tarj > 0):
+        if c_tipo == 'tarjeta':
             bal = -float(gas_tarj) if gas_tarj > 0 else float(saldo_liq)
             icon_name = 'card'
             icon_cls = 'macro'
