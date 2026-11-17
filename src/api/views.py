@@ -394,10 +394,14 @@ def calcular_imputacion_tarjeta(g, c_obj=None, cuota1_map=None):
     cuenta = c_obj or getattr(g, 'cuenta_bancaria', None)
     k = max(1, int(getattr(g, 'cuota_actual', 1) or 1))
     grp = getattr(g, 'grupo_cuotas_uid', '') or ''
-    if k > 1 and grp and cuota1_map and grp in cuota1_map:
-        compra_dt = get_local_dt(cuota1_map[grp].fecha)
+    if grp and cuota1_map and grp in cuota1_map:
+        g_base = cuota1_map[grp]
+        k_base = max(1, int(getattr(g_base, 'cuota_actual', 1) or 1))
+        compra_dt = get_local_dt(g_base.fecha)
+        rel_k = max(0, k - k_base)
     else:
-        compra_dt = add_months_datetime(dt_g, -(k - 1))
+        compra_dt = dt_g
+        rel_k = 0
 
     compra_ym = compra_dt.strftime('%Y-%m')
     fc = get_fecha_cierre_for_ym(cuenta, compra_ym)
@@ -409,7 +413,7 @@ def calcular_imputacion_tarjeta(g, c_obj=None, cuota1_map=None):
         es_post_cierre = False
         offset_base = 1
 
-    mes_resumen_ym = shift_ym(compra_ym, offset_base + (k - 1))
+    mes_resumen_ym = shift_ym(compra_ym, offset_base + rel_k)
     return {
         'compra_dt': compra_dt,
         'compra_ym': compra_ym,
@@ -696,11 +700,12 @@ def presupuesto_detalle_api(request, pk=None):
     hoy_ym = hoy.strftime('%Y-%m')
     mes_param = (request.GET.get('mes') or '').strip()
 
-    cuota1_por_grupo = {
-        g.grupo_cuotas_uid: g
-        for g in all_gastos
-        if g.grupo_cuotas_uid and (g.cuota_actual or 1) == 1
-    }
+    cuota1_por_grupo = {}
+    for g in all_gastos:
+        if g.grupo_cuotas_uid:
+            prev_g = cuota1_por_grupo.get(g.grupo_cuotas_uid)
+            if prev_g is None or (g.cuota_actual or 1) < (prev_g.cuota_actual or 1):
+                cuota1_por_grupo[g.grupo_cuotas_uid] = g
     g_imputaciones = {}
     for g in all_gastos:
         if g.metodo_pago == 'tarjeta':
@@ -754,7 +759,10 @@ def presupuesto_detalle_api(request, pk=None):
             g for g in all_gastos
             if g.metodo_pago == 'tarjeta'
             and not g.es_ajuste_tarjeta
-            and (g.cuota_actual or 1) == 1
+            and (
+                not g.grupo_cuotas_uid
+                or (cuota1_por_grupo.get(g.grupo_cuotas_uid) and cuota1_por_grupo[g.grupo_cuotas_uid].id == g.id)
+            )
             and g_imputaciones[g.id]['compra_ym'] == mes_seleccionado
         ]
         ingresos = [i for i in all_ingresos if get_local_ym(i.fecha) == mes_seleccionado]
@@ -1943,6 +1951,11 @@ def crear_gasto_api(request):
     except (ValueError, TypeError):
         cuotas_totales = 1
     cuotas_totales = max(1, min(48, cuotas_totales))
+    try:
+        cuota_inicial = int(data.get('cuota_inicial') or 1)
+    except (ValueError, TypeError):
+        cuota_inicial = 1
+    cuota_inicial = max(1, min(cuotas_totales, cuota_inicial))
     modo_monto_cuotas = (data.get('modo_monto_cuotas') or 'cuota').strip().lower()
     es_ajuste_tarjeta = bool(data.get('es_ajuste_tarjeta', False))
 
@@ -1956,8 +1969,8 @@ def crear_gasto_api(request):
         base_nombre = re.sub(r'\s*\(Cuota\s+\d+/\d+\)\s*$', '', nombre, flags=re.IGNORECASE).strip()
 
         created_gastos = []
-        for k in range(1, cuotas_totales + 1):
-            dt_k = add_months_datetime(base_dt, k - 1)
+        for k in range(cuota_inicial, cuotas_totales + 1):
+            dt_k = add_months_datetime(base_dt, k - cuota_inicial)
             g_k = Gasto(
                 presupuesto=presupuesto,
                 categoria=categoria,
@@ -1968,7 +1981,7 @@ def crear_gasto_api(request):
                 metodo_pago='tarjeta',
                 descripcion=descripcion or None,
                 fecha=dt_k,
-                es_rapido=es_rapido if k == 1 else False,
+                es_rapido=es_rapido if k == cuota_inicial else False,
                 cuota_actual=k,
                 cuotas_totales=cuotas_totales,
                 grupo_cuotas_uid=grupo_uid,
@@ -1978,6 +1991,7 @@ def crear_gasto_api(request):
             g_k.save()
             created_gastos.append(g_k)
         gasto = created_gastos[0]
+        cuotas_creadas_count = len(created_gastos)
     else:
         gasto = Gasto(
             presupuesto=presupuesto,
@@ -1997,6 +2011,7 @@ def crear_gasto_api(request):
         )
         gasto.full_clean()
         gasto.save()
+        cuotas_creadas_count = 1
 
     presupuesto.refresh_from_db()
 
@@ -2005,7 +2020,10 @@ def crear_gasto_api(request):
         res_lbl = format_mes_label(imp_creado['mes_resumen_ym'])
         post_note = ' (post-cierre)' if imp_creado['es_post_cierre'] else ''
         if cuotas_totales > 1:
-            msg_resp = f"Compra en {cuotas_totales} cuotas registrada{post_note} · Cuota 1 pasa a {res_lbl}"
+            if cuota_inicial > 1:
+                msg_resp = f"Registradas cuotas {cuota_inicial} a {cuotas_totales} ({cuotas_creadas_count} restantes){post_note} · Cuota {cuota_inicial} pasa a {res_lbl}"
+            else:
+                msg_resp = f"Compra en {cuotas_totales} cuotas registrada{post_note} · Cuota 1 pasa a {res_lbl}"
         else:
             msg_resp = f"Gasto con tarjeta registrado{post_note} · Pasa a {res_lbl}"
     else:
@@ -2014,7 +2032,7 @@ def crear_gasto_api(request):
     return JsonResponse({
         'success': True,
         'mensaje': msg_resp,
-        'cuotas_creadas': cuotas_totales if metodo_pago == 'tarjeta' else 1,
+        'cuotas_creadas': cuotas_creadas_count,
         'gasto': {
             'id': gasto.id,
             'nombre': gasto.nombre,

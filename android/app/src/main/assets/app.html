@@ -1557,6 +1557,7 @@
       gastoCategoria: '',
       gastoPersonas: [],
       gastoCuotas: 1,
+      gastoCuotaInicial: 1,
       gastoModoCuotas: 'cuota', // 'cuota' | 'total'
       ingresoTipo: 'transferencia',
       ingresoCuenta: '',
@@ -1768,6 +1769,11 @@
         if (fd.get('cuotas_totales') !== null) {
           state.gastoCuotas = Math.max(1, parseInt(fd.get('cuotas_totales'), 10) || 1);
         }
+        if (fd.get('cuota_inicial') !== null) {
+          state.gastoCuotaInicial = Math.max(1, Math.min(state.gastoCuotas, parseInt(fd.get('cuota_inicial'), 10) || 1));
+        } else if (state.gastoCuotaInicial > state.gastoCuotas) {
+          state.gastoCuotaInicial = state.gastoCuotas;
+        }
       }
       const formResumenTarjeta = document.getElementById('formResumenTarjeta');
       if (formResumenTarjeta) {
@@ -1849,6 +1855,7 @@
         state.gastoCategoria = '';
         state.gastoPersonas = [];
         state.gastoCuotas = 1;
+        state.gastoCuotaInicial = 1;
         state.gastoModoCuotas = 'cuota';
       } else if (name === 'ingreso') {
         state.ingresoTipo = 'transferencia';
@@ -3203,16 +3210,41 @@
                       `).join('')}
                     </div>
                     <div class="form-row" style="margin-top:4px;">
-                      <input type="number" name="cuotas_totales" min="1" max="48" value="${Number(state.gastoCuotas) || 1}" placeholder="Cantidad de cuotas" />
+                      <input type="number" name="cuotas_totales" id="inpGastoCuotasTotales" min="1" max="48" value="${Number(state.gastoCuotas) || 1}" placeholder="Cantidad de cuotas" />
                       <select name="modo_monto_cuotas" id="selectModoMontoCuotas">
                         <option value="cuota" ${state.gastoModoCuotas === 'cuota' ? 'selected' : ''}>Monto = valor de cada cuota</option>
                         <option value="total" ${state.gastoModoCuotas === 'total' ? 'selected' : ''}>Monto = total compra (dividir)</option>
                       </select>
                     </div>
+                    ${(Number(state.gastoCuotas) || 1) > 1 ? (() => {
+                      const totC = Number(state.gastoCuotas) || 1;
+                      const iniC = Math.max(1, Math.min(totC, Number(state.gastoCuotaInicial) || 1));
+                      const opts = [];
+                      for (let i = 1; i <= totC; i++) {
+                        opts.push(`<option value="${i}" ${iniC === i ? 'selected' : ''}>${i === 1 ? `Cuota 1/${totC} (compra nueva)` : `Cuota ${i}/${totC} (ya pagué ${i - 1})`}</option>`);
+                      }
+                      return `
+                        <label style="margin-top:6px;">
+                          ¿Desde qué cuota empezás a registrar? (si ya venís pagando)
+                          <select name="cuota_inicial" id="selectGastoCuotaInicial">
+                            ${opts.join('')}
+                          </select>
+                        </label>
+                      `;
+                    })() : ''}
                     <small style="color:#a99fff;font-size:10px;margin-top:2px;">
-                      🗓️ ${(Number(state.gastoCuotas) || 1) > 1
-                        ? `Se registrará la Cuota 1/${state.gastoCuotas} en el próximo resumen (o al subsiguiente si comprás después del cierre) y las cuotas 2 a ${state.gastoCuotas} en los meses siguientes.`
-                        : `Si comprás antes o el día del cierre pasa al resumen del mes siguiente; después del cierre pasa al mes subsiguiente.`}
+                      🗓️ ${(() => {
+                        const totC = Number(state.gastoCuotas) || 1;
+                        const iniC = Math.max(1, Math.min(totC, Number(state.gastoCuotaInicial) || 1));
+                        if (totC <= 1) {
+                          return 'Si comprás antes o el día del cierre pasa al resumen del mes siguiente; después del cierre pasa al mes subsiguiente.';
+                        }
+                        const restantes = totC - iniC + 1;
+                        if (iniC > 1) {
+                          return `Se registrará desde la Cuota ${iniC}/${totC} hasta la ${totC}/${totC} (${restantes} ${restantes === 1 ? 'cuota restante' : 'cuotas restantes'}), sin cargar las ${iniC - 1} ya pagadas.`;
+                        }
+                        return `Se registrará la Cuota 1/${totC} en el próximo resumen (o al subsiguiente si comprás después del cierre) y las cuotas 2 a ${totC} en los meses siguientes.`;
+                      })()}
                     </small>
                   </label>
                   <button type="button" class="btn-card-resumen" data-open-resumen-tarjeta="${escapeHtml(state.gastoCuenta || '')}" style="padding:9px;text-align:center;">
@@ -4485,10 +4517,36 @@
         btn.onclick = () => {
           syncFormDraftFromDom();
           state.gastoCuotas = Number(btn.getAttribute('data-gasto-cuotas')) || 1;
+          if (state.gastoCuotaInicial > state.gastoCuotas) {
+            state.gastoCuotaInicial = state.gastoCuotas;
+          }
           state.sheetNoAnim = true;
           render();
         };
       });
+
+      const inpGastoCuotasTotales = document.getElementById('inpGastoCuotasTotales');
+      if (inpGastoCuotasTotales) {
+        inpGastoCuotasTotales.onchange = (e) => {
+          syncFormDraftFromDom();
+          state.gastoCuotas = Math.max(1, Math.min(48, parseInt(e.target.value, 10) || 1));
+          if (state.gastoCuotaInicial > state.gastoCuotas) {
+            state.gastoCuotaInicial = state.gastoCuotas;
+          }
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
+
+      const selectGastoCuotaInicial = document.getElementById('selectGastoCuotaInicial');
+      if (selectGastoCuotaInicial) {
+        selectGastoCuotaInicial.onchange = (e) => {
+          syncFormDraftFromDom();
+          state.gastoCuotaInicial = Math.max(1, Math.min(state.gastoCuotas || 1, parseInt(e.target.value, 10) || 1));
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
 
       const selectModoMontoCuotas = document.getElementById('selectModoMontoCuotas');
       if (selectModoMontoCuotas) {
@@ -4669,6 +4727,7 @@
               cuenta_bancaria: state.gastoMetodo === 'efectivo' ? '' : (fd.get('cuenta_bancaria') || state.gastoCuenta || ''),
               persona: fd.get('persona_extra') || state.gastoPersonas.join(', '),
               cuotas_totales: state.gastoMetodo === 'tarjeta' ? (Number(fd.get('cuotas_totales')) || state.gastoCuotas || 1) : 1,
+              cuota_inicial: state.gastoMetodo === 'tarjeta' ? (Number(fd.get('cuota_inicial')) || state.gastoCuotaInicial || 1) : 1,
               modo_monto_cuotas: state.gastoMetodo === 'tarjeta' ? (fd.get('modo_monto_cuotas') || state.gastoModoCuotas || 'cuota') : 'cuota',
             }
           });

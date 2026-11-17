@@ -701,6 +701,45 @@ class ApiEndpointsTestCase(TestCase):
         p_abierto.refresh_from_db()
         self.assertEqual(p_abierto.monto_restante, Decimal('76500.00'))
 
+        # 5. Compra en cuotas ya iniciada (ej. 6 cuotas, empezando desde la cuota 4/6)
+        resp_ini = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'nombre': 'Auriculares',
+                'monto': 10000,
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Visa Patagonia',
+                'cuotas_totales': 6,
+                'cuota_inicial': 4,
+                'modo_monto_cuotas': 'cuota',
+                'fecha': '2026-11-17T12:00',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_ini.status_code, 201)
+        self.assertEqual(resp_ini.json()['cuotas_creadas'], 3)
+        self.assertEqual(resp_ini.json()['gasto']['nombre'], 'Auriculares (Cuota 4/6)')
+        self.assertEqual(resp_ini.json()['gasto']['cuota_actual'], 4)
+        self.assertEqual(resp_ini.json()['gasto']['mes_resumen'], '2026-12')
+
+        det_nov_ini = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-11',
+            **self.auth_headers
+        ).json()
+        titles_nov_ini = [m['title'] for m in det_nov_ini['movimientos']]
+        self.assertIn('Auriculares (Cuota 4/6)', titles_nov_ini)
+        self.assertNotIn('Auriculares (Cuota 1/6)', titles_nov_ini)
+
+        det_dic_ini = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
+            **self.auth_headers
+        ).json()
+        visa_dic_ini = next((c for c in det_dic_ini['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        res_dic_ini_titles = [x['nombre'] for x in visa_dic_ini['resumen_tarjeta']['consumos_mes_actual']]
+        self.assertIn('Auriculares (Cuota 4/6)', res_dic_ini_titles)
+
 
 
 
