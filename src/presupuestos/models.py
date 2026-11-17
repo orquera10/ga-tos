@@ -284,6 +284,10 @@ class Gasto(models.Model):
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
     fecha = models.DateTimeField(default=timezone.now)
     es_rapido = models.BooleanField(default=False, verbose_name="Carga rápida pendiente")
+    cuota_actual = models.PositiveSmallIntegerField(default=1, verbose_name="Cuota actual")
+    cuotas_totales = models.PositiveSmallIntegerField(default=1, verbose_name="Total de cuotas")
+    grupo_cuotas_uid = models.CharField(max_length=40, blank=True, default='', verbose_name="ID grupo de cuotas")
+    es_ajuste_tarjeta = models.BooleanField(default=False, verbose_name="Diferencia / Impuestos de resumen de tarjeta")
 
     @property
     def persona_list(self):

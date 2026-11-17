@@ -1,4 +1,7 @@
+import calendar
 import json
+import re
+import uuid
 from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from django.http import JsonResponse
@@ -204,6 +207,55 @@ def serialize_cuenta_fechas(c_obj):
         'fecha_cierre_str': fc.strftime('%d/%m') if fc else '',
         'fecha_vencimiento_str': fv.strftime('%d/%m') if fv else '',
     }
+
+
+def get_local_dt(dt):
+    if not dt:
+        return timezone.localtime(timezone.now())
+    if isinstance(dt, datetime):
+        return timezone.localtime(dt) if timezone.is_aware(dt) else dt
+    return datetime.combine(dt, datetime.min.time())
+
+
+def get_local_ym(dt):
+    return get_local_dt(dt).strftime('%Y-%m')
+
+
+def shift_ym(ym_str, delta_months):
+    """Suma o resta meses a un string 'YYYY-MM'."""
+    try:
+        y, m = [int(x) for x in ym_str.split('-')[:2]]
+        total_m = (y * 12 + (m - 1)) + delta_months
+        ny = total_m // 12
+        nm = (total_m % 12) + 1
+        return f"{ny:04d}-{nm:02d}"
+    except (ValueError, TypeError, AttributeError):
+        return ym_str
+
+
+def format_mes_label(ym_str):
+    """Convierte '2026-11' en 'Noviembre 2026'."""
+    if not ym_str or ym_str == 'todos':
+        return 'Todos los meses'
+    try:
+        y, m = [int(x) for x in ym_str.split('-')[:2]]
+        if 1 <= m <= 12:
+            return f"{MESES_ES[m]} {y}"
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return ym_str
+
+
+def add_months_datetime(dt, months):
+    """Suma `months` meses a un datetime preservando hora y ajustando el día al fin de mes."""
+    if not months:
+        return dt
+    total_m = (dt.year * 12 + (dt.month - 1)) + months
+    ny = total_m // 12
+    nm = (total_m % 12) + 1
+    last_day = calendar.monthrange(ny, nm)[1]
+    nd = min(dt.day, last_day)
+    return dt.replace(year=ny, month=nm, day=nd)
 
 
 def get_user_initials(user):
@@ -474,11 +526,62 @@ def presupuesto_detalle_api(request, pk=None):
         })
 
     # Recopilar movimientos del presupuesto seleccionado
-    gastos = list(presupuesto.gastos.select_related('categoria', 'cuenta_bancaria').order_by('-fecha', '-id'))
-    ingresos = list(presupuesto.ingresos.select_related('cuenta_bancaria').order_by('-fecha', '-id'))
-    transferencias = list(
+    all_gastos = list(presupuesto.gastos.select_related('categoria', 'cuenta_bancaria').order_by('-fecha', '-id'))
+    all_ingresos = list(presupuesto.ingresos.select_related('cuenta_bancaria').order_by('-fecha', '-id'))
+    all_transferencias = list(
         presupuesto.transferencias_fondos.select_related('origen_cuenta', 'destino_cuenta').order_by('-fecha', '-id')
     )
+
+    hoy_ym = hoy.strftime('%Y-%m')
+    mes_param = (request.GET.get('mes') or '').strip()
+
+    # Selector de mes para presupuestos abiertos (y resumen por mes para tarjetas)
+    meses_set = {
+        shift_ym(hoy_ym, -1),
+        hoy_ym,
+        shift_ym(hoy_ym, 1),
+        shift_ym(hoy_ym, 2),
+    }
+    for g in all_gastos:
+        meses_set.add(get_local_ym(g.fecha))
+    for i in all_ingresos:
+        meses_set.add(get_local_ym(i.fecha))
+    for t in all_transferencias:
+        meses_set.add(get_local_ym(t.fecha))
+
+    if presupuesto.tipo == 'abierto':
+        if mes_param == 'todos':
+            mes_seleccionado = 'todos'
+        elif re.match(r'^\d{4}-\d{2}$', mes_param):
+            mes_seleccionado = mes_param
+            meses_set.add(mes_seleccionado)
+        else:
+            mes_seleccionado = hoy_ym
+    else:
+        if re.match(r'^\d{4}-\d{2}$', mes_param):
+            mes_seleccionado = mes_param
+            meses_set.add(mes_seleccionado)
+        else:
+            mes_seleccionado = 'todos'
+
+    meses_ordenados = sorted(list(meses_set))
+    meses_disponibles = [
+        {'ym': ym, 'label': format_mes_label(ym)}
+        for ym in meses_ordenados
+    ]
+
+    if presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos':
+        gastos = [g for g in all_gastos if get_local_ym(g.fecha) == mes_seleccionado]
+        ingresos = [i for i in all_ingresos if get_local_ym(i.fecha) == mes_seleccionado]
+        transferencias = [t for t in all_transferencias if get_local_ym(t.fecha) == mes_seleccionado]
+    else:
+        gastos = all_gastos
+        ingresos = all_ingresos
+        transferencias = all_transferencias
+
+    mes_ref_ym = mes_seleccionado if (mes_seleccionado and mes_seleccionado != 'todos') else hoy_ym
+    mes_ant_ym = shift_ym(mes_ref_ym, -1)
+    mes_sig_ym = shift_ym(mes_ref_ym, 1)
 
     total_gastos_all = sum((g.monto for g in gastos), Decimal('0'))
     total_gastos_comp = sum((g.monto for g in gastos if g.metodo_pago != 'tarjeta'), Decimal('0'))
@@ -500,6 +603,8 @@ def presupuesto_detalle_api(request, pk=None):
             parts_detail.append('Tarjeta')
         elif g.metodo_pago == 'efectivo':
             parts_detail.append('Efectivo')
+        if g.cuotas_totales and g.cuotas_totales > 1:
+            parts_detail.append(f"🗓️ Cuota {g.cuota_actual}/{g.cuotas_totales}")
         if g.persona:
             parts_detail.append(f"👤 {g.persona}")
         parts_detail.append(format_fecha_humana(g.fecha))
@@ -522,6 +627,10 @@ def presupuesto_detalle_api(request, pk=None):
             'amount': -float(g.monto),
             'raw_monto': float(g.monto),
             'es_rapido': bool(g.es_rapido),
+            'cuota_actual': g.cuota_actual or 1,
+            'cuotas_totales': g.cuotas_totales or 1,
+            'grupo_cuotas_uid': g.grupo_cuotas_uid or '',
+            'es_ajuste_tarjeta': bool(g.es_ajuste_tarjeta),
             'is_transfer': False,
             'icon': icon,
             'tone': tone,
@@ -661,7 +770,7 @@ def presupuesto_detalle_api(request, pk=None):
             if c.nombre.lower() not in existing_names:
                 user_cuentas.append(c)
 
-    # Calcular saldos por CuentaBancaria en este presupuesto
+    # Calcular saldos por CuentaBancaria en este presupuesto (liquidez acumulada total, consumos tarjeta del período)
     cuentas_stats = {}
     for c in user_cuentas:
         cuentas_stats[c.nombre.lower()] = {
@@ -670,9 +779,13 @@ def presupuesto_detalle_api(request, pk=None):
             'ingresos': Decimal('0'),
             'gastos_liquidos': Decimal('0'),
             'gastos_tarjeta': Decimal('0'),
+            'consumos_mes_actual': [],
+            'consumos_mes_anterior': [],
+            'total_mes_actual': Decimal('0'),
+            'total_mes_anterior': Decimal('0'),
         }
 
-    for i in ingresos:
+    for i in all_ingresos:
         if i.cuenta_bancaria:
             key = i.cuenta_bancaria.nombre.lower()
             if key not in cuentas_stats:
@@ -682,11 +795,17 @@ def presupuesto_detalle_api(request, pk=None):
                     'ingresos': Decimal('0'),
                     'gastos_liquidos': Decimal('0'),
                     'gastos_tarjeta': Decimal('0'),
+                    'consumos_mes_actual': [],
+                    'consumos_mes_anterior': [],
+                    'total_mes_actual': Decimal('0'),
+                    'total_mes_anterior': Decimal('0'),
                 }
             cuentas_stats[key]['ingresos'] += i.monto
 
     tarjeta_sin_cuenta = Decimal('0')
-    for g in gastos:
+    for g in all_gastos:
+        g_ym = get_local_ym(g.fecha)
+        in_vista = (presupuesto.tipo != 'abierto' or mes_seleccionado == 'todos' or g_ym == mes_seleccionado)
         if g.cuenta_bancaria:
             key = g.cuenta_bancaria.nombre.lower()
             if key not in cuentas_stats:
@@ -696,15 +815,35 @@ def presupuesto_detalle_api(request, pk=None):
                     'ingresos': Decimal('0'),
                     'gastos_liquidos': Decimal('0'),
                     'gastos_tarjeta': Decimal('0'),
+                    'consumos_mes_actual': [],
+                    'consumos_mes_anterior': [],
+                    'total_mes_actual': Decimal('0'),
+                    'total_mes_anterior': Decimal('0'),
                 }
             if g.metodo_pago == 'tarjeta':
-                cuentas_stats[key]['gastos_tarjeta'] += g.monto
+                if in_vista:
+                    cuentas_stats[key]['gastos_tarjeta'] += g.monto
+                item_tarj = {
+                    'id': g.id,
+                    'nombre': g.nombre,
+                    'monto': float(g.monto),
+                    'fecha_str': get_local_dt(g.fecha).strftime('%d/%m'),
+                    'cuota_actual': g.cuota_actual or 1,
+                    'cuotas_totales': g.cuotas_totales or 1,
+                    'es_ajuste_tarjeta': bool(g.es_ajuste_tarjeta),
+                }
+                if g_ym == mes_ref_ym or (presupuesto.tipo != 'abierto' and mes_seleccionado == 'todos'):
+                    cuentas_stats[key]['consumos_mes_actual'].append(item_tarj)
+                    cuentas_stats[key]['total_mes_actual'] += g.monto
+                if g_ym == mes_ant_ym:
+                    cuentas_stats[key]['consumos_mes_anterior'].append(item_tarj)
+                    cuentas_stats[key]['total_mes_anterior'] += g.monto
             else:
                 cuentas_stats[key]['gastos_liquidos'] += g.monto
-        elif g.metodo_pago == 'tarjeta':
+        elif g.metodo_pago == 'tarjeta' and in_vista:
             tarjeta_sin_cuenta += g.monto
 
-    for t in transferencias:
+    for t in all_transferencias:
         if t.origen_cuenta:
             key = t.origen_cuenta.nombre.lower()
             if key not in cuentas_stats:
@@ -714,6 +853,10 @@ def presupuesto_detalle_api(request, pk=None):
                     'ingresos': Decimal('0'),
                     'gastos_liquidos': Decimal('0'),
                     'gastos_tarjeta': Decimal('0'),
+                    'consumos_mes_actual': [],
+                    'consumos_mes_anterior': [],
+                    'total_mes_actual': Decimal('0'),
+                    'total_mes_anterior': Decimal('0'),
                 }
             cuentas_stats[key]['gastos_liquidos'] += t.monto
         if t.destino_cuenta:
@@ -725,6 +868,10 @@ def presupuesto_detalle_api(request, pk=None):
                     'ingresos': Decimal('0'),
                     'gastos_liquidos': Decimal('0'),
                     'gastos_tarjeta': Decimal('0'),
+                    'consumos_mes_actual': [],
+                    'consumos_mes_anterior': [],
+                    'total_mes_actual': Decimal('0'),
+                    'total_mes_anterior': Decimal('0'),
                 }
             cuentas_stats[key]['ingresos'] += t.monto
 
@@ -758,6 +905,16 @@ def presupuesto_detalle_api(request, pk=None):
             'es_favorita': is_fav,
             'balance': bal,
             'gastos_tarjeta': float(gas_tarj),
+            'resumen_tarjeta': {
+                'mes_actual_ym': mes_ref_ym,
+                'mes_actual_label': format_mes_label(mes_ref_ym),
+                'total_mes_actual': float(st['total_mes_actual']),
+                'consumos_mes_actual': st['consumos_mes_actual'],
+                'mes_anterior_ym': mes_ant_ym,
+                'mes_anterior_label': format_mes_label(mes_ant_ym),
+                'total_mes_anterior': float(st['total_mes_anterior']),
+                'consumos_mes_anterior': st['consumos_mes_anterior'],
+            },
             'icon': icon_name,
             'icon_class': icon_cls,
             'is_system': False,
@@ -828,12 +985,35 @@ def presupuesto_detalle_api(request, pk=None):
             'is_system': True,
         })
 
-    mes_nombre = MESES_ES[presupuesto.fecha_inicio.month].upper() if 1 <= presupuesto.fecha_inicio.month <= 12 else ''
-    mes_label = f"{mes_nombre} {presupuesto.fecha_inicio.year}".strip()
+    if presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos':
+        mes_label = format_mes_label(mes_seleccionado).upper()
+    elif presupuesto.tipo == 'abierto' and mes_seleccionado == 'todos':
+        mes_label = 'TODOS LOS MESES'
+    else:
+        mes_nombre = MESES_ES[presupuesto.fecha_inicio.month].upper() if 1 <= presupuesto.fecha_inicio.month <= 12 else ''
+        mes_label = f"{mes_nombre} {presupuesto.fecha_inicio.year}".strip()
 
     presupuesto_data = serialize_presupuesto_item(presupuesto, user, hoy)
     presupuesto_data['mes_label'] = mes_label
     presupuesto_data['total_gastos_all'] = float(total_gastos_all)
+    presupuesto_data['ingresos_periodo'] = float(total_ingresos)
+    presupuesto_data['gastos_computables_periodo'] = float(total_gastos_comp)
+    presupuesto_data['total_tarjeta_periodo'] = float(total_tarjeta)
+
+    mes_info = None
+    if presupuesto.tipo == 'abierto':
+        mes_info = {
+            'mes_seleccionado': mes_seleccionado,
+            'mes_label': format_mes_label(mes_seleccionado),
+            'mes_anterior': mes_ant_ym,
+            'mes_anterior_label': format_mes_label(mes_ant_ym),
+            'mes_siguiente': mes_sig_ym,
+            'mes_siguiente_label': format_mes_label(mes_sig_ym),
+            'meses_disponibles': meses_disponibles,
+            'ingresos_mes': float(total_ingresos),
+            'gastos_computables_mes': float(total_gastos_comp),
+            'gastos_tarjeta_mes': float(total_tarjeta),
+        }
 
     prestamo_info = None
     if presupuesto.tipo == 'prestamo':
@@ -851,6 +1031,7 @@ def presupuesto_detalle_api(request, pk=None):
             'initials': get_user_initials(user),
         },
         'presupuesto': presupuesto_data,
+        'mes_info': mes_info,
         'prestamo_info': prestamo_info,
         'presupuestos': all_selector,
         'movimientos': raw_movs,
@@ -1527,26 +1708,77 @@ def crear_gasto_api(request):
             es_favorita=True
         ).exclude(tipo='tarjeta').first()
 
-    gasto = Gasto(
-        presupuesto=presupuesto,
-        categoria=categoria,
-        nombre=nombre,
-        persona=persona,
-        cuenta_bancaria=cuenta_bancaria,
-        monto=monto,
-        metodo_pago=metodo_pago,
-        descripcion=descripcion or None,
-        fecha=fecha or timezone.localtime(timezone.now()),
-        es_rapido=es_rapido
-    )
-    gasto.full_clean()
-    gasto.save()
+    # Cuotas opcionales cuando es gasto con tarjeta (se generan automáticamente en los meses siguientes)
+    try:
+        cuotas_totales = int(data.get('cuotas_totales') or 1)
+    except (ValueError, TypeError):
+        cuotas_totales = 1
+    cuotas_totales = max(1, min(48, cuotas_totales))
+    modo_monto_cuotas = (data.get('modo_monto_cuotas') or 'cuota').strip().lower()
+    es_ajuste_tarjeta = bool(data.get('es_ajuste_tarjeta', False))
+
+    base_dt = fecha or timezone.localtime(timezone.now())
+    if metodo_pago == 'tarjeta' and cuotas_totales > 1:
+        if modo_monto_cuotas == 'total':
+            monto_cuota = (monto / Decimal(cuotas_totales)).quantize(Decimal('0.01'))
+        else:
+            monto_cuota = monto
+        grupo_uid = f"cuotas-{uuid.uuid4().hex[:12]}"
+        base_nombre = re.sub(r'\s*\(Cuota\s+\d+/\d+\)\s*$', '', nombre, flags=re.IGNORECASE).strip()
+
+        created_gastos = []
+        for k in range(1, cuotas_totales + 1):
+            dt_k = add_months_datetime(base_dt, k - 1)
+            g_k = Gasto(
+                presupuesto=presupuesto,
+                categoria=categoria,
+                nombre=f"{base_nombre} (Cuota {k}/{cuotas_totales})"[:100],
+                persona=persona,
+                cuenta_bancaria=cuenta_bancaria,
+                monto=monto_cuota,
+                metodo_pago='tarjeta',
+                descripcion=descripcion or None,
+                fecha=dt_k,
+                es_rapido=es_rapido if k == 1 else False,
+                cuota_actual=k,
+                cuotas_totales=cuotas_totales,
+                grupo_cuotas_uid=grupo_uid,
+                es_ajuste_tarjeta=False,
+            )
+            g_k.full_clean()
+            g_k.save()
+            created_gastos.append(g_k)
+        gasto = created_gastos[0]
+    else:
+        gasto = Gasto(
+            presupuesto=presupuesto,
+            categoria=categoria,
+            nombre=nombre,
+            persona=persona,
+            cuenta_bancaria=cuenta_bancaria,
+            monto=monto,
+            metodo_pago=metodo_pago,
+            descripcion=descripcion or None,
+            fecha=base_dt,
+            es_rapido=es_rapido,
+            cuota_actual=1,
+            cuotas_totales=1,
+            grupo_cuotas_uid='',
+            es_ajuste_tarjeta=es_ajuste_tarjeta if metodo_pago == 'tarjeta' else False,
+        )
+        gasto.full_clean()
+        gasto.save()
 
     presupuesto.refresh_from_db()
 
     return JsonResponse({
         'success': True,
-        'mensaje': f'Gasto de {presupuesto.moneda} {monto} registrado exitosamente',
+        'mensaje': (
+            f'Compra en {cuotas_totales} cuotas de {presupuesto.moneda} {gasto.monto} registrada automáticamente mes a mes'
+            if (metodo_pago == 'tarjeta' and cuotas_totales > 1)
+            else f'Gasto de {presupuesto.moneda} {gasto.monto} registrado exitosamente'
+        ),
+        'cuotas_creadas': cuotas_totales if metodo_pago == 'tarjeta' else 1,
         'gasto': {
             'id': gasto.id,
             'nombre': gasto.nombre,
@@ -1554,6 +1786,8 @@ def crear_gasto_api(request):
             'cuenta_bancaria': gasto.cuenta_bancaria.nombre if gasto.cuenta_bancaria else None,
             'metodo_pago': gasto.metodo_pago,
             'monto': float(gasto.monto),
+            'cuota_actual': gasto.cuota_actual,
+            'cuotas_totales': gasto.cuotas_totales,
             'categoria': gasto.categoria.nombre if gasto.categoria else None,
             'fecha': gasto.fecha.strftime('%Y-%m-%d %H:%M'),
         },
@@ -2290,5 +2524,162 @@ def eliminar_movimiento_api(request):
         return JsonResponse({'success': True, 'mensaje': 'Diferencia eliminada'})
 
     return JsonResponse({'success': False, 'error': 'Tipo de movimiento no soportado'}, status=400)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def pagar_resumen_tarjeta_api(request):
+    """
+    Permite:
+    1) Agregar una diferencia por impuestos / sellos / mantenimiento al resumen de una tarjeta ('accion': 'solo_diferencia')
+    2) O registrar el Pago del resumen de una tarjeta ('accion': 'pagar'), descontándolo de Efectivo o Transferencia/Billetera,
+       incluyendo opcionalmente la diferencia de impuestos/sellos.
+    POST /api/tarjetas/pagar-resumen/
+    """
+    data = parse_request_data(request)
+    presupuesto_id = data.get('presupuesto_id')
+    tarjeta_nombre = (data.get('tarjeta_nombre') or '').strip()
+    accion = (data.get('accion') or 'pagar').strip().lower()  # 'pagar' | 'solo_diferencia'
+    mes_resumen = (data.get('mes_resumen') or '').strip()
+
+    if not presupuesto_id or not tarjeta_nombre:
+        return JsonResponse({'success': False, 'error': 'Faltan datos de presupuesto o tarjeta'}, status=400)
+
+    presupuesto = presupuestos_editables(request.api_user).filter(id=presupuesto_id).first()
+    if not presupuesto:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+
+    tarjeta_obj = CuentaBancaria.objects.filter(
+        usuario=request.api_user,
+        nombre__iexact=tarjeta_nombre
+    ).first()
+    if not tarjeta_obj:
+        tarjeta_obj = CuentaBancaria.objects.create(
+            usuario=request.api_user,
+            nombre=tarjeta_nombre[:60],
+            tipo='tarjeta'
+        )
+
+    dif_raw = data.get('monto_diferencia')
+    monto_diferencia = Decimal('0')
+    if dif_raw not in [None, '', '0', 0]:
+        try:
+            monto_diferencia = max(Decimal('0'), Decimal(str(dif_raw).replace(',', '.')))
+        except (InvalidOperation, TypeError):
+            return JsonResponse({'success': False, 'error': 'Monto de diferencia inválido'}, status=400)
+
+    concepto_dif = (data.get('concepto_diferencia') or 'Impuestos y mantenimiento resumen').strip()
+    fecha_pago = parse_fecha_hora_input(data.get('fecha')) or timezone.localtime(timezone.now())
+
+    # Si solo quiere agregar la diferencia/impuestos al resumen de la tarjeta:
+    if accion == 'solo_diferencia':
+        if monto_diferencia <= 0:
+            return JsonResponse({'success': False, 'error': 'Ingresá un monto de diferencia/impuestos mayor a 0'}, status=400)
+
+        # Ubicar la fecha en el mes del resumen si se especificó YYYY-MM
+        fecha_dif = fecha_pago
+        if re.match(r'^\d{4}-\d{2}$', mes_resumen) and get_local_ym(fecha_pago) != mes_resumen:
+            y_r, m_r = [int(x) for x in mes_resumen.split('-')]
+            last_d = calendar.monthrange(y_r, m_r)[1]
+            fecha_dif = timezone.make_aware(
+                datetime(y_r, m_r, min(fecha_pago.day, last_d), 12, 0),
+                timezone.get_current_timezone()
+            )
+
+        cat_tarj = resolve_or_create_categoria(None, 'Tarjeta de crédito')
+        g_dif = Gasto.objects.create(
+            presupuesto=presupuesto,
+            categoria=cat_tarj,
+            nombre=f"{concepto_dif} · {tarjeta_obj.nombre}"[:100],
+            cuenta_bancaria=tarjeta_obj,
+            monto=monto_diferencia,
+            metodo_pago='tarjeta',
+            fecha=fecha_dif,
+            es_rapido=False,
+            es_ajuste_tarjeta=True,
+        )
+        return JsonResponse({
+            'success': True,
+            'mensaje': f'Diferencia de ${monto_diferencia:,.0f} sumada al resumen de {tarjeta_obj.nombre}',
+            'gasto_id': g_dif.id,
+        }, status=201)
+
+    # Acción 'pagar': Registrar el pago real de la tarjeta (descuenta de Efectivo o Transferencia)
+    monto_pagar_raw = data.get('monto_total')
+    try:
+        monto_total = Decimal(str(monto_pagar_raw).replace(',', '.'))
+        if monto_total <= 0:
+            return JsonResponse({'success': False, 'error': 'El monto total a pagar debe ser mayor a cero'}, status=400)
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Monto a pagar inválido'}, status=400)
+
+    # Si además ingresó una diferencia de impuestos que aún no estaba cargada en la tarjeta, registrarla en el resumen de la tarjeta
+    if monto_diferencia > 0 and bool(data.get('registrar_diferencia_en_tarjeta', True)):
+        fecha_dif = fecha_pago
+        if re.match(r'^\d{4}-\d{2}$', mes_resumen) and get_local_ym(fecha_pago) != mes_resumen:
+            y_r, m_r = [int(x) for x in mes_resumen.split('-')]
+            last_d = calendar.monthrange(y_r, m_r)[1]
+            fecha_dif = timezone.make_aware(
+                datetime(y_r, m_r, min(fecha_pago.day, last_d), 12, 0),
+                timezone.get_current_timezone()
+            )
+        cat_tarj = resolve_or_create_categoria(None, 'Tarjeta de crédito')
+        Gasto.objects.create(
+            presupuesto=presupuesto,
+            categoria=cat_tarj,
+            nombre=f"{concepto_dif} · {tarjeta_obj.nombre}"[:100],
+            cuenta_bancaria=tarjeta_obj,
+            monto=monto_diferencia,
+            metodo_pago='tarjeta',
+            fecha=fecha_dif,
+            es_rapido=False,
+            es_ajuste_tarjeta=True,
+        )
+
+    metodo_pago = (data.get('metodo_pago') or 'transferencia').strip().lower()
+    if metodo_pago not in ['efectivo', 'transferencia']:
+        metodo_pago = 'transferencia'
+
+    cuenta_origen_raw = (data.get('cuenta_bancaria') or '').strip()
+    cuenta_origen = None
+    if metodo_pago == 'transferencia':
+        if cuenta_origen_raw:
+            cuenta_origen = CuentaBancaria.objects.filter(
+                usuario=request.api_user,
+                nombre__iexact=cuenta_origen_raw
+            ).first()
+        if not cuenta_origen:
+            cuenta_origen = CuentaBancaria.objects.filter(
+                usuario=request.api_user,
+                es_favorita=True
+            ).exclude(tipo='tarjeta').first()
+
+    mes_label_str = format_mes_label(mes_resumen) if mes_resumen else ''
+    nombre_pago = f"Pago tarjeta {tarjeta_obj.nombre}" + (f" ({mes_label_str})" if mes_label_str else "")
+    cat_pago = resolve_or_create_categoria(None, 'Tarjeta de crédito')
+    desc_pago = f"Pago de resumen de {tarjeta_obj.nombre}"
+    if monto_diferencia > 0:
+        desc_pago += f" (incluye ${monto_diferencia:,.0f} de {concepto_dif})"
+
+    gasto_pago = Gasto.objects.create(
+        presupuesto=presupuesto,
+        categoria=cat_pago,
+        nombre=nombre_pago[:100],
+        cuenta_bancaria=cuenta_origen,
+        monto=monto_total,
+        metodo_pago=metodo_pago,
+        descripcion=desc_pago,
+        fecha=fecha_pago,
+        es_rapido=False,
+    )
+    presupuesto.refresh_from_db()
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': f'Pago de {tarjeta_obj.nombre} por ${monto_total:,.0f} registrado',
+        'gasto_id': gasto_pago.id,
+    }, status=201)
+
 
 

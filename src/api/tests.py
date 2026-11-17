@@ -528,6 +528,108 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(visa_item['fecha_cierre_str'], '24/11')
         self.assertEqual(visa_item['fecha_vencimiento_str'], '05/12')
 
+    def test_presupuesto_abierto_selector_mes_cuotas_y_pago_resumen_tarjeta(self):
+        p_abierto = Presupuesto.objects.create(
+            usuario=self.user,
+            nombre='Flujo Abierto General',
+            tipo='abierto',
+            monto_total=Decimal('0.00'),
+            monto_restante=Decimal('0.00'),
+            fecha_inicio=timezone.localdate(),
+            fecha_fin=timezone.localdate() + timezone.timedelta(days=365),
+            moneda='ARS',
+        )
+
+        # 1. Crear billetera favorita con saldo inicial 100.000 y tarjeta Visa
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Mercado Pago',
+                'tipo': 'billetera',
+                'saldo_inicial': 100000,
+                'es_favorita': True,
+                'presupuesto_id': p_abierto.id,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.client.post(
+            '/api/cuentas/crear/',
+            data=json.dumps({
+                'nombre': 'Visa Patagonia',
+                'tipo': 'tarjeta',
+                'fecha_cierre': '2026-11-24',
+                'fecha_vencimiento': '2026-12-05',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+
+        # 2. Registrar compra con tarjeta en 3 cuotas en Noviembre 2026 (total $60.000 -> $20.000 por cuota)
+        resp_cuotas = self.client.post(
+            '/api/gastos/crear/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'nombre': 'Zapatillas',
+                'monto': 60000,
+                'fecha': '2026-11-17T11:00',
+                'metodo_pago': 'tarjeta',
+                'cuenta_bancaria': 'Visa Patagonia',
+                'cuotas_totales': 3,
+                'modo_monto_cuotas': 'total',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_cuotas.status_code, 201)
+        self.assertEqual(resp_cuotas.json()['cuotas_creadas'], 3)
+        self.assertEqual(resp_cuotas.json()['gasto']['monto'], 20000.0)
+
+        # 3. Consultar Noviembre 2026 y Diciembre 2026 con el selector de mes
+        det_nov = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-11',
+            **self.auth_headers
+        ).json()
+        self.assertEqual(det_nov['mes_info']['mes_seleccionado'], '2026-11')
+        titles_nov = [m['title'] for m in det_nov['movimientos']]
+        self.assertIn('Zapatillas (Cuota 1/3)', titles_nov)
+        self.assertNotIn('Zapatillas (Cuota 2/3)', titles_nov)
+
+        det_dic = self.client.get(
+            f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
+            **self.auth_headers
+        ).json()
+        self.assertEqual(det_dic['mes_info']['mes_seleccionado'], '2026-12')
+        titles_dic = [m['title'] for m in det_dic['movimientos']]
+        self.assertIn('Zapatillas (Cuota 2/3)', titles_dic)
+
+        visa_dic = next((c for c in det_dic['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        self.assertIsNotNone(visa_dic)
+        self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_anterior'], 20000.0)
+        self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_actual'], 20000.0)
+
+        # 4. Pagar en Diciembre 2026 el resumen de Noviembre ($20.000 + $3.500 de impuestos = $23.500)
+        resp_pago = self.client.post(
+            '/api/tarjetas/pagar-resumen/',
+            data=json.dumps({
+                'presupuesto_id': p_abierto.id,
+                'tarjeta_nombre': 'Visa Patagonia',
+                'accion': 'pagar',
+                'mes_resumen': '2026-11',
+                'monto_diferencia': 3500,
+                'concepto_diferencia': 'Impuestos y sellos',
+                'monto_total': 23500,
+                'metodo_pago': 'transferencia',
+                'fecha': '2026-12-05T10:30',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_pago.status_code, 201)
+        p_abierto.refresh_from_db()
+        self.assertEqual(p_abierto.monto_restante, Decimal('76500.00'))
+
+
 
 
 
