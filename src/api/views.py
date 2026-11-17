@@ -749,10 +749,7 @@ def presupuesto_detalle_api(request, pk=None):
     ]
 
     if presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos':
-        gastos = [
-            g for g in all_gastos
-            if (g_imputaciones[g.id]['mes_resumen_ym'] if g.metodo_pago == 'tarjeta' else get_local_ym(g.fecha)) == mes_seleccionado
-        ]
+        gastos = [g for g in all_gastos if get_local_ym(g.fecha) == mes_seleccionado]
         gastos_tarjeta_comprados_mes = [
             g for g in all_gastos
             if g.metodo_pago == 'tarjeta'

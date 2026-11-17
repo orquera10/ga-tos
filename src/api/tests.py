@@ -612,35 +612,39 @@ class ApiEndpointsTestCase(TestCase):
             **self.auth_headers
         ).json()
         self.assertEqual(det_nov['mes_info']['mes_seleccionado'], '2026-11')
-        origen_titles_nov = [m['title'] for m in det_nov['mes_info']['compras_tarjeta_mes_origen']]
-        self.assertIn('Zapatillas (Cuota 1/3)', origen_titles_nov)
-        self.assertIn('Campera Post Cierre', origen_titles_nov)
+        titles_nov = [m['title'] for m in det_nov['movimientos']]
+        self.assertIn('Zapatillas (Cuota 1/3)', titles_nov)
+        self.assertIn('Campera Post Cierre', titles_nov)
         self.assertEqual(det_nov['mes_info']['total_origen_pasa_siguiente'], 20000.0)
         self.assertEqual(det_nov['mes_info']['total_origen_pasa_subsiguiente'], 35000.0)
 
-        # En Diciembre 2026 entra la Cuota 1/3 (comprada el 15/11 antes del cierre 24/11), pero NO la compra post-cierre del 25/11
+        # En Diciembre 2026 el resumen a pagar de la tarjeta incluye Cuota 1/3 (pre-cierre Nov), pero NO la compra post-cierre del 25/11
         det_dic = self.client.get(
             f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
             **self.auth_headers
         ).json()
         self.assertEqual(det_dic['mes_info']['mes_seleccionado'], '2026-12')
         titles_dic = [m['title'] for m in det_dic['movimientos']]
-        self.assertIn('Zapatillas (Cuota 1/3)', titles_dic)
-        self.assertNotIn('Campera Post Cierre', titles_dic)
+        self.assertIn('Zapatillas (Cuota 2/3)', titles_dic)
 
         visa_dic = next((c for c in det_dic['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
         self.assertIsNotNone(visa_dic)
         self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_actual'], 20000.0)
+        res_dic_titles = [x['nombre'] for x in visa_dic['resumen_tarjeta']['consumos_mes_actual']]
+        self.assertIn('Zapatillas (Cuota 1/3)', res_dic_titles)
+        self.assertNotIn('Campera Post Cierre', res_dic_titles)
         self.assertEqual(visa_dic['resumen_tarjeta']['total_mes_siguiente'], 55000.0)  # Cuota 2 ($20k) + Campera post-cierre ($35k) en Enero 2027
 
-        # En Enero 2027 entra la Cuota 2/3 ($20.000) + la compra post-cierre del 25/11 ($35.000)
+        # En Enero 2027 el resumen a pagar de la tarjeta incluye Cuota 2/3 ($20.000) + la compra post-cierre del 25/11 ($35.000)
         det_ene = self.client.get(
             f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2027-01',
             **self.auth_headers
         ).json()
-        titles_ene = [m['title'] for m in det_ene['movimientos']]
-        self.assertIn('Zapatillas (Cuota 2/3)', titles_ene)
-        self.assertIn('Campera Post Cierre', titles_ene)
+        visa_ene = next((c for c in det_ene['cuentas']['items'] if c['name'] == 'Visa Patagonia'), None)
+        self.assertEqual(visa_ene['resumen_tarjeta']['total_mes_actual'], 55000.0)
+        res_ene_titles = [x['nombre'] for x in visa_ene['resumen_tarjeta']['consumos_mes_actual']]
+        self.assertIn('Zapatillas (Cuota 2/3)', res_ene_titles)
+        self.assertIn('Campera Post Cierre', res_ene_titles)
         # En diciembre aún no se habían configurado las fechas de diciembre -> fechas_configuradas_mes es False pero sugiere fecha
         self.assertFalse(visa_dic['fechas_configuradas_mes'])
         self.assertEqual(visa_dic['sugerencia_cierre'], '2026-12-24')

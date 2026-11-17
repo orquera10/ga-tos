@@ -2493,28 +2493,21 @@
           </div>
           <div class="date-label">${escapeHtml(isPrestamo && d.prestamo_info && d.prestamo_info.ciclo_actual ? d.prestamo_info.ciclo_actual.nombre : (p ? p.mes_label : ''))} (${filtered.length})</div>
           ${renderTransactionsByDayHtml(filtered, isPrestamo)}
-          ${(!isPrestamo && d.mes_info && d.mes_info.mes_seleccionado !== 'todos' && d.mes_info.compras_tarjeta_mes_origen && d.mes_info.compras_tarjeta_mes_origen.length) ? `
-            <div class="day-group" style="margin-top:20px;border:1px solid rgba(156,145,255,0.28);border-radius:16px;padding:12px;background:#161824;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-                <div>
-                  <span class="overline" style="color:#a99fff;">COMPRAS CON TARJETA EN ${escapeHtml((d.mes_info.mes_label || '').toUpperCase())}</span>
-                  <strong style="display:block;font-size:13px;color:#eeeef6;">Pasan a próximos resúmenes según fecha de cierre</strong>
-                </div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                  ${d.mes_info.total_origen_pasa_siguiente > 0 ? `
-                    <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_siguiente)}">
-                      ➔ ${escapeHtml(d.mes_info.mes_siguiente_label)}: −${money(d.mes_info.total_origen_pasa_siguiente)}
-                    </button>
-                  ` : ''}
-                  ${d.mes_info.total_origen_pasa_subsiguiente > 0 ? `
-                    <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_subsiguiente)}">
-                      ⏭️ Post-cierre ➔ ${escapeHtml(d.mes_info.mes_subsiguiente_label)}: −${money(d.mes_info.total_origen_pasa_subsiguiente)}
-                    </button>
-                  ` : ''}
-                </div>
-              </div>
-              <div class="transaction-list">
-                ${d.mes_info.compras_tarjeta_mes_origen.map(item => renderSingleTransactionArticle(item)).join('')}
+          ${(!isPrestamo && d.mes_info && d.mes_info.mes_seleccionado !== 'todos' && (d.mes_info.total_origen_pasa_siguiente > 0 || d.mes_info.total_origen_pasa_subsiguiente > 0)) ? `
+            <div class="day-group" style="margin-top:18px;border:1px solid rgba(156,145,255,0.28);border-radius:16px;padding:12px;background:#161824;">
+              <span class="overline" style="color:#a99fff;">RESUMEN TARJETA DE ${escapeHtml((d.mes_info.mes_label || '').toUpperCase())}</span>
+              <strong style="display:block;font-size:12.5px;color:#eeeef6;margin:2px 0 8px;">A qué resumen pasa cada compra según la fecha de cierre</strong>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${d.mes_info.total_origen_pasa_siguiente > 0 ? `
+                  <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_siguiente)}">
+                    ➔ Pasa a ${escapeHtml(d.mes_info.mes_siguiente_label)}: −${money(d.mes_info.total_origen_pasa_siguiente)}
+                  </button>
+                ` : ''}
+                ${d.mes_info.total_origen_pasa_subsiguiente > 0 ? `
+                  <button type="button" class="btn-card-resumen" data-select-mes="${escapeHtml(d.mes_info.mes_subsiguiente)}">
+                    ⏭️ Post-cierre ➔ ${escapeHtml(d.mes_info.mes_subsiguiente_label)}: −${money(d.mes_info.total_origen_pasa_subsiguiente)}
+                  </button>
+                ` : ''}
               </div>
             </div>
           ` : ''}
