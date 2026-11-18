@@ -1,12 +1,16 @@
 package com.dario.gastos
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
@@ -21,15 +25,20 @@ class QuickIncomeActivity : AppCompatActivity() {
     private lateinit var spPresupuesto: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
+    private lateinit var chipTransf: TextView
+    private lateinit var chipEfectivo: TextView
+    private lateinit var chipSueldo: TextView
 
     private var budgets: List<ApiClient.Budget> = emptyList()
+    private var selectedTipoIngreso: String = "transferencia"
+    private var tipoManuallyChosen: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_income)
 
         val dm = resources.displayMetrics
-        val dialogWidth = (dm.widthPixels * 0.90).toInt()
+        val dialogWidth = (dm.widthPixels * 0.92).toInt()
         window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
 
         etMonto = findViewById(R.id.etMontoIngreso)
@@ -37,6 +46,9 @@ class QuickIncomeActivity : AppCompatActivity() {
         spPresupuesto = findViewById(R.id.spPresupuestoIngreso)
         btnSave = findViewById(R.id.btnSaveIngreso)
         btnCancel = findViewById(R.id.btnCancelIngreso)
+        chipTransf = findViewById(R.id.chipIngresoTransf)
+        chipEfectivo = findViewById(R.id.chipIngresoEfectivo)
+        chipSueldo = findViewById(R.id.chipIngresoSueldo)
 
         btnCancel.setOnClickListener { finish() }
 
@@ -47,6 +59,34 @@ class QuickIncomeActivity : AppCompatActivity() {
             return
         }
 
+        chipTransf.setOnClickListener {
+            tipoManuallyChosen = true
+            setTipoIngreso("transferencia")
+        }
+        chipEfectivo.setOnClickListener {
+            tipoManuallyChosen = true
+            setTipoIngreso("efectivo")
+        }
+        chipSueldo.setOnClickListener {
+            tipoManuallyChosen = true
+            setTipoIngreso("sueldo")
+        }
+        setTipoIngreso("transferencia")
+
+        etNombre.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (tipoManuallyChosen) return
+                val txt = (s?.toString() ?: "").lowercase()
+                when {
+                    txt.contains("sueldo") || txt.contains("salario") -> setTipoIngreso("sueldo")
+                    txt.contains("efectivo") -> setTipoIngreso("efectivo")
+                    txt.contains("transferencia") || txt.contains("transf") -> setTipoIngreso("transferencia")
+                }
+            }
+        })
+
         // Auto focus monto y abrir teclado numérico
         etMonto.requestFocus()
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
@@ -55,6 +95,21 @@ class QuickIncomeActivity : AppCompatActivity() {
         btnSave.setOnClickListener { saveIncome() }
 
         loadBudgets()
+    }
+
+    private fun setTipoIngreso(tipo: String) {
+        selectedTipoIngreso = tipo
+        val activeColor = Color.parseColor("#FFFFFF")
+        val mutedColor = Color.parseColor("#C2C4D4")
+
+        chipTransf.setBackgroundResource(if (tipo == "transferencia") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTransf.setTextColor(if (tipo == "transferencia") activeColor else mutedColor)
+
+        chipEfectivo.setBackgroundResource(if (tipo == "efectivo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipEfectivo.setTextColor(if (tipo == "efectivo") activeColor else mutedColor)
+
+        chipSueldo.setBackgroundResource(if (tipo == "sueldo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipSueldo.setTextColor(if (tipo == "sueldo") activeColor else mutedColor)
     }
 
     private fun loadBudgets() {
@@ -96,7 +151,6 @@ class QuickIncomeActivity : AppCompatActivity() {
         val budget = budgets[selectedBudgetIdx]
         Prefs.saveLastBudgetId(this, budget.id)
 
-        // Nombre opcional: si está vacío, el servidor asignará "⚡ Ingreso rápido 01" automáticamente
         val nombre = etNombre.text.toString().trim()
 
         btnSave.isEnabled = false
@@ -107,7 +161,8 @@ class QuickIncomeActivity : AppCompatActivity() {
                 context = this@QuickIncomeActivity,
                 budgetId = budget.id,
                 nombre = nombre,
-                monto = monto
+                monto = monto,
+                tipoIngreso = selectedTipoIngreso
             )
 
             withContext(Dispatchers.Main) {
@@ -117,7 +172,7 @@ class QuickIncomeActivity : AppCompatActivity() {
                     finish()
                 } else {
                     btnSave.isEnabled = true
-                    btnSave.text = "Guardar"
+                    btnSave.text = "Guardar ingreso"
                     Toast.makeText(this@QuickIncomeActivity, "Error: $msg", Toast.LENGTH_LONG).show()
                 }
             }

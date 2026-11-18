@@ -5,21 +5,21 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:padding="7dp"
+    android:padding="6dp"
     android:background="@drawable/widget_bg">
 
-    <!-- Left: Figma Purple Gradient Balance Card -->
+    <!-- Left: Balance Card (máximo espacio para visualizar el saldo en 1 línea) -->
     <LinearLayout
         android:id="@+id/widgetBudgetInfo"
         android:layout_width="0dp"
         android:layout_height="match_parent"
-        android:layout_weight="1.25"
+        android:layout_weight="1"
         android:orientation="vertical"
         android:gravity="center_vertical"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="7dp"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="5dp"
         android:background="@drawable/widget_balance_card_bg"
-        android:layout_marginEnd="6dp">
+        android:layout_marginEnd="5dp">
 
         <!-- Top row: Balance label + Budget Selector Pill -->
         <LinearLayout
@@ -29,26 +29,26 @@
             android:gravity="center_vertical">
 
             <TextView
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Balance"
+                android:text="Saldo"
                 android:textColor="#D9D2FF"
-                android:textSize="10sp"
+                android:textSize="9.5sp"
+                android:layout_marginEnd="6dp"
                 android:singleLine="true" />
 
             <TextView
                 android:id="@+id/widgetBudgetName"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:maxWidth="115dp"
+                android:layout_weight="1"
                 android:text="Presupuesto ▾"
                 android:textColor="#F2EFFF"
                 android:textSize="9.5sp"
                 android:textStyle="bold"
                 android:background="@drawable/widget_period_pill_bg"
-                android:paddingHorizontal="7dp"
-                android:paddingVertical="2dp"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="1.5dp"
                 android:singleLine="true"
                 android:ellipsize="end" />
 
@@ -68,120 +68,83 @@
             android:ellipsize="end"
             android:autoSizeTextType="uniform"
             android:autoSizeMinTextSize="13sp"
-            android:autoSizeMaxTextSize="19sp" />
+            android:autoSizeMaxTextSize="20sp" />
 
     </LinearLayout>
 
-    <!-- Right: Figma Quick Action Cards (Gasto / Ingreso / Entrar al Presupuesto) -->
+    <!-- Right: Botones compactos solo iconos (Gasto rojo, Ingreso verde, Ver, Actualizar) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- Card Button: Gasto -->
-        <LinearLayout
+        <!-- Botón Rojo: Gasto (solo icono) -->
+        <FrameLayout
             android:id="@+id/widgetBtnAddExpense"
-            android:layout_width="64dp"
+            android:layout_width="38dp"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingVertical="5dp"
-            android:paddingHorizontal="4dp"
-            android:background="@drawable/widget_action_card_bg"
-            android:layout_marginEnd="6dp">
+            android:background="@drawable/widget_icon_rose_bg"
+            android:layout_marginEnd="4dp">
 
-            <FrameLayout
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:background="@drawable/widget_icon_rose_bg">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_up"
+                android:contentDescription="Gasto rápido" />
 
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_widget_up"
-                    android:contentDescription="Gasto" />
+        </FrameLayout>
 
-            </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Gasto"
-                android:textColor="#EEEEF6"
-                android:textSize="10.5sp"
-                android:textStyle="bold"
-                android:singleLine="true" />
-
-        </LinearLayout>
-
-        <!-- Card Button: Ingreso -->
-        <LinearLayout
+        <!-- Botón Verde: Ingreso (solo icono) -->
+        <FrameLayout
             android:id="@+id/widgetBtnAddIncome"
-            android:layout_width="64dp"
+            android:layout_width="38dp"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingVertical="5dp"
-            android:paddingHorizontal="4dp"
-            android:background="@drawable/widget_action_card_bg"
-            android:layout_marginEnd="6dp">
+            android:background="@drawable/widget_icon_green_bg"
+            android:layout_marginEnd="4dp">
 
-            <FrameLayout
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:background="@drawable/widget_icon_green_bg">
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_down"
+                android:contentDescription="Ingreso rápido" />
 
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_widget_down"
-                    android:contentDescription="Ingreso" />
+        </FrameLayout>
 
-            </FrameLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Ingreso"
-                android:textColor="#EEEEF6"
-                android:textSize="10.5sp"
-                android:textStyle="bold"
-                android:singleLine="true" />
-
-        </LinearLayout>
-
-        <!-- Card Button: Abrir Presupuesto Seleccionado en la App -->
-        <LinearLayout
+        <!-- Botón Ver presupuesto (solo icono) -->
+        <FrameLayout
             android:id="@+id/widgetBtnOpenBudget"
-            android:layout_width="40dp"
+            android:layout_width="34dp"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:paddingVertical="4dp"
+            android:background="@drawable/widget_action_card_bg"
+            android:layout_marginEnd="4dp">
+
+            <ImageView
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_open"
+                android:contentDescription="Ver presupuesto" />
+
+        </FrameLayout>
+
+        <!-- Botón Actualizar (solo icono) -->
+        <FrameLayout
+            android:id="@+id/widgetBtnRefresh"
+            android:layout_width="34dp"
+            android:layout_height="match_parent"
             android:background="@drawable/widget_action_card_bg">
 
             <ImageView
                 android:layout_width="17dp"
                 android:layout_height="17dp"
-                android:src="@drawable/ic_widget_open"
-                android:contentDescription="Entrar al presupuesto" />
+                android:layout_gravity="center"
+                android:src="@drawable/ic_widget_refresh"
+                android:contentDescription="Actualizar saldo" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Ver"
-                android:textColor="#D9D2FF"
-                android:textSize="9.5sp"
-                android:textStyle="bold"
-                android:singleLine="true" />
-
-        </LinearLayout>
+        </FrameLayout>
 
     </LinearLayout>
 

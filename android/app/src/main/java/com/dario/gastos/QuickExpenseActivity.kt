@@ -1,12 +1,16 @@
 package com.dario.gastos
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.CoroutineScope
@@ -21,15 +25,20 @@ class QuickExpenseActivity : AppCompatActivity() {
     private lateinit var spPresupuesto: Spinner
     private lateinit var btnSave: Button
     private lateinit var btnCancel: Button
+    private lateinit var chipEfectivo: TextView
+    private lateinit var chipTransferencia: TextView
+    private lateinit var chipTarjeta: TextView
 
     private var budgets: List<ApiClient.Budget> = emptyList()
+    private var selectedMetodo: String = "efectivo"
+    private var metodoManuallyChosen: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_quick_expense)
 
         val dm = resources.displayMetrics
-        val dialogWidth = (dm.widthPixels * 0.90).toInt()
+        val dialogWidth = (dm.widthPixels * 0.92).toInt()
         window.setLayout(dialogWidth, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
 
         etMonto = findViewById(R.id.etMonto)
@@ -37,6 +46,9 @@ class QuickExpenseActivity : AppCompatActivity() {
         spPresupuesto = findViewById(R.id.spPresupuesto)
         btnSave = findViewById(R.id.btnSave)
         btnCancel = findViewById(R.id.btnCancel)
+        chipEfectivo = findViewById(R.id.chipMetodoEfectivo)
+        chipTransferencia = findViewById(R.id.chipMetodoTransferencia)
+        chipTarjeta = findViewById(R.id.chipMetodoTarjeta)
 
         btnCancel.setOnClickListener { finish() }
 
@@ -47,6 +59,34 @@ class QuickExpenseActivity : AppCompatActivity() {
             return
         }
 
+        chipEfectivo.setOnClickListener {
+            metodoManuallyChosen = true
+            setMetodo("efectivo")
+        }
+        chipTransferencia.setOnClickListener {
+            metodoManuallyChosen = true
+            setMetodo("transferencia")
+        }
+        chipTarjeta.setOnClickListener {
+            metodoManuallyChosen = true
+            setMetodo("tarjeta")
+        }
+        setMetodo("efectivo")
+
+        etNombre.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (metodoManuallyChosen) return
+                val txt = (s?.toString() ?: "").lowercase()
+                when {
+                    txt.contains("tarjeta") || txt.contains("visa") || txt.contains("master") -> setMetodo("tarjeta")
+                    txt.contains("transferencia") || txt.contains("transf") || txt.contains("mp") || txt.contains("mercado pago") -> setMetodo("transferencia")
+                    txt.contains("efectivo") -> setMetodo("efectivo")
+                }
+            }
+        })
+
         // Auto focus monto y abrir teclado numérico directamente
         etMonto.requestFocus()
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
@@ -55,6 +95,21 @@ class QuickExpenseActivity : AppCompatActivity() {
         btnSave.setOnClickListener { saveExpense() }
 
         loadBudgets()
+    }
+
+    private fun setMetodo(metodo: String) {
+        selectedMetodo = metodo
+        val activeColor = Color.parseColor("#FFFFFF")
+        val mutedColor = Color.parseColor("#C2C4D4")
+
+        chipEfectivo.setBackgroundResource(if (metodo == "efectivo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipEfectivo.setTextColor(if (metodo == "efectivo") activeColor else mutedColor)
+
+        chipTransferencia.setBackgroundResource(if (metodo == "transferencia") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTransferencia.setTextColor(if (metodo == "transferencia") activeColor else mutedColor)
+
+        chipTarjeta.setBackgroundResource(if (metodo == "tarjeta") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTarjeta.setTextColor(if (metodo == "tarjeta") activeColor else mutedColor)
     }
 
     private fun loadBudgets() {
@@ -96,7 +151,6 @@ class QuickExpenseActivity : AppCompatActivity() {
         val budget = budgets[selectedBudgetIdx]
         Prefs.saveLastBudgetId(this, budget.id)
 
-        // Nombre opcional: si está vacío, el servidor asignará "⚡ Gasto rápido 01" automáticamente
         val nombre = etNombre.text.toString().trim()
 
         btnSave.isEnabled = false
@@ -107,7 +161,8 @@ class QuickExpenseActivity : AppCompatActivity() {
                 context = this@QuickExpenseActivity,
                 budgetId = budget.id,
                 nombre = nombre,
-                monto = monto
+                monto = monto,
+                metodoPago = selectedMetodo
             )
 
             withContext(Dispatchers.Main) {
@@ -117,7 +172,7 @@ class QuickExpenseActivity : AppCompatActivity() {
                     finish()
                 } else {
                     btnSave.isEnabled = true
-                    btnSave.text = "Guardar"
+                    btnSave.text = "Guardar gasto"
                     Toast.makeText(this@QuickExpenseActivity, "Error: $msg", Toast.LENGTH_LONG).show()
                 }
             }
