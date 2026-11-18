@@ -2390,16 +2390,19 @@
         ${(() => {
           const allTarjs = ((d.cuentas && d.cuentas.items) || []).filter(c => c.tipo === 'tarjeta' && !c.is_system);
           if (!allTarjs.length) return '';
-          const vencenMes = allTarjs.filter(c => c.vence_en_mes);
+          const vencenMes = allTarjs.filter(c => c.vence_en_mes && !c.pagada_en_mes);
+          const pagadasMes = allTarjs.filter(c => c.pagada_en_mes);
           const mesNom = (mInfo && mInfo.mes_seleccionado !== 'todos') ? mInfo.mes_label : 'este mes';
           const subTxt = vencenMes.length
             ? `Vencen en ${mesNom}: ${vencenMes.map(c => `${c.name} (${c.fecha_vencimiento_str})`).join(', ')}`
-            : `Consultá consumos, diferencias y registrá el pago del resumen`;
+            : (pagadasMes.length
+                ? `✓ Pagada en ${mesNom}: ${pagadasMes.map(c => c.name).join(', ')}`
+                : `Consultá consumos, diferencias y registrá el pago del resumen`);
           return `
-            <button type="button" data-open-sheet="resumen_tarjeta" style="width:100%;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid rgba(240,189,98,0.35);background:linear-gradient(135deg,rgba(240,189,98,0.12),rgba(102,87,232,0.12));display:flex;align-items:center;gap:12px;text-align:left;color:#fff;">
-              <span class="action-icon amber" style="width:38px;height:38px;flex-shrink:0;">${iconSvg('card', 18)}</span>
+            <button type="button" data-open-sheet="resumen_tarjeta" style="width:100%;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid ${vencenMes.length ? 'rgba(240,189,98,0.35)' : 'rgba(85,210,173,0.28)'};background:linear-gradient(135deg,rgba(240,189,98,0.12),rgba(102,87,232,0.12));display:flex;align-items:center;gap:12px;text-align:left;color:#fff;">
+              <span class="action-icon ${vencenMes.length ? 'amber' : 'green'}" style="width:38px;height:38px;flex-shrink:0;">${iconSvg('card', 18)}</span>
               <div style="min-width:0;flex:1;">
-                <strong style="display:block;font:700 13px 'Manrope',sans-serif;color:#f5d28b;">💳 Pagar tarjeta</strong>
+                <strong style="display:block;font:700 13px 'Manrope',sans-serif;color:${vencenMes.length ? '#f5d28b' : '#7ae5c4'};">💳 Pagar tarjeta</strong>
                 <small style="display:block;font-size:10.5px;color:#cfd1e2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subTxt)}</small>
               </div>
               ${iconSvg('chevron', 17)}
@@ -2999,7 +3002,7 @@
               ` : `
                 <form id="formResumenTarjeta">
                   ${(() => {
-                    const vencenMes = cardItems.filter(c => c.vence_en_mes);
+                    const vencenMes = cardItems.filter(c => c.vence_en_mes && !c.pagada_en_mes);
                     if (!vencenMes.length) return '';
                     return `
                       <div style="padding:8px 11px;border-radius:11px;background:rgba(240,189,98,0.12);border:1px solid rgba(240,189,98,0.35);font-size:10.5px;color:#f5d28b;">
@@ -3013,7 +3016,7 @@
                     <div class="chips-selector">
                       ${cardItems.map(c => `
                         <button type="button" class="chip-btn ${c.name === curCardName ? 'selected' : ''}" data-resumen-select-tarjeta="${escapeHtml(c.name)}">
-                          💳 ${escapeHtml(c.name)}${c.vence_en_mes && c.fecha_vencimiento_str ? ` · ⏳ ${escapeHtml(c.fecha_vencimiento_str)}` : ''}
+                          💳 ${escapeHtml(c.name)}${c.pagada_en_mes ? ' · ✓ Pagada' : (c.vence_en_mes && c.fecha_vencimiento_str ? ` · ⏳ ${escapeHtml(c.fecha_vencimiento_str)}` : '')}
                         </button>
                       `).join('')}
                     </div>

@@ -820,6 +820,9 @@ class ApiEndpointsTestCase(TestCase):
             f'/api/presupuestos/{p_abierto.id}/detalle/?mes=2026-12',
             **self.auth_headers
         ).json()
+        bna_dic = next((c for c in det_bna_dic['cuentas']['items'] if c['name'] == 'Bna_Visa'), None)
+        self.assertTrue(bna_dic['pagada_en_mes'])
+        self.assertFalse(bna_dic['vence_en_mes'])
         pago_mov = next((m for m in det_bna_dic['movimientos'] if m['id'] == resp_bna_pago.json()['gasto_id']), None)
         self.assertIsNotNone(pago_mov)
         self.assertIsNotNone(pago_mov['pago_tarjeta_detalle'])

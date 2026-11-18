@@ -51,7 +51,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 val budgetName = Prefs.getLastBudgetName(context)
                 val remaining = Prefs.getLastRemaining(context)
 
-                views.setTextViewText(R.id.widgetBudgetName, "$budgetName ▾")
+                views.setTextViewText(R.id.widgetBudgetName, budgetName)
                 views.setTextViewText(
                     R.id.widgetTxtRestante,
                     String.format(Locale.getDefault(), "$ %,.0f", remaining)
@@ -74,18 +74,9 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetContainer, mainPending)
             views.setOnClickPendingIntent(R.id.widgetBtnOpenBudget, mainPending)
-
-            // Click en el selector de presupuesto o saldo -> Abrir diálogo para cambiar de presupuesto
-            val selectIntent = Intent(context, SelectBudgetActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            }
-            val selectPending = PendingIntent.getActivity(
-                context, 4, selectIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widgetBudgetInfo, selectPending)
-            views.setOnClickPendingIntent(R.id.widgetBudgetName, selectPending)
-            views.setOnClickPendingIntent(R.id.widgetTxtRestante, selectPending)
+            views.setOnClickPendingIntent(R.id.widgetBudgetInfo, mainPending)
+            views.setOnClickPendingIntent(R.id.widgetBudgetName, mainPending)
+            views.setOnClickPendingIntent(R.id.widgetTxtRestante, mainPending)
 
             // Click + Gasto -> Abrir QuickExpenseActivity independiente
             val expenseIntent = Intent(context, QuickExpenseActivity::class.java).apply {

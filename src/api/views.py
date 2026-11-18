@@ -1165,6 +1165,13 @@ def presupuesto_detalle_api(request, pk=None):
                 cuentas_stats[key] = init_cuenta_stat(t.destino_cuenta, t.destino_cuenta.nombre)
             cuentas_stats[key]['ingresos'] += t.monto
 
+    tarjetas_pagadas_mes = set()
+    for g in all_gastos:
+        if g.metodo_pago != 'tarjeta':
+            p_det = build_pago_tarjeta_detalle(g)
+            if p_det and (p_det['mes_resumen'] == mes_ref_ym or get_local_ym(g.fecha) == mes_ref_ym):
+                tarjetas_pagadas_mes.add(p_det['tarjeta_nombre'].lower())
+
     cuentas_items = []
     for key, st in cuentas_stats.items():
         c_obj = st['obj']
@@ -1188,6 +1195,12 @@ def presupuesto_detalle_api(request, pk=None):
 
         is_fav = bool(c_obj.es_favorita) if c_obj else False
         fechas_mes_target = mes_seleccionado if (presupuesto.tipo == 'abierto' and mes_seleccionado != 'todos') else None
+        fechas_ser = serialize_cuenta_fechas(c_obj, mes_ym=fechas_mes_target)
+        is_paid_mes = (st['nombre'].lower() in tarjetas_pagadas_mes) if c_tipo == 'tarjeta' else False
+        fechas_ser['pagada_en_mes'] = is_paid_mes
+        if is_paid_mes:
+            fechas_ser['vence_en_mes'] = False
+
         cuentas_items.append({
             'id': c_obj.id if c_obj else 0,
             'name': st['nombre'],
@@ -1217,7 +1230,7 @@ def presupuesto_detalle_api(request, pk=None):
             'icon': icon_name,
             'icon_class': icon_cls,
             'is_system': False,
-            **serialize_cuenta_fechas(c_obj, mes_ym=fechas_mes_target),
+            **fechas_ser,
         })
 
     # Ordenar cuentas:

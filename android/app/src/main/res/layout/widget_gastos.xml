@@ -8,7 +8,7 @@
     android:padding="6dp"
     android:background="@drawable/widget_bg">
 
-    <!-- Left: Balance Card (máximo espacio para visualizar el saldo en 1 línea) -->
+    <!-- Left: Solo saldo + nombre sutil del presupuesto seleccionado en la app -->
     <LinearLayout
         android:id="@+id/widgetBudgetInfo"
         android:layout_width="0dp"
@@ -17,58 +17,33 @@
         android:orientation="vertical"
         android:gravity="center_vertical"
         android:paddingHorizontal="10dp"
-        android:paddingVertical="5dp"
+        android:paddingVertical="4dp"
         android:background="@drawable/widget_balance_card_bg"
         android:layout_marginEnd="5dp">
 
-        <!-- Top row: Balance label + Budget Selector Pill -->
-        <LinearLayout
+        <TextView
+            android:id="@+id/widgetBudgetName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:text="Presupuesto"
+            android:textColor="#D9D2FF"
+            android:textSize="9.5sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Saldo"
-                android:textColor="#D9D2FF"
-                android:textSize="9.5sp"
-                android:layout_marginEnd="6dp"
-                android:singleLine="true" />
-
-            <TextView
-                android:id="@+id/widgetBudgetName"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Presupuesto ▾"
-                android:textColor="#F2EFFF"
-                android:textSize="9.5sp"
-                android:textStyle="bold"
-                android:background="@drawable/widget_period_pill_bg"
-                android:paddingHorizontal="6dp"
-                android:paddingVertical="1.5dp"
-                android:singleLine="true"
-                android:ellipsize="end" />
-
-        </LinearLayout>
-
-        <!-- Bottom row: Main Balance Amount -->
         <TextView
             android:id="@+id/widgetTxtRestante"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="$ 0"
             android:textColor="#FFFFFF"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:layout_marginTop="2dp"
             android:singleLine="true"
             android:ellipsize="end"
             android:autoSizeTextType="uniform"
-            android:autoSizeMinTextSize="13sp"
-            android:autoSizeMaxTextSize="20sp" />
+            android:autoSizeMinTextSize="14sp"
+            android:autoSizeMaxTextSize="22sp" />
 
     </LinearLayout>
 
