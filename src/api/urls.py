@@ -10,10 +10,15 @@ urlpatterns = [
 
     # Recursos para la App / Widget
     path('presupuestos/', views.presupuestos_api, name='presupuestos'),
+    path('presupuestos/guardar/', views.guardar_presupuesto_api, name='guardar_presupuesto'),
+    path('presupuestos/<int:pk>/eliminar/', views.eliminar_presupuesto_api, name='eliminar_presupuesto'),
     path('presupuestos/activo/detalle/', views.presupuesto_detalle_api, name='presupuesto_activo_detalle'),
     path('presupuestos/<int:pk>/detalle/', views.presupuesto_detalle_api, name='presupuesto_detalle'),
     path('categorias/', views.categorias_api, name='categorias'),
     path('metadata/', views.metadata_api, name='metadata'),
+    path('calculadoras/', views.calculadoras_api, name='calculadoras'),
+    path('calculadoras/guardar/', views.guardar_calculadora_api, name='guardar_calculadora'),
+    path('calculadoras/<int:pk>/eliminar/', views.eliminar_calculadora_api, name='eliminar_calculadora'),
 
     # Acciones de carga rápida y gestión de cuentas / transferencias
     path('gastos/crear/', views.crear_gasto_api, name='crear_gasto'),

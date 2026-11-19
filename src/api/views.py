@@ -30,6 +30,7 @@ from presupuestos.views import (
     get_user_recent_personas,
     get_user_recent_cuentas,
 )
+from calculadoras.models import CalculadoraDivisa
 from .models import ApiToken
 from .auth import api_auth_required, get_user_from_request
 
@@ -3087,6 +3088,189 @@ def pagar_resumen_tarjeta_api(request):
         'subtotal_consumos': float(subtotal_consumos),
         'diferencia': float(diferencia_calc),
     }, status=201)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def guardar_presupuesto_api(request):
+    """
+    Crea o actualiza un presupuesto desde la app móvil.
+    POST /api/presupuestos/guardar/
+    """
+    data = parse_request_data(request)
+    p_id = data.get('id')
+    nombre = (data.get('nombre') or '').strip()
+    if not nombre:
+        return JsonResponse({'success': False, 'error': 'El nombre del presupuesto es obligatorio'}, status=400)
+
+    tipo = (data.get('tipo') or 'abierto').strip().lower()
+    if tipo not in ['fijo', 'abierto', 'prestamo']:
+        tipo = 'abierto'
+
+    moneda = (data.get('moneda') or 'ARS').strip().upper()
+    if moneda not in ['ARS', 'USD', 'EUR', 'BOB']:
+        moneda = 'ARS'
+
+    hoy = timezone.localdate()
+    f_ini = parse_date((data.get('fecha_inicio') or '').strip()) or hoy.replace(day=1)
+    last_d = calendar.monthrange(f_ini.year, f_ini.month)[1]
+    f_fin = parse_date((data.get('fecha_fin') or '').strip()) or f_ini.replace(day=last_d)
+    if f_fin < f_ini:
+        return JsonResponse({'success': False, 'error': 'La fecha de fin no puede ser anterior al inicio'}, status=400)
+
+    monto_raw = data.get('monto_total')
+    try:
+        monto_total = Decimal(str(monto_raw or '0').replace(',', '.')) if tipo == 'fijo' else Decimal('0')
+        if monto_total < 0:
+            monto_total = Decimal('0')
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Monto inicial inválido'}, status=400)
+
+    descripcion = (data.get('descripcion') or '').strip() or None
+
+    if p_id:
+        p = presupuestos_editables(request.api_user).filter(id=p_id).first()
+        if not p:
+            return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado'}, status=404)
+        p.nombre = nombre[:100]
+        p.tipo = tipo
+        p.moneda = moneda
+        p.fecha_inicio = f_ini
+        p.fecha_fin = f_fin
+        p.monto_total = monto_total
+        p.descripcion = descripcion
+        p.save()
+        p.actualizar_monto_restante()
+        msg = f'Presupuesto "{p.nombre}" actualizado'
+    else:
+        p = Presupuesto.objects.create(
+            usuario=request.api_user,
+            nombre=nombre[:100],
+            tipo=tipo,
+            moneda=moneda,
+            fecha_inicio=f_ini,
+            fecha_fin=f_fin,
+            monto_total=monto_total,
+            monto_restante=monto_total,
+            descripcion=descripcion,
+        )
+        p.actualizar_monto_restante()
+        msg = f'Presupuesto "{p.nombre}" creado'
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': msg,
+        'presupuesto': serialize_presupuesto_item(p, request.api_user, hoy),
+    }, status=201 if not p_id else 200)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def eliminar_presupuesto_api(request, pk):
+    """Elimina un presupuesto propio del usuario."""
+    p = Presupuesto.objects.filter(id=pk, usuario=request.api_user).first()
+    if not p:
+        return JsonResponse({'success': False, 'error': 'Presupuesto no encontrado o sin permiso para eliminar'}, status=404)
+    nombre = p.nombre
+    p.delete()
+    return JsonResponse({'success': True, 'mensaje': f'Presupuesto "{nombre}" eliminado'})
+
+
+def serialize_calculadora_item(c):
+    return {
+        'id': c.id,
+        'nombre': c.nombre,
+        'moneda_origen': c.moneda_origen,
+        'moneda_destino': c.moneda_destino,
+        'moneda_origen_nombre': c.get_moneda_origen_display_name(),
+        'moneda_destino_nombre': c.get_moneda_destino_display_name(),
+        'relacion': float(c.relacion),
+    }
+
+
+@api_auth_required
+@require_http_methods(["GET"])
+def calculadoras_api(request):
+    """
+    Lista las calculadoras de divisas disponibles y las monedas soportadas.
+    GET /api/calculadoras/
+    """
+    calcs = CalculadoraDivisa.objects.all().order_by('-fecha_actualizacion', '-id')
+    return JsonResponse({
+        'success': True,
+        'calculadoras': [serialize_calculadora_item(c) for c in calcs],
+        'monedas': [{'code': code, 'name': name} for code, name in CalculadoraDivisa.MONEDAS],
+    })
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def guardar_calculadora_api(request):
+    """
+    Crea o edita una calculadora de divisas desde la app móvil.
+    POST /api/calculadoras/guardar/
+    """
+    data = parse_request_data(request)
+    c_id = data.get('id')
+    nombre = (data.get('nombre') or '').strip()
+    moneda_origen = (data.get('moneda_origen') or 'USD').strip().upper()
+    moneda_destino = (data.get('moneda_destino') or 'ARS').strip().upper()
+    valid_codes = {code for code, _ in CalculadoraDivisa.MONEDAS}
+    if moneda_origen not in valid_codes or moneda_destino not in valid_codes:
+        return JsonResponse({'success': False, 'error': 'Moneda no soportada'}, status=400)
+    if moneda_origen == moneda_destino:
+        return JsonResponse({'success': False, 'error': 'La moneda origen y destino deben ser distintas'}, status=400)
+
+    try:
+        relacion = Decimal(str(data.get('relacion') or '0').replace(',', '.'))
+        if relacion <= 0:
+            return JsonResponse({'success': False, 'error': 'La cotización debe ser mayor a cero'}, status=400)
+    except (InvalidOperation, TypeError):
+        return JsonResponse({'success': False, 'error': 'Cotización inválida'}, status=400)
+
+    if not nombre:
+        nombre = f"{moneda_origen} a {moneda_destino}"
+
+    if c_id:
+        calc = CalculadoraDivisa.objects.filter(id=c_id).first()
+        if not calc:
+            return JsonResponse({'success': False, 'error': 'Calculadora no encontrada'}, status=404)
+        calc.nombre = nombre[:100]
+        calc.moneda_origen = moneda_origen
+        calc.moneda_destino = moneda_destino
+        calc.relacion = relacion
+        calc.save()
+        msg = f'Calculadora "{calc.nombre}" actualizada'
+    else:
+        calc = CalculadoraDivisa.objects.create(
+            nombre=nombre[:100],
+            moneda_origen=moneda_origen,
+            moneda_destino=moneda_destino,
+            relacion=relacion,
+        )
+        msg = f'Calculadora "{calc.nombre}" creada'
+
+    return JsonResponse({
+        'success': True,
+        'mensaje': msg,
+        'calculadora': serialize_calculadora_item(calc),
+    }, status=201 if not c_id else 200)
+
+
+@csrf_exempt
+@api_auth_required
+@require_http_methods(["POST"])
+def eliminar_calculadora_api(request, pk):
+    calc = CalculadoraDivisa.objects.filter(id=pk).first()
+    if not calc:
+        return JsonResponse({'success': False, 'error': 'Calculadora no encontrada'}, status=404)
+    nombre = calc.nombre
+    calc.delete()
+    return JsonResponse({'success': True, 'mensaje': f'Calculadora "{nombre}" eliminada'})
+
 
 
 

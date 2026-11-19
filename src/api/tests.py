@@ -831,6 +831,72 @@ class ApiEndpointsTestCase(TestCase):
         self.assertEqual(pago_mov['pago_tarjeta_detalle']['diferencia'], 4932.0)
         self.assertEqual(pago_mov['pago_tarjeta_detalle']['consumos'][0]['nombre'], 'Gas Post Cierre BNA')
 
+    def test_presupuestos_y_calculadoras_crud_app_movil(self):
+        # 1. Crear presupuesto desde la app móvil
+        resp_new_p = self.client.post(
+            '/api/presupuestos/guardar/',
+            data=json.dumps({
+                'nombre': 'Vacaciones 2027',
+                'tipo': 'fijo',
+                'moneda': 'USD',
+                'monto_total': 1500,
+                'fecha_inicio': '2027-01-01',
+                'fecha_fin': '2027-01-31',
+                'descripcion': 'Viaje',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_new_p.status_code, 201)
+        p_id = resp_new_p.json()['presupuesto']['id']
+        self.assertEqual(resp_new_p.json()['presupuesto']['moneda'], 'USD')
+        self.assertEqual(resp_new_p.json()['presupuesto']['monto_restante'], 1500.0)
+
+        # Editar presupuesto
+        resp_ed_p = self.client.post(
+            '/api/presupuestos/guardar/',
+            data=json.dumps({
+                'id': p_id,
+                'nombre': 'Vacaciones Brasil',
+                'tipo': 'fijo',
+                'moneda': 'USD',
+                'monto_total': 2000,
+                'fecha_inicio': '2027-01-01',
+                'fecha_fin': '2027-01-31',
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_ed_p.status_code, 200)
+        self.assertEqual(resp_ed_p.json()['presupuesto']['nombre'], 'Vacaciones Brasil')
+        self.assertEqual(resp_ed_p.json()['presupuesto']['monto_restante'], 2000.0)
+
+        # Eliminar presupuesto
+        resp_del_p = self.client.post(f'/api/presupuestos/{p_id}/eliminar/', **self.auth_headers)
+        self.assertEqual(resp_del_p.status_code, 200)
+
+        # 2. Calculadoras de divisas CRUD
+        resp_new_c = self.client.post(
+            '/api/calculadoras/guardar/',
+            data=json.dumps({
+                'nombre': 'Dólar Blue',
+                'moneda_origen': 'USD',
+                'moneda_destino': 'ARS',
+                'relacion': 1180,
+            }),
+            content_type='application/json',
+            **self.auth_headers
+        )
+        self.assertEqual(resp_new_c.status_code, 201)
+        c_id = resp_new_c.json()['calculadora']['id']
+
+        resp_list_c = self.client.get('/api/calculadoras/', **self.auth_headers)
+        self.assertEqual(resp_list_c.status_code, 200)
+        self.assertTrue(any(c['id'] == c_id and c['relacion'] == 1180.0 for c in resp_list_c.json()['calculadoras']))
+
+        resp_del_c = self.client.post(f'/api/calculadoras/{c_id}/eliminar/', **self.auth_headers)
+        self.assertEqual(resp_del_c.status_code, 200)
+
 
 
 

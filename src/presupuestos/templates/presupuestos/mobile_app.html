@@ -1578,6 +1578,24 @@
       editCuenta: '',
       editPersonas: [],
       confirmDeleteMov: false,
+      editingPresupuesto: null,
+      presupuestoTipo: 'abierto',
+      presupuestoMoneda: 'ARS',
+      confirmDeletePresupuesto: false,
+      calculadoras: [],
+      calculadoraMonedas: [
+        { code: 'USD', name: 'Dólar Estadounidense' },
+        { code: 'ARS', name: 'Peso Argentino' },
+        { code: 'BOB', name: 'Boliviano' },
+        { code: 'EUR', name: 'Euro' },
+        { code: 'BRL', name: 'Real Brasileño' },
+        { code: 'CLP', name: 'Peso Chileno' },
+      ],
+      calcSelectedId: 0,
+      calcDirection: 'directa',
+      calcMonto: '100',
+      calcFormMode: null,
+      calcLoading: false,
       sheetNoAnim: false,
       formDraft: {
         monto: '',
@@ -1817,6 +1835,15 @@
         if (fd.get('tasa_interes') !== null) state.editingMov.tasa_interes = fd.get('tasa_interes');
         if (fd.get('monto_proximo_mes') !== null) state.editingMov.monto_proximo_mes = fd.get('monto_proximo_mes');
       }
+      const formPresupuesto = document.getElementById('formPresupuesto');
+      if (formPresupuesto) {
+        const fd = new FormData(formPresupuesto);
+        if (fd.get('nombre') !== null) state.formDraft.p_nombre = fd.get('nombre');
+        if (fd.get('monto_total') !== null) state.formDraft.p_monto_total = fd.get('monto_total');
+        if (fd.get('fecha_inicio') !== null) state.formDraft.p_fecha_inicio = fd.get('fecha_inicio');
+        if (fd.get('fecha_fin') !== null) state.formDraft.p_fecha_fin = fd.get('fecha_fin');
+        if (fd.get('descripcion') !== null) state.formDraft.p_descripcion = fd.get('descripcion');
+      }
       const formCuenta = document.getElementById('formCuenta');
       if (formCuenta) {
         const fd = new FormData(formCuenta);
@@ -1892,8 +1919,46 @@
         state.resumenTarjetaCuentaPago = getDefaultCuentaForMetodo('transferencia');
         state.resumenDiferenciaMonto = '';
         state.resumenDiferenciaConcepto = 'Impuestos y sellos resumen';
+      } else if (name === 'editar_presupuesto') {
+        const todayDate = new Date();
+        const y = todayDate.getFullYear();
+        const m = String(todayDate.getMonth() + 1).padStart(2, '0');
+        const lastDay = new Date(y, todayDate.getMonth() + 1, 0).getDate();
+        const edP = (extra && extra.presupuesto) || null;
+        state.editingPresupuesto = edP;
+        state.presupuestoTipo = edP ? (edP.tipo || 'abierto') : 'abierto';
+        state.presupuestoMoneda = edP ? (edP.moneda || 'ARS') : 'ARS';
+        state.confirmDeletePresupuesto = false;
+        state.formDraft.p_nombre = edP ? (edP.nombre || '') : '';
+        state.formDraft.p_monto_total = edP ? String(edP.monto_total || 0) : '';
+        state.formDraft.p_fecha_inicio = edP ? (edP.fecha_inicio || `${y}-${m}-01`) : `${y}-${m}-01`;
+        state.formDraft.p_fecha_fin = edP ? (edP.fecha_fin || `${y}-${m}-${String(lastDay).padStart(2, '0')}`) : `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+        state.formDraft.p_descripcion = edP ? (edP.descripcion || '') : '';
+      } else if (name === 'calculadora_monedas') {
+        state.calcFormMode = null;
+        state.calcDirection = 'directa';
+        loadCalculadoras();
       }
       render();
+    }
+
+    async function loadCalculadoras() {
+      state.calcLoading = true;
+      const res = await apiFetch('/api/calculadoras/');
+      state.calcLoading = false;
+      if (res.ok && res.data && res.data.success) {
+        state.calculadoras = res.data.calculadoras || [];
+        if (res.data.monedas && res.data.monedas.length) {
+          state.calculadoraMonedas = res.data.monedas;
+        }
+        if (state.calculadoras.length && !state.calculadoras.some(c => c.id === state.calcSelectedId)) {
+          state.calcSelectedId = state.calculadoras[0].id;
+        }
+      }
+      if (state.sheet === 'calculadora_monedas') {
+        state.sheetNoAnim = true;
+        render();
+      }
     }
 
     function getGreeting() {
@@ -2399,16 +2464,31 @@
                 ? `✓ Pagada en ${mesNom}: ${pagadasMes.map(c => c.name).join(', ')}`
                 : `Consultá consumos, diferencias y registrá el pago del resumen`);
           return `
-            <button type="button" data-open-sheet="resumen_tarjeta" style="width:100%;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid ${vencenMes.length ? 'rgba(240,189,98,0.35)' : 'rgba(85,210,173,0.28)'};background:linear-gradient(135deg,rgba(240,189,98,0.12),rgba(102,87,232,0.12));display:flex;align-items:center;gap:12px;text-align:left;color:#fff;">
-              <span class="action-icon ${vencenMes.length ? 'amber' : 'green'}" style="width:38px;height:38px;flex-shrink:0;">${iconSvg('card', 18)}</span>
-              <div style="min-width:0;flex:1;">
-                <strong style="display:block;font:700 13px 'Manrope',sans-serif;color:${vencenMes.length ? '#f5d28b' : '#7ae5c4'};">💳 Pagar tarjeta</strong>
-                <small style="display:block;font-size:10.5px;color:#cfd1e2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subTxt)}</small>
-              </div>
-              ${iconSvg('chevron', 17)}
-            </button>
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px;">
+              <button type="button" data-open-sheet="resumen_tarjeta" style="padding:12px 13px;border-radius:16px;border:1px solid ${vencenMes.length ? 'rgba(240,189,98,0.35)' : 'rgba(85,210,173,0.28)'};background:linear-gradient(135deg,rgba(240,189,98,0.12),rgba(102,87,232,0.12));display:flex;align-items:center;gap:10px;text-align:left;color:#fff;min-width:0;">
+                <span class="action-icon ${vencenMes.length ? 'amber' : 'green'}" style="width:36px;height:36px;flex-shrink:0;">${iconSvg('card', 17)}</span>
+                <div style="min-width:0;flex:1;">
+                  <strong style="display:block;font:700 12.5px 'Manrope',sans-serif;color:${vencenMes.length ? '#f5d28b' : '#7ae5c4'};">💳 Pagar tarjeta</strong>
+                  <small style="display:block;font-size:10px;color:#cfd1e2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(subTxt)}</small>
+                </div>
+              </button>
+              <button type="button" data-open-sheet="calculadora_monedas" style="padding:12px 13px;border-radius:16px;border:1px solid rgba(156,145,255,0.32);background:linear-gradient(135deg,rgba(102,87,232,0.18),rgba(43,170,213,0.14));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;min-width:84px;">
+                <span style="font-size:16px;line-height:1.1;">💱</span>
+                <strong style="font:700 11px 'Manrope',sans-serif;color:#d9d2ff;margin-top:3px;">Divisas</strong>
+              </button>
+            </div>
           `;
         })()}
+        ${!(((d.cuentas && d.cuentas.items) || []).some(c => c.tipo === 'tarjeta' && !c.is_system)) ? `
+          <button type="button" data-open-sheet="calculadora_monedas" style="width:100%;margin-top:12px;padding:11px 14px;border-radius:16px;border:1px solid rgba(156,145,255,0.32);background:linear-gradient(135deg,rgba(102,87,232,0.18),rgba(43,170,213,0.14));display:flex;align-items:center;gap:12px;text-align:left;color:#fff;">
+            <span class="action-icon blue" style="width:36px;height:36px;flex-shrink:0;font-size:16px;">💱</span>
+            <div style="min-width:0;flex:1;">
+              <strong style="display:block;font:700 12.5px 'Manrope',sans-serif;color:#d9d2ff;">Calculadora de monedas</strong>
+              <small style="display:block;font-size:10px;color:#cfd1e2;">Convertí USD, ARS, BOB, EUR al instante</small>
+            </div>
+            ${iconSvg('chevron', 17)}
+          </button>
+        ` : ''}
 
         <section class="budget-card">
           <div class="section-top">
@@ -2906,6 +2986,22 @@
                 </div>
                 ${iconSvg('chevron', 18)}
               </button>
+              <button type="button" data-open-sheet="editar_presupuesto">
+                <span class="action-icon purple">${iconSvg('plus')}</span>
+                <div>
+                  <strong>Nuevo presupuesto</strong>
+                  <small>Creá un presupuesto abierto, fijo o de préstamo</small>
+                </div>
+                ${iconSvg('chevron', 18)}
+              </button>
+              <button type="button" data-open-sheet="calculadora_monedas">
+                <span class="action-icon blue" style="font-size:16px;">💱</span>
+                <div>
+                  <strong>Calculadora de monedas</strong>
+                  <small>Convertí entre USD, ARS, BOB, EUR y más</small>
+                </div>
+                ${iconSvg('chevron', 18)}
+              </button>
             </div>
           </div>
         `;
@@ -3161,21 +3257,223 @@
               </div>
               <div>
                 ${presupuestos.map(item => `
-                  <button type="button" class="budget-option ${p && p.id === item.id ? 'selected' : ''}" data-select-budget="${item.id}">
-                    <div>
-                      <strong>${escapeHtml(item.nombre)} ${item.es_activo ? '· ⭐ Activo' : ''}</strong>
-                      <small>${escapeHtml(item.tipo_display)} · ${item.porcentaje_gastado}% usado</small>
-                    </div>
-                    <div class="b-right">
-                      <b>${money(item.monto_restante)}</b>
-                      <small>de ${money(item.disponible)}</small>
-                    </div>
-                  </button>
+                  <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;margin-bottom:8px;">
+                    <button type="button" class="budget-option ${p && p.id === item.id ? 'selected' : ''}" data-select-budget="${item.id}" style="margin-bottom:0;">
+                      <div>
+                        <strong>${escapeHtml(item.nombre)} ${item.es_activo ? '· ⭐ Activo' : ''}</strong>
+                        <small>${escapeHtml(item.tipo_display)} · ${item.porcentaje_gastado}% usado</small>
+                      </div>
+                      <div class="b-right">
+                        <b>${money(item.monto_restante)}</b>
+                        <small>de ${money(item.disponible)}</small>
+                      </div>
+                    </button>
+                    ${item.puede_editar ? `
+                      <button type="button" class="fav-star-btn" data-edit-presupuesto="${item.id}" title="Editar presupuesto" style="height:44px;width:36px;border-radius:12px;background:#1e2130;border:1px solid #2e3246;color:#a99fff;font-size:14px;">
+                        ✎
+                      </button>
+                    ` : ''}
+                  </div>
                 `).join('')}
               </div>
-              <button type="button" class="outline-add" id="btnOpenClassicWeb" style="margin-top:8px;">
-                🌐 Abrir vista web completa / Nuevo presupuesto
+              <button type="button" class="submit purple" data-open-sheet="editar_presupuesto" style="margin-top:6px;">
+                + Nuevo presupuesto
               </button>
+              <button type="button" class="outline-add" id="btnOpenClassicWeb" style="margin-top:8px;">
+                🌐 Abrir vista web clásica
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'editar_presupuesto') {
+        const edP = state.editingPresupuesto;
+        const draft = state.formDraft || {};
+        return `
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">${edP ? 'EDITAR PRESUPUESTO' : 'NUEVO PRESUPUESTO'}</span>
+                  <h2>${edP ? escapeHtml(edP.nombre) : 'Crear presupuesto'}</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              <form id="formPresupuesto">
+                <label>
+                  Nombre del presupuesto
+                  <input name="nombre" required placeholder="Ej. Gastos Mensuales" value="${escapeHtml(draft.p_nombre || '')}" />
+                </label>
+                <label>
+                  Tipo de presupuesto
+                  <div class="chips-selector">
+                    ${[
+                      { k: 'abierto', l: '📅 Abierto (continuo)' },
+                      { k: 'fijo', l: '💰 Monto fijo' },
+                      { k: 'prestamo', l: '🏦 Préstamo' },
+                    ].map(t => `
+                      <button type="button" class="chip-btn ${state.presupuestoTipo === t.k ? 'selected' : ''}" data-presupuesto-tipo="${t.k}">${t.l}</button>
+                    `).join('')}
+                  </div>
+                </label>
+                <label>
+                  Moneda
+                  <div class="chips-selector">
+                    ${['ARS', 'USD', 'EUR', 'BOB'].map(m => `
+                      <button type="button" class="chip-btn ${state.presupuestoMoneda === m ? 'selected' : ''}" data-presupuesto-moneda="${m}">${m}</button>
+                    `).join('')}
+                  </div>
+                </label>
+                ${state.presupuestoTipo === 'fijo' ? `
+                  <label>
+                    Monto inicial
+                    <div class="amount-input">
+                      <span>$</span>
+                      <input name="monto_total" type="number" step="0.01" min="0" value="${escapeHtml(draft.p_monto_total || '')}" placeholder="0" inputmode="decimal" />
+                    </div>
+                  </label>
+                ` : ''}
+                <div class="form-row">
+                  <label>
+                    Fecha inicio
+                    <input type="date" name="fecha_inicio" value="${escapeHtml(draft.p_fecha_inicio || '')}" required />
+                  </label>
+                  <label>
+                    Fecha fin
+                    <input type="date" name="fecha_fin" value="${escapeHtml(draft.p_fecha_fin || '')}" required />
+                  </label>
+                </div>
+                <label>
+                  Descripción (opcional)
+                  <input name="descripcion" placeholder="Notas o detalle del presupuesto" value="${escapeHtml(draft.p_descripcion || '')}" />
+                </label>
+                <button type="submit" class="submit purple">${edP ? 'Guardar cambios' : 'Crear presupuesto'}</button>
+                ${edP && edP.es_propio ? `
+                  <button type="button" class="btn-delete-mov" id="btnDeletePresupuesto">
+                    ${state.confirmDeletePresupuesto ? '⚠️ Tocá de nuevo para confirmar eliminación' : '🗑️ Eliminar presupuesto'}
+                  </button>
+                ` : ''}
+              </form>
+            </div>
+          </div>
+        `;
+      }
+
+      if (state.sheet === 'calculadora_monedas') {
+        const calcs = state.calculadoras || [];
+        const curCalc = calcs.find(c => c.id === state.calcSelectedId) || calcs[0] || null;
+        const monedasList = state.calculadoraMonedas || [];
+        const montoNum = parseFloat(String(state.calcMonto || '0').replace(',', '.')) || 0;
+        const isInv = state.calcDirection === 'inversa';
+        let resConv = 0;
+        let origCode = curCalc ? (isInv ? curCalc.moneda_destino : curCalc.moneda_origen) : 'USD';
+        let destCode = curCalc ? (isInv ? curCalc.moneda_origen : curCalc.moneda_destino) : 'ARS';
+        let tasaDisplay = '';
+        if (curCalc && curCalc.relacion > 0) {
+          if (isInv) {
+            resConv = montoNum / curCalc.relacion;
+            tasaDisplay = `1 ${origCode} = ${(1 / curCalc.relacion).toFixed(6)} ${destCode}`;
+          } else {
+            resConv = montoNum * curCalc.relacion;
+            tasaDisplay = `1 ${origCode} = ${Number(curCalc.relacion).toLocaleString('es-AR', { maximumFractionDigits: 4 })} ${destCode}`;
+          }
+        }
+        const showForm = state.calcFormMode === 'new' || state.calcFormMode === 'edit' || (!state.calcLoading && !calcs.length);
+        const edCalc = state.calcFormMode === 'edit' ? curCalc : null;
+
+        return `
+          <div class="sheet-backdrop ${state.sheetNoAnim ? 'no-anim' : ''}" id="sheetBackdrop">
+            <div class="bottom-sheet form-sheet ${state.sheetNoAnim ? 'no-anim' : ''}">
+              <div class="handle"></div>
+              <div class="sheet-title">
+                <div>
+                  <span class="overline">CONVERSOR DE DIVISAS</span>
+                  <h2>💱 Calculadora de monedas</h2>
+                </div>
+                <button type="button" data-close-sheet>${iconSvg('close', 20)}</button>
+              </div>
+              ${state.calcLoading && !calcs.length ? `<div class="empty">Cargando cotizaciones...</div>` : `
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+                  <span class="overline" style="margin:0;">COTIZACIONES GUARDADAS</span>
+                  <div style="display:flex;gap:6px;">
+                    ${curCalc ? `<button type="button" class="btn-card-resumen" id="btnEditCalc" style="padding:4px 9px;">✎ Editar</button>` : ''}
+                    <button type="button" class="btn-card-resumen" id="btnNewCalc" style="padding:4px 9px;">+ Nueva</button>
+                  </div>
+                </div>
+                ${calcs.length ? `
+                  <div class="chips-selector" style="margin-bottom:10px;">
+                    ${calcs.map(c => `
+                      <button type="button" class="chip-btn ${curCalc && c.id === curCalc.id ? 'selected' : ''}" data-select-calc="${c.id}">
+                        ${escapeHtml(c.nombre)} (${escapeHtml(c.moneda_origen)}→${escapeHtml(c.moneda_destino)})
+                      </button>
+                    `).join('')}
+                  </div>
+                ` : ''}
+
+                ${showForm ? `
+                  <form id="formCalculadora" style="padding:12px;border-radius:14px;background:#171926;border:1px solid #2b2f42;margin-bottom:10px;">
+                    <span class="overline" style="color:#a99fff;">${edCalc ? 'EDITAR COTIZACIÓN' : 'NUEVA COTIZACIÓN'}</span>
+                    <label>
+                      Nombre
+                      <input name="nombre" required placeholder="Ej. Dólar Blue" value="${escapeHtml(edCalc ? edCalc.nombre : '')}" />
+                    </label>
+                    <div class="form-row">
+                      <label>
+                        Moneda origen
+                        <select name="moneda_origen">
+                          ${monedasList.map(m => `<option value="${m.code}" ${(edCalc ? edCalc.moneda_origen : 'USD') === m.code ? 'selected' : ''}>${m.code} - ${escapeHtml(m.name)}</option>`).join('')}
+                        </select>
+                      </label>
+                      <label>
+                        Moneda destino
+                        <select name="moneda_destino">
+                          ${monedasList.map(m => `<option value="${m.code}" ${(edCalc ? edCalc.moneda_destino : 'ARS') === m.code ? 'selected' : ''}>${m.code} - ${escapeHtml(m.name)}</option>`).join('')}
+                        </select>
+                      </label>
+                    </div>
+                    <label>
+                      Cotización (1 moneda origen = X moneda destino)
+                      <input name="relacion" type="number" step="any" min="0.000001" required placeholder="Ej. 1150" value="${edCalc ? edCalc.relacion : ''}" inputmode="decimal" />
+                    </label>
+                    <div style="display:flex;gap:8px;">
+                      ${calcs.length ? `<button type="button" class="outline-add" id="btnCancelCalcForm" style="margin:0;flex:1;">Cancelar</button>` : ''}
+                      <button type="submit" class="submit purple" style="flex:1.4;margin:0;">${edCalc ? 'Guardar cambios' : 'Crear cotización'}</button>
+                    </div>
+                    ${edCalc ? `
+                      <button type="button" class="btn-delete-mov" id="btnDeleteCalc" style="margin-top:8px;">
+                        🗑️ Eliminar cotización
+                      </button>
+                    ` : ''}
+                  </form>
+                ` : ''}
+
+                ${curCalc ? `
+                  <div style="padding:14px;border-radius:18px;background:linear-gradient(145deg,#21233a 0%,#171926 100%);border:1px solid rgba(156,145,255,0.32);display:flex;flex-direction:column;gap:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                      <span style="font-size:11px;color:#b6acff;font-weight:700;">${escapeHtml(origCode)} ➔ ${escapeHtml(destCode)}</span>
+                      <button type="button" id="btnSwapCalcDir" class="btn-card-resumen" style="padding:5px 10px;">
+                        ⇅ Invertir (${escapeHtml(destCode)} ➔ ${escapeHtml(origCode)})
+                      </button>
+                    </div>
+                    <label style="margin:0;">
+                      Monto en ${escapeHtml(origCode)}
+                      <div class="amount-input">
+                        <span style="font-size:13px;width:auto;padding:0 10px;">${escapeHtml(origCode)}</span>
+                        <input id="inpCalcMonto" type="number" step="any" min="0" value="${escapeHtml(state.calcMonto)}" placeholder="0" inputmode="decimal" />
+                      </div>
+                    </label>
+                    <div style="padding:12px;border-radius:13px;background:rgba(85,210,173,0.1);border:1px solid rgba(85,210,173,0.3);">
+                      <span style="font-size:10px;color:#8ee8ce;display:block;">Equivalente en ${escapeHtml(destCode)}</span>
+                      <strong id="txtCalcResultado" style="font:800 24px 'Manrope',sans-serif;color:#55d2ad;display:block;margin-top:2px;">
+                        ${escapeHtml(destCode)} ${resConv.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </strong>
+                      <small style="color:#b8b9c9;font-size:10px;">${escapeHtml(tasaDisplay)}</small>
+                    </div>
+                  </div>
+                ` : ''}
+              `}
             </div>
           </div>
         `;
@@ -4908,6 +5206,15 @@
       }
 
       // Submit Nueva Cuenta o Edición de Tarjeta
+      const formPresupuesto = document.getElementById('formPresupuesto');
+      if (formPresupuesto) {
+        const fd = new FormData(formPresupuesto);
+        if (fd.get('nombre') !== null) state.formDraft.p_nombre = fd.get('nombre');
+        if (fd.get('monto_total') !== null) state.formDraft.p_monto_total = fd.get('monto_total');
+        if (fd.get('fecha_inicio') !== null) state.formDraft.p_fecha_inicio = fd.get('fecha_inicio');
+        if (fd.get('fecha_fin') !== null) state.formDraft.p_fecha_fin = fd.get('fecha_fin');
+        if (fd.get('descripcion') !== null) state.formDraft.p_descripcion = fd.get('descripcion');
+      }
       const formCuenta = document.getElementById('formCuenta');
       if (formCuenta) {
         formCuenta.onsubmit = async (e) => {
@@ -4938,6 +5245,198 @@
             await loadBudgetDetail(state.selectedBudgetId, state.selectedCicloId);
           } else {
             showToast((res.data && res.data.error) || 'Error al guardar cuenta');
+          }
+        };
+      }
+
+      // Eventos Presupuesto (Crear / Editar / Eliminar)
+      document.querySelectorAll('[data-edit-presupuesto]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const pid = Number(btn.getAttribute('data-edit-presupuesto'));
+          const pList = (state.data && state.data.presupuestos) || [];
+          const found = pList.find(x => Number(x.id) === pid);
+          if (found) openSheet('editar_presupuesto', { presupuesto: found });
+        };
+      });
+
+      document.querySelectorAll('[data-presupuesto-tipo]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.presupuestoTipo = btn.getAttribute('data-presupuesto-tipo') || 'abierto';
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      document.querySelectorAll('[data-presupuesto-moneda]').forEach(btn => {
+        btn.onclick = () => {
+          syncFormDraftFromDom();
+          state.presupuestoMoneda = btn.getAttribute('data-presupuesto-moneda') || 'ARS';
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      const formPresupuesto = document.getElementById('formPresupuesto');
+      if (formPresupuesto) {
+        formPresupuesto.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formPresupuesto);
+          const edP = state.editingPresupuesto;
+          const res = await apiFetch('/api/presupuestos/guardar/', {
+            method: 'POST',
+            body: {
+              id: edP ? edP.id : null,
+              nombre: fd.get('nombre'),
+              tipo: state.presupuestoTipo,
+              moneda: state.presupuestoMoneda,
+              monto_total: fd.get('monto_total') || 0,
+              fecha_inicio: fd.get('fecha_inicio'),
+              fecha_fin: fd.get('fecha_fin'),
+              descripcion: fd.get('descripcion') || '',
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            const newId = res.data.presupuesto && res.data.presupuesto.id;
+            state.sheet = null;
+            state.editingPresupuesto = null;
+            showToast(res.data.mensaje || '✓ Presupuesto guardado');
+            await loadBudgetDetail(newId || state.selectedBudgetId, 0);
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar presupuesto');
+          }
+        };
+      }
+
+      const btnDeletePresupuesto = document.getElementById('btnDeletePresupuesto');
+      if (btnDeletePresupuesto && state.editingPresupuesto) {
+        btnDeletePresupuesto.onclick = async () => {
+          if (!state.confirmDeletePresupuesto) {
+            state.confirmDeletePresupuesto = true;
+            state.sheetNoAnim = true;
+            render();
+            return;
+          }
+          const pid = state.editingPresupuesto.id;
+          const res = await apiFetch(`/api/presupuestos/${pid}/eliminar/`, { method: 'POST', body: {} });
+          if (res.ok && res.data && res.data.success) {
+            state.sheet = null;
+            state.editingPresupuesto = null;
+            state.confirmDeletePresupuesto = false;
+            showToast(res.data.mensaje || '🗑️ Presupuesto eliminado');
+            const nextId = state.selectedBudgetId === pid ? 0 : state.selectedBudgetId;
+            await loadBudgetDetail(nextId, 0);
+          } else {
+            showToast((res.data && res.data.error) || 'No se pudo eliminar');
+          }
+        };
+      }
+
+      // Eventos Calculadora de Monedas
+      document.querySelectorAll('[data-select-calc]').forEach(btn => {
+        btn.onclick = () => {
+          state.calcSelectedId = Number(btn.getAttribute('data-select-calc')) || 0;
+          state.calcDirection = 'directa';
+          state.calcFormMode = null;
+          state.sheetNoAnim = true;
+          render();
+        };
+      });
+
+      const btnNewCalc = document.getElementById('btnNewCalc');
+      if (btnNewCalc) {
+        btnNewCalc.onclick = () => {
+          state.calcFormMode = 'new';
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
+
+      const btnEditCalc = document.getElementById('btnEditCalc');
+      if (btnEditCalc) {
+        btnEditCalc.onclick = () => {
+          state.calcFormMode = 'edit';
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
+
+      const btnCancelCalcForm = document.getElementById('btnCancelCalcForm');
+      if (btnCancelCalcForm) {
+        btnCancelCalcForm.onclick = () => {
+          state.calcFormMode = null;
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
+
+      const btnSwapCalcDir = document.getElementById('btnSwapCalcDir');
+      if (btnSwapCalcDir) {
+        btnSwapCalcDir.onclick = () => {
+          state.calcDirection = state.calcDirection === 'inversa' ? 'directa' : 'inversa';
+          state.sheetNoAnim = true;
+          render();
+        };
+      }
+
+      const inpCalcMonto = document.getElementById('inpCalcMonto');
+      const txtCalcResultado = document.getElementById('txtCalcResultado');
+      if (inpCalcMonto && txtCalcResultado) {
+        inpCalcMonto.oninput = (e) => {
+          state.calcMonto = e.target.value;
+          const calcs = state.calculadoras || [];
+          const curCalc = calcs.find(c => c.id === state.calcSelectedId) || calcs[0] || null;
+          if (!curCalc || !curCalc.relacion) return;
+          const val = parseFloat(String(e.target.value || '0').replace(',', '.')) || 0;
+          const isInv = state.calcDirection === 'inversa';
+          const resVal = isInv ? (val / curCalc.relacion) : (val * curCalc.relacion);
+          const destCode = isInv ? curCalc.moneda_origen : curCalc.moneda_destino;
+          txtCalcResultado.textContent = `${destCode} ${resVal.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        };
+      }
+
+      const formCalculadora = document.getElementById('formCalculadora');
+      if (formCalculadora) {
+        formCalculadora.onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(formCalculadora);
+          const isEdit = state.calcFormMode === 'edit';
+          const res = await apiFetch('/api/calculadoras/guardar/', {
+            method: 'POST',
+            body: {
+              id: isEdit ? state.calcSelectedId : null,
+              nombre: fd.get('nombre'),
+              moneda_origen: fd.get('moneda_origen'),
+              moneda_destino: fd.get('moneda_destino'),
+              relacion: fd.get('relacion'),
+            }
+          });
+          if (res.ok && res.data && res.data.success) {
+            state.calcFormMode = null;
+            if (res.data.calculadora && res.data.calculadora.id) {
+              state.calcSelectedId = res.data.calculadora.id;
+            }
+            showToast(res.data.mensaje || '✓ Cotización guardada');
+            await loadCalculadoras();
+          } else {
+            showToast((res.data && res.data.error) || 'Error al guardar cotización');
+          }
+        };
+      }
+
+      const btnDeleteCalc = document.getElementById('btnDeleteCalc');
+      if (btnDeleteCalc) {
+        btnDeleteCalc.onclick = async () => {
+          if (!state.calcSelectedId) return;
+          const res = await apiFetch(`/api/calculadoras/${state.calcSelectedId}/eliminar/`, { method: 'POST', body: {} });
+          if (res.ok && res.data && res.data.success) {
+            state.calcFormMode = null;
+            state.calcSelectedId = 0;
+            showToast(res.data.mensaje || '🗑️ Cotización eliminada');
+            await loadCalculadoras();
+          } else {
+            showToast((res.data && res.data.error) || 'Error al eliminar');
           }
         };
       }
