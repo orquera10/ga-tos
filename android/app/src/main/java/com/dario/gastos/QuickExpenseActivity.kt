@@ -100,15 +100,15 @@ class QuickExpenseActivity : AppCompatActivity() {
     private fun setMetodo(metodo: String) {
         selectedMetodo = metodo
         val activeColor = Color.parseColor("#FFFFFF")
-        val mutedColor = Color.parseColor("#C2C4D4")
+        val mutedColor = Color.parseColor("#A8AAB8")
 
-        chipEfectivo.setBackgroundResource(if (metodo == "efectivo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipEfectivo.setBackgroundResource(if (metodo == "efectivo") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipEfectivo.setTextColor(if (metodo == "efectivo") activeColor else mutedColor)
 
-        chipTransferencia.setBackgroundResource(if (metodo == "transferencia") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTransferencia.setBackgroundResource(if (metodo == "transferencia") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipTransferencia.setTextColor(if (metodo == "transferencia") activeColor else mutedColor)
 
-        chipTarjeta.setBackgroundResource(if (metodo == "tarjeta") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTarjeta.setBackgroundResource(if (metodo == "tarjeta") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipTarjeta.setTextColor(if (metodo == "tarjeta") activeColor else mutedColor)
     }
 

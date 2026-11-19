@@ -120,12 +120,14 @@
                 android:layout_width="0dp"
                 android:layout_height="34dp"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center"
                 android:text="🏦 Transf."
                 android:textSize="11.5sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:background="@drawable/widget_pill_purple"
+                android:background="@drawable/chip_method_selected"
                 android:singleLine="true"
                 android:layout_marginEnd="5dp" />
 
@@ -134,12 +136,14 @@
                 android:layout_width="0dp"
                 android:layout_height="34dp"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center"
                 android:text="💵 Efectivo"
                 android:textSize="11.5sp"
                 android:textStyle="bold"
-                android:textColor="#C2C4D4"
-                android:background="@drawable/chip_tag_bg"
+                android:textColor="#A8AAB8"
+                android:background="@drawable/chip_method_unselected"
                 android:singleLine="true"
                 android:layout_marginEnd="5dp" />
 
@@ -148,12 +152,14 @@
                 android:layout_width="0dp"
                 android:layout_height="34dp"
                 android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center"
                 android:text="💼 Sueldo"
                 android:textSize="11.5sp"
                 android:textStyle="bold"
-                android:textColor="#C2C4D4"
-                android:background="@drawable/chip_tag_bg"
+                android:textColor="#A8AAB8"
+                android:background="@drawable/chip_method_unselected"
                 android:singleLine="true" />
 
         </LinearLayout>

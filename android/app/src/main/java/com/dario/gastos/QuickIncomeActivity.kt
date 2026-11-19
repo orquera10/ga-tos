@@ -100,15 +100,15 @@ class QuickIncomeActivity : AppCompatActivity() {
     private fun setTipoIngreso(tipo: String) {
         selectedTipoIngreso = tipo
         val activeColor = Color.parseColor("#FFFFFF")
-        val mutedColor = Color.parseColor("#C2C4D4")
+        val mutedColor = Color.parseColor("#A8AAB8")
 
-        chipTransf.setBackgroundResource(if (tipo == "transferencia") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipTransf.setBackgroundResource(if (tipo == "transferencia") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipTransf.setTextColor(if (tipo == "transferencia") activeColor else mutedColor)
 
-        chipEfectivo.setBackgroundResource(if (tipo == "efectivo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipEfectivo.setBackgroundResource(if (tipo == "efectivo") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipEfectivo.setTextColor(if (tipo == "efectivo") activeColor else mutedColor)
 
-        chipSueldo.setBackgroundResource(if (tipo == "sueldo") R.drawable.widget_pill_purple else R.drawable.chip_tag_bg)
+        chipSueldo.setBackgroundResource(if (tipo == "sueldo") R.drawable.chip_method_selected else R.drawable.chip_method_unselected)
         chipSueldo.setTextColor(if (tipo == "sueldo") activeColor else mutedColor)
     }
 

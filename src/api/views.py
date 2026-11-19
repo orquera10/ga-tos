@@ -2011,10 +2011,11 @@ def crear_gasto_api(request):
     if metodo_pago not in ['efectivo', 'transferencia', 'tarjeta']:
         metodo_pago = 'efectivo'
 
-    # Detectar automáticamente efectivo / transferencia en el concepto (especialmente desde el Widget)
+    # Detectar automáticamente efectivo / transferencia en el concepto (cuando no se eligió explícitamente en el selector)
     cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    metodo_explicit = bool(data.get('metodo_pago_explicit'))
     metodo_det, cuenta_det = detectar_metodo_y_cuenta_desde_concepto(f"{nombre} {descripcion}", request.api_user)
-    if metodo_det and (es_rapido or not data.get('metodo_pago')):
+    if metodo_det and not metodo_explicit and (es_rapido or not data.get('metodo_pago')):
         metodo_pago = metodo_det
 
     persona_raw = (data.get('persona') or '').strip()
@@ -2212,8 +2213,9 @@ def crear_ingreso_api(request):
         tipo_ingreso = 'transferencia'
 
     cuenta_raw = (data.get('cuenta_bancaria') or '').strip()
+    tipo_explicit = bool(data.get('tipo_ingreso_explicit'))
     metodo_det, cuenta_det = detectar_metodo_y_cuenta_desde_concepto(f"{nombre} {data.get('descripcion') or ''}", request.api_user)
-    if metodo_det in ['efectivo', 'transferencia'] and (es_rapido or not data.get('tipo_ingreso')):
+    if metodo_det in ['efectivo', 'transferencia'] and not tipo_explicit and (es_rapido or not data.get('tipo_ingreso')):
         tipo_ingreso = metodo_det
 
     cuenta_bancaria = None
