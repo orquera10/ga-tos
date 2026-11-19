@@ -83,6 +83,14 @@ class MainActivity : AppCompatActivity() {
     private fun loadRedesignedApp() {
         isInClassicWeb = false
         val baseUrl = Prefs.getBaseUrl(this).trimEnd('/')
+        // Cargar directamente desde https://gastos.dario10.pw/app/ para habilitar
+        // el autocompletado de Google Password Manager / Gboard y recibir mejoras UI al instante.
+        webView.loadUrl("$baseUrl/app/")
+    }
+
+    private fun loadOfflineFallbackApp() {
+        isInClassicWeb = false
+        val baseUrl = Prefs.getBaseUrl(this).trimEnd('/')
         try {
             val html = assets.open("app.html").bufferedReader(Charsets.UTF_8).use { it.readText() }
             webView.loadDataWithBaseURL(
@@ -92,9 +100,7 @@ class MainActivity : AppCompatActivity() {
                 "UTF-8",
                 "$baseUrl/app/"
             )
-        } catch (e: Exception) {
-            webView.loadUrl("$baseUrl/app/")
-        }
+        } catch (_: Exception) {}
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -121,10 +127,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Configure WebView
+        webView.importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_YES
         val settings: WebSettings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
+        settings.saveFormData = true
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT

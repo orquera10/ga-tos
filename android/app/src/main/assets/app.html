@@ -2190,14 +2190,14 @@
             <p style="margin:0 0 18px;color:var(--muted);font-size:12px;">Ingresá con tu usuario de Ga$tos para sincronizar tus presupuestos, cuentas y el widget.</p>
             ${state.loginError ? `<div style="padding:10px 12px;margin-bottom:14px;border-radius:10px;background:#382326;color:#ff8780;font-size:11px;">${escapeHtml(state.loginError)}</div>` : ''}
             <div class="form-sheet">
-              <form id="loginForm">
-                <label>
+              <form id="loginForm" action="/api/auth/login/" method="post" autocomplete="on">
+                <label for="loginUsername">
                   Usuario o Email
-                  <input name="username" required placeholder="Ej. dario" autocomplete="username" />
+                  <input id="loginUsername" name="username" type="text" required placeholder="Ej. dario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" />
                 </label>
-                <label>
+                <label for="loginPassword">
                   Contraseña
-                  <input name="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
+                  <input id="loginPassword" name="password" type="password" required placeholder="••••••••" autocomplete="current-password" />
                 </label>
                 <button type="submit" class="submit purple">Entrar a mi cuenta</button>
               </form>
@@ -5206,15 +5206,6 @@
       }
 
       // Submit Nueva Cuenta o Edición de Tarjeta
-      const formPresupuesto = document.getElementById('formPresupuesto');
-      if (formPresupuesto) {
-        const fd = new FormData(formPresupuesto);
-        if (fd.get('nombre') !== null) state.formDraft.p_nombre = fd.get('nombre');
-        if (fd.get('monto_total') !== null) state.formDraft.p_monto_total = fd.get('monto_total');
-        if (fd.get('fecha_inicio') !== null) state.formDraft.p_fecha_inicio = fd.get('fecha_inicio');
-        if (fd.get('fecha_fin') !== null) state.formDraft.p_fecha_fin = fd.get('fecha_fin');
-        if (fd.get('descripcion') !== null) state.formDraft.p_descripcion = fd.get('descripcion');
-      }
       const formCuenta = document.getElementById('formCuenta');
       if (formCuenta) {
         formCuenta.onsubmit = async (e) => {
