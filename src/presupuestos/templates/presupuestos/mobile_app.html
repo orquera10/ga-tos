@@ -1226,6 +1226,11 @@
       font-size: 11px;
       font-weight: 700;
     }
+    html.sheet-open,
+    body.sheet-open {
+      overflow: hidden !important;
+      overscroll-behavior: none !important;
+    }
     .sheet-backdrop {
       position: fixed;
       z-index: 50;
@@ -1235,12 +1240,17 @@
       justify-content: center;
       background: rgba(2, 3, 7, 0.72);
       backdrop-filter: blur(3px);
+      overscroll-behavior: contain;
+      touch-action: none;
       animation: fade 0.2s ease;
     }
     .bottom-sheet {
       width: min(100%, 480px);
       max-height: 90vh;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       padding: 9px 20px max(25px, env(safe-area-inset-bottom));
       border-radius: 26px 26px 0 0;
       background: #141720;
@@ -4327,6 +4337,10 @@
       const root = document.getElementById('appRoot');
       if (!root) return;
 
+      const hasSheet = Boolean(state.sheet) && !state.needsLogin;
+      document.documentElement.classList.toggle('sheet-open', hasSheet);
+      document.body.classList.toggle('sheet-open', hasSheet);
+
       if (state.needsLogin) {
         root.innerHTML = renderLogin();
         bindEvents();
@@ -4522,6 +4536,9 @@
             render();
           }
         };
+        backdrop.addEventListener('touchmove', (e) => {
+          if (e.target === backdrop) e.preventDefault();
+        }, { passive: false });
       }
 
       document.querySelectorAll('[data-select-budget]').forEach(btn => {
