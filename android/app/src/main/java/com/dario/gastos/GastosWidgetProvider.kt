@@ -8,9 +8,11 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.widget.RemoteViews
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 class GastosWidgetProvider : AppWidgetProvider() {
@@ -19,22 +21,40 @@ class GastosWidgetProvider : AppWidgetProvider() {
         for (widgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, widgetId)
         }
-        refreshDataFromApi(context)
+        val pendingResult = goAsync()
+        refreshDataFromApi(context, showToast = false, pendingResult = pendingResult)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_REFRESH_WIDGET || intent.action == AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
-            refreshDataFromApi(context)
+        if (intent.action == ACTION_REFRESH_WIDGET) {
+            val isManual = intent.getBooleanExtra(EXTRA_MANUAL_REFRESH, false)
+            updateAllWidgets(context)
+            val pendingResult = goAsync()
+            refreshDataFromApi(context, showToast = isManual, pendingResult = pendingResult)
         }
     }
 
     companion object {
         const val ACTION_REFRESH_WIDGET = "com.dario.gastos.ACTION_REFRESH_WIDGET"
+        const val EXTRA_MANUAL_REFRESH = "manual_refresh"
+
+        fun updateAllWidgets(context: Context) {
+            val appWidgetManager = AppWidgetManager.getInstance(context)
+            val thisWidget = ComponentName(context, GastosWidgetProvider::class.java)
+            val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
+            for (id in allWidgetIds) {
+                updateAppWidget(context, appWidgetManager, id)
+            }
+        }
 
         fun notifyUpdate(context: Context) {
+            // Redibujar de inmediato con los últimos datos guardados en Prefs
+            updateAllWidgets(context)
+            // Y disparar actualización fresca desde la API
             val intent = Intent(context, GastosWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH_WIDGET
+                putExtra(EXTRA_MANUAL_REFRESH, false)
             }
             context.sendBroadcast(intent)
         }
@@ -60,7 +80,7 @@ class GastosWidgetProvider : AppWidgetProvider() {
                 views.setTextColor(R.id.widgetTxtRestante, remainingColor)
             }
 
-            // Click en el botón "Ver ↗" o cuerpo del widget -> Abrir MainActivity en el presupuesto seleccionado
+            // Click en el botón "Ver" o cuerpo/saldo del widget -> Abrir MainActivity en el presupuesto seleccionado
             val currentBudgetId = Prefs.getLastBudgetId(context)
             val mainIntent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -98,9 +118,10 @@ class GastosWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widgetBtnAddIncome, incomePending)
 
-            // Click Actualizar -> Refrescar datos desde la API
+            // Click Actualizar -> Refrescar datos desde la API (con confirmación visual)
             val refreshIntent = Intent(context, GastosWidgetProvider::class.java).apply {
                 action = ACTION_REFRESH_WIDGET
+                putExtra(EXTRA_MANUAL_REFRESH, true)
             }
             val refreshPending = PendingIntent.getBroadcast(
                 context, 3, refreshIntent,
@@ -111,42 +132,53 @@ class GastosWidgetProvider : AppWidgetProvider() {
             appWidgetManager.updateAppWidget(appWidgetId, views)
         }
 
-        private fun refreshDataFromApi(context: Context) {
-            val token = Prefs.getToken(context)
+        private fun refreshDataFromApi(
+            context: Context,
+            showToast: Boolean = false,
+            pendingResult: PendingResult? = null
+        ) {
+            val appCtx = context.applicationContext
+            val token = Prefs.getToken(appCtx)
             if (token.isNullOrEmpty()) {
-                val appWidgetManager = AppWidgetManager.getInstance(context)
-                val thisWidget = ComponentName(context, GastosWidgetProvider::class.java)
-                val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
-                for (id in allWidgetIds) {
-                    updateAppWidget(context, appWidgetManager, id)
-                }
+                updateAllWidgets(appCtx)
+                pendingResult?.finish()
                 return
             }
 
             CoroutineScope(Dispatchers.IO).launch {
-                val selectedId = Prefs.getSelectedBudgetId(context)
-                val budgetIdParam = if (selectedId > 0) selectedId else null
-                val summary = ApiClient.getWidgetSummary(context, budgetIdParam)
+                try {
+                    val selectedId = Prefs.getLastBudgetId(appCtx)
+                    val budgetIdParam = if (selectedId > 0) selectedId else null
+                    val summary = ApiClient.getWidgetSummary(appCtx, budgetIdParam)
 
-                if (summary?.budget != null) {
-                    val b = summary.budget
-                    Prefs.saveWidgetData(
-                        context,
-                        id = b.id,
-                        name = b.nombre,
-                        remaining = b.montoRestante,
-                        available = b.disponible,
-                        percent = b.porcentajeGastado
-                    )
-                }
-
-                launch(Dispatchers.Main) {
-                    val appWidgetManager = AppWidgetManager.getInstance(context)
-                    val thisWidget = ComponentName(context, GastosWidgetProvider::class.java)
-                    val allWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
-                    for (id in allWidgetIds) {
-                        updateAppWidget(context, appWidgetManager, id)
+                    val updated = summary?.budget != null
+                    if (summary?.budget != null) {
+                        val b = summary.budget
+                        Prefs.saveWidgetData(
+                            appCtx,
+                            id = b.id,
+                            name = b.nombre,
+                            remaining = b.montoRestante,
+                            available = b.disponible,
+                            percent = b.porcentajeGastado
+                        )
                     }
+
+                    withContext(Dispatchers.Main) {
+                        updateAllWidgets(appCtx)
+                        if (showToast) {
+                            val msg = if (updated) "✓ Saldo actualizado" else "No se pudo actualizar el saldo"
+                            Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } catch (_: Exception) {
+                    if (showToast) {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(appCtx, "Error de conexión al actualizar", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } finally {
+                    pendingResult?.finish()
                 }
             }
         }

@@ -2305,6 +2305,7 @@ def widget_resumen_api(request):
             'mensaje': 'No tienes presupuestos registrados'
         })
 
+    presupuesto.actualizar_monto_restante()
     ultimos_gastos = presupuesto.gastos.select_related('categoria').order_by('-fecha')[:5]
 
     return JsonResponse({
